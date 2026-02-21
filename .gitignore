@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Generated output
+_artifacts/
+_publish/
+
+# Generated reports
+_scratch/browser-validation-report-*.json
+_scratch/build-output-delta.json
+_scratch/kpi-gate-result.json
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Step Wizard - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .progress-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .progress-step {
+            flex: 1;
+            padding: 15px 10px;
+            text-align: center;
+            background: #e9ecef;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .progress-step.active {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        /* Step-specific colors when active - v1.0.0 enhancement */
+        .progress-step:nth-child(1).active {
+            background: #667eea;  /* Royal Blue/Purple - Personal Info */
+        }
+
+        .progress-step:nth-child(2).active {
+            background: #28a745;  /* Green - Address/Shipping */
+        }
+
+        .progress-step:nth-child(3).active {
+            background: #ffc107;  /* Amber/Gold - Payment */
+        }
+
+        .progress-step:nth-child(4).active {
+            background: #2196F3;  /* Blue - Review */
+        }
+
+        .step-content {
+            margin-bottom: 30px;
+        }
+
+        .step-content h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .navigation {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        .review-section {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .review-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .review-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .review-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧙 Multi-Step Wizard</h1>
+        <p class="subtitle">4-step checkout process with validation</p>
+
+        <div id="example">
+            <!-- Progress Bar -->
+            <div class="progress-bar">
+                <div class="progress-step" data-class="step1Classes">
+                    1. Personal
+                </div>
+                <div class="progress-step" data-class="step2Classes">
+                    2. Address
+                </div>
+                <div class="progress-step" data-class="step3Classes">
+                    3. Payment
+                </div>
+                <div class="progress-step" data-class="step4Classes">
+                    4. Review
+                </div>
+            </div>
+
+            <!-- Step 1: Personal Info -->
+            <div data-visible="isWizardStep1" class="step-content">
+                <h2>Personal Information</h2>
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" placeholder="First Name" data-value="wizardFirstName">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" placeholder="Last Name" data-value="wizardLastName">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" placeholder="you@example.com" data-value="wizardEmail">
+                </div>
+            </div>
+
+            <!-- Step 2: Address -->
+            <div data-visible="isWizardStep2" class="step-content">
+                <h2>Shipping Address</h2>
+                <div class="form-group">
+                    <label>Street Address</label>
+                    <input type="text" placeholder="123 Main St" data-value="wizardStreet">
+                </div>
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" placeholder="City" data-value="wizardCity">
+                </div>
+                <div class="form-group">
+                    <label>ZIP Code (5 digits)</label>
+                    <input type="text" placeholder="12345" maxlength="5" data-value="wizardZip">
+                </div>
+            </div>
+
+            <!-- Step 3: Payment -->
+            <div data-visible="isWizardStep3" class="step-content">
+                <h2>Payment Information</h2>
+                <div class="form-group">
+                    <label>Card Number (16 digits)</label>
+                    <input type="text" placeholder="1234567890123456" maxlength="16" data-value="wizardCardNumber">
+                </div>
+                <div class="form-group">
+                    <label>Expiry Date</label>
+                    <input type="text" placeholder="MM/YY" data-value="wizardCardExpiry">
+                </div>
+                <div class="form-group">
+                    <label>CVV (3 digits)</label>
+                    <input type="text" placeholder="123" maxlength="3" data-value="wizardCardCVV">
+                </div>
+            </div>
+
+            <!-- Step 4: Review -->
+            <div data-visible="isWizardStep4" class="step-content">
+                <h2>Review Your Order</h2>
+                <div class="review-section">
+                    <h3>Personal Information</h3>
+                    <div class="review-item">
+                        <strong>Name:</strong> <span data-text="wizardFirstName"></span> <span data-text="wizardLastName"></span>
+                    </div>
+                    <div class="review-item">
+                        <strong>Email:</strong> <span data-text="wizardEmail"></span>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">Shipping Address</h3>
+                    <div class="review-item">
+                        <strong>Address:</strong> <span data-text="wizardStreet"></span>
+                    </div>
+                    <div class="review-item">
+                        <strong>City, ZIP:</strong> <span data-text="wizardCity"></span>, <span data-text="wizardZip"></span>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">Payment</h3>
+                    <div class="review-item">
+                        <strong>Card:</strong> **** **** **** <span data-text="wizardCardNumber"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="navigation">
+                <button data-visible="isWizardStep2" data-click="wizardPrevStep" class="secondary">Previous</button>
+                <button data-visible="isWizardStep3" data-click="wizardPrevStep" class="secondary">Previous</button>
+                <button data-visible="isWizardStep4" data-click="wizardPrevStep" class="secondary">Previous</button>
+
+                <button data-visible="isWizardStep1" data-enabled="canProceedFromStep1" data-click="wizardNextStep">Next</button>
+                <button data-visible="isWizardStep2" data-enabled="canProceedFromStep2" data-click="wizardNextStep">Next</button>
+                <button data-visible="isWizardStep3" data-enabled="canProceedFromStep3" data-click="wizardNextStep">Next</button>
+                <button data-visible="isWizardStep4" data-click="completeWizard" class="success">Complete Order</button>
+            </div>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>visible:</strong> Step-by-step navigation with conditional visibility<br>
+                    <strong>Stitch.computed():</strong> Step validation and progress tracking<br>
+                    <strong>enabled:</strong> Next button only enabled when current step is valid
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Wizard state
+            wizardCurrentStep: 1,  // 1, 2, 3, or 4
+            wizardMaxStep: 1,  // Highest step user has reached
+
+            // Step 1: Personal Info
+            wizardFirstName: '',
+            wizardLastName: '',
+            wizardEmail: '',
+
+            // Step 2: Address
+            wizardStreet: '',
+            wizardCity: '',
+            wizardZip: '',
+
+            // Step 3: Payment
+            wizardCardNumber: '',
+            wizardCardExpiry: '',
+            wizardCardCVV: '',
+
+            // v1.0.0: Computed - Step visibility
+            isWizardStep1: Stitch.computed(function() {
+                return this.wizardCurrentStep === 1;
+            }),
+
+            isWizardStep2: Stitch.computed(function() {
+                return this.wizardCurrentStep === 2;
+            }),
+
+            isWizardStep3: Stitch.computed(function() {
+                return this.wizardCurrentStep === 3;
+            }),
+
+            isWizardStep4: Stitch.computed(function() {
+                return this.wizardCurrentStep === 4;
+            }),
+
+            // v1.0.0: Computed - Class objects for progress steps (object mode class binding)
+            step1Classes: Stitch.computed(function() {
+                return { 'active': this.isWizardStep1 };
+            }),
+
+            step2Classes: Stitch.computed(function() {
+                return { 'active': this.isWizardStep2 };
+            }),
+
+            step3Classes: Stitch.computed(function() {
+                return { 'active': this.isWizardStep3 };
+            }),
+
+            step4Classes: Stitch.computed(function() {
+                return { 'active': this.isWizardStep4 };
+            }),
+
+            // v1.0.0: Computed - Step validation
+            isStep1Valid: Stitch.computed(function() {
+                return this.wizardFirstName.length > 0 &&
+                       this.wizardLastName.length > 0 &&
+                       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.wizardEmail);
+            }),
+
+            isStep2Valid: Stitch.computed(function() {
+                return this.wizardStreet.length > 0 &&
+                       this.wizardCity.length > 0 &&
+                       this.wizardZip.length === 5;
+            }),
+
+            isStep3Valid: Stitch.computed(function() {
+                return this.wizardCardNumber.length === 16 &&
+                       this.wizardCardExpiry.length > 0 &&
+                       this.wizardCardCVV.length === 3;
+            }),
+
+            // v1.0.0: Computed - Can proceed to next step
+            canProceedFromStep1: Stitch.computed(function() {
+                return this.isStep1Valid;
+            }),
+
+            canProceedFromStep2: Stitch.computed(function() {
+                return this.isStep2Valid;
+            }),
+
+            canProceedFromStep3: Stitch.computed(function() {
+                return this.isStep3Valid;
+            }),
+
+            // Navigation
+            wizardNextStep() {
+                const currentStepValid =
+                    (this.wizardCurrentStep === 1 && this.isStep1Valid) ||
+                    (this.wizardCurrentStep === 2 && this.isStep2Valid) ||
+                    (this.wizardCurrentStep === 3 && this.isStep3Valid);
+
+                if (currentStepValid && this.wizardCurrentStep < 4) {
+                    this.wizardCurrentStep++;
+                    if (this.wizardCurrentStep > this.wizardMaxStep) {
+                        this.wizardMaxStep = this.wizardCurrentStep;
+                    }
+                    console.log(`Advanced to step ${this.wizardCurrentStep}`);
+                }
+            },
+
+            wizardPrevStep() {
+                if (this.wizardCurrentStep > 1) {
+                    this.wizardCurrentStep--;
+                    console.log(`Back to step ${this.wizardCurrentStep}`);
+                }
+            },
+
+            wizardGoToStep(stepNumber) {
+                if (stepNumber >= 1 && stepNumber <= this.wizardMaxStep) {
+                    this.wizardCurrentStep = stepNumber;
+                }
+            },
+
+            // Complete wizard
+            completeWizard() {
+                if (this.isStep1Valid && this.isStep2Valid && this.isStep3Valid) {
+                    alert(`✅ Order complete for ${this.wizardFirstName} ${this.wizardLastName}!\n\nShipping to:\n${this.wizardStreet}\n${this.wizardCity}, ${this.wizardZip}`);
+                    console.log('Order completed:', {
+                        name: `${this.wizardFirstName} ${this.wizardLastName}`,
+                        email: this.wizardEmail,
+                        address: `${this.wizardStreet}, ${this.wizardCity}, ${this.wizardZip}`,
+                        card: `**** **** **** ${this.wizardCardNumber.slice(-4)}`
+                    });
+                    this.resetWizard();
+                }
+            },
+
+            resetWizard() {
+                this.wizardCurrentStep = 1;
+                this.wizardMaxStep = 1;
+                this.wizardFirstName = '';
+                this.wizardLastName = '';
+                this.wizardEmail = '';
+                this.wizardStreet = '';
+                this.wizardCity = '';
+                this.wizardZip = '';
+                this.wizardCardNumber = '';
+                this.wizardCardExpiry = '';
+                this.wizardCardCVV = '';
+                console.log('Wizard reset');
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Multi-Step Wizard example initialized (v1.0.0)');
+    </script>
+</body>
+</html>

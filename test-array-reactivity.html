@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - Array Reactivity Test Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .test-case {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #95a5a6;
+            border-radius: 4px;
+        }
+        .test-case.pass {
+            border-left-color: #27ae60;
+            background: #d5f4e6;
+        }
+        .test-case.fail {
+            border-left-color: #e74c3c;
+            background: #fadbd8;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .assertion {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 3px;
+        }
+        .assertion.pass {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        .assertion.pass::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+        .assertion.fail {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        .assertion.fail::before {
+            content: "✗ ";
+            font-weight: bold;
+        }
+        .summary {
+            position: sticky;
+            top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            margin-bottom: 20px;
+        }
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+        .foreach-demo {
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .foreach-demo ul {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        .foreach-demo li {
+            padding: 8px;
+            background: white;
+            margin: 5px 0;
+            border-radius: 3px;
+            border-left: 3px solid #3498db;
+        }
+        input, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>🔄 Stitch.js Array Reactivity Test Suite</h1>
+        <p>Testing foreach binding, array mutations, and array reactivity</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">
+                <div class="stat-value" id="totalTests">0</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat pass">
+                <div class="stat-value" id="passedTests">0</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat fail">
+                <div class="stat-value" id="failedTests">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+
+    <!-- Load Stitch.js -->
+    <script id="stitchScript" src="stitch.js"></script>
+
+    <script>
+        Stitch.debug.enable(); // Enable debug mode for detailed logging
+        // Test Framework
+        let testResults = [];
+
+        function assert(condition, message) {
+            return { pass: condition, message: message };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return {
+                pass: pass,
+                message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+            };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement('div');
+            testCase.className = `test-case ${allPass ? 'pass' : 'fail'}`;
+
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? 'pass' : 'fail'}">${assertion.message}</div>`;
+            });
+
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = total - passed;
+
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = failed;
+        }
+
+        // TEST SUITE 1: Array Mutations
+        function testArrayMutations() {
+            const section = createTestSection('Test 1: Array Mutation Methods');
+
+            // Test 1.1: push()
+            const model1 = Stitch.Observable.create({
+                items: [1, 2, 3]
+            });
+
+            const assertions1 = [
+                assertEqual(model1.items.length, 3, 'Initial length'),
+            ];
+
+            model1.items.push(4);
+            assertions1.push(
+                assertEqual(model1.items.length, 4, 'Length after push'),
+                assertEqual(model1.items[3], 4, 'Pushed value correct')
+            );
+
+            model1.items.push(5, 6);
+            assertions1.push(
+                assertEqual(model1.items.length, 6, 'Length after push multiple'),
+                assertEqual(model1.items[4], 5, 'First pushed value'),
+                assertEqual(model1.items[5], 6, 'Second pushed value')
+            );
+
+            const pass1 = renderTestCase(section, '1.1: Array.push()', assertions1);
+            testResults.push({ name: '1.1', passed: pass1 });
+
+            // Test 1.2: pop()
+            const model2 = Stitch.Observable.create({
+                items: ['a', 'b', 'c', 'd']
+            });
+
+            const assertions2 = [
+                assertEqual(model2.items.length, 4, 'Initial length'),
+            ];
+
+            const popped = model2.items.pop();
+            assertions2.push(
+                assertEqual(popped, 'd', 'Popped value correct'),
+                assertEqual(model2.items.length, 3, 'Length after pop'),
+                assertEqual(model2.items[2], 'c', 'Last item now correct')
+            );
+
+            const pass2 = renderTestCase(section, '1.2: Array.pop()', assertions2);
+            testResults.push({ name: '1.2', passed: pass2 });
+
+            // Test 1.3: shift()
+            const model3 = Stitch.Observable.create({
+                items: [10, 20, 30]
+            });
+
+            const assertions3 = [];
+            const shifted = model3.items.shift();
+            assertions3.push(
+                assertEqual(shifted, 10, 'Shifted value correct'),
+                assertEqual(model3.items.length, 2, 'Length after shift'),
+                assertEqual(model3.items[0], 20, 'First item now correct')
+            );
+
+            const pass3 = renderTestCase(section, '1.3: Array.shift()', assertions3);
+            testResults.push({ name: '1.3', passed: pass3 });
+
+            // Test 1.4: unshift()
+            const model4 = Stitch.Observable.create({
+                items: [2, 3]
+            });
+
+            const assertions4 = [];
+            model4.items.unshift(1);
+            assertions4.push(
+                assertEqual(model4.items.length, 3, 'Length after unshift'),
+                assertEqual(model4.items[0], 1, 'First item correct'),
+                assertEqual(model4.items[1], 2, 'Second item correct')
+            );
+
+            model4.items.unshift(-1, 0);
+            assertions4.push(
+                assertEqual(model4.items.length, 5, 'Length after unshift multiple'),
+                assertEqual(model4.items[0], -1, 'First unshifted value'),
+                assertEqual(model4.items[1], 0, 'Second unshifted value')
+            );
+
+            const pass4 = renderTestCase(section, '1.4: Array.unshift()', assertions4);
+            testResults.push({ name: '1.4', passed: pass4 });
+
+            // Test 1.5: splice()
+            const model5 = Stitch.Observable.create({
+                items: ['a', 'b', 'c', 'd', 'e']
+            });
+
+            const assertions5 = [];
+            const removed = model5.items.splice(1, 2, 'x', 'y');
+            assertions5.push(
+                assert(removed.length === 2 && removed[0] === 'b' && removed[1] === 'c', 'Splice removed correct items'),
+                assertEqual(model5.items.length, 5, 'Length after splice'),
+                assertEqual(model5.items[1], 'x', 'First inserted item'),
+                assertEqual(model5.items[2], 'y', 'Second inserted item')
+            );
+
+            const pass5 = renderTestCase(section, '1.5: Array.splice()', assertions5);
+            testResults.push({ name: '1.5', passed: pass5 });
+
+            // Test 1.6: sort()
+            const model6 = Stitch.Observable.create({
+                items: [3, 1, 4, 1, 5]
+            });
+
+            const assertions6 = [];
+            model6.items.sort((a, b) => a - b);
+            assertions6.push(
+                assertEqual(model6.items[0], 1, 'First sorted item'),
+                assertEqual(model6.items[4], 5, 'Last sorted item'),
+                assert(model6.items[0] <= model6.items[1] && model6.items[1] <= model6.items[2], 'Array is sorted')
+            );
+
+            const pass6 = renderTestCase(section, '1.6: Array.sort()', assertions6);
+            testResults.push({ name: '1.6', passed: pass6 });
+
+            // Test 1.7: reverse()
+            const model7 = Stitch.Observable.create({
+                items: [1, 2, 3, 4, 5]
+            });
+
+            const assertions7 = [];
+            model7.items.reverse();
+            assertions7.push(
+                assertEqual(model7.items[0], 5, 'First item after reverse'),
+                assertEqual(model7.items[4], 1, 'Last item after reverse'),
+                assertEqual(model7.items.length, 5, 'Length unchanged')
+            );
+
+            const pass7 = renderTestCase(section, '1.7: Array.reverse()', assertions7);
+            testResults.push({ name: '1.7', passed: pass7 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST SUITE 2: foreach Binding with Simple Arrays
+        function testForeachSimple() {
+            const section = createTestSection('Test 2: foreach Binding with Simple Arrays');
+
+            // Test 2.1: foreach with primitives
+            const container1 = document.createElement('div');
+            container1.innerHTML = '<ul data-foreach="items"><li data-text="$data"></li></ul>';
+            document.body.appendChild(container1);
+
+            const model1 = Stitch.Observable.create({
+                items: ['Apple', 'Banana', 'Cherry']
+            });
+
+            const binder1 = new Stitch.DataBinder();
+            binder1.bind(container1, model1);
+
+            const assertions1 = [];
+            const lis1 = container1.querySelectorAll('li');
+            assertions1.push(
+                assertEqual(lis1.length, 3, 'Rendered 3 items'),
+                assertEqual(lis1[0].textContent, 'Apple', 'First item text'),
+                assertEqual(lis1[1].textContent, 'Banana', 'Second item text'),
+                assertEqual(lis1[2].textContent, 'Cherry', 'Third item text')
+            );
+
+            model1.items.push('Date');
+            setTimeout(() => {
+                const lis1Updated = container1.querySelectorAll('li');
+                assertions1.push(
+                    assertEqual(lis1Updated.length, 4, 'Rendered 4 items after push'),
+                    assertEqual(lis1Updated[3].textContent, 'Date', 'Fourth item text')
+                );
+
+                document.body.removeChild(container1);
+                const pass1 = renderTestCase(section, '2.1: foreach with Primitive Values', assertions1);
+                testResults.push({ name: '2.1', passed: pass1 });
+
+                continueTest2();
+            }, 50);
+
+            function continueTest2() {
+                // Test 2.2: foreach with objects
+                const container2 = document.createElement('div');
+                container2.innerHTML = '<ul data-foreach="users"><li data-text="name"></li></ul>';
+                document.body.appendChild(container2);
+
+                const model2 = Stitch.Observable.create({
+                    users: [
+                        { name: 'Alice' },
+                        { name: 'Bob' }
+                    ]
+                });
+
+                const binder2 = new Stitch.DataBinder();
+                binder2.bind(container2, model2);
+
+                const assertions2 = [];
+                const lis2 = container2.querySelectorAll('li');
+                assertions2.push(
+                    assertEqual(lis2.length, 2, 'Rendered 2 users'),
+                    assertEqual(lis2[0].textContent, 'Alice', 'First user name'),
+                    assertEqual(lis2[1].textContent, 'Bob', 'Second user name')
+                );
+
+                model2.users[0].name = 'Alicia';
+                setTimeout(() => {
+                    const lis2Updated = container2.querySelectorAll('li');
+                    assertions2.push(
+                        assertEqual(lis2Updated[0].textContent, 'Alicia', 'First user name updated')
+                    );
+
+                    document.body.removeChild(container2);
+                    const pass2 = renderTestCase(section, '2.2: foreach with Objects', assertions2);
+                    testResults.push({ name: '2.2', passed: pass2 });
+
+                    document.getElementById('testContainer').appendChild(section);
+                    testForeachComputed();
+                }, 50);
+            }
+        }
+
+        // TEST SUITE 3: foreach with Computed Properties (CRITICAL for v1 vs v2)
+        function testForeachComputed() {
+            const section = createTestSection('Test 3: foreach with Computed Properties (v1 vs v2 Critical Difference)');
+
+            // Test 3.1: foreach with computed in items
+            const container1 = document.createElement('div');
+            container1.innerHTML = '<ul data-foreach="users"><li data-text="fullName"></li></ul>';
+            document.body.appendChild(container1);
+
+            const model1 = Stitch.Observable.create({
+                users: [
+                    {
+                        firstName: 'John',
+                        lastName: 'Doe',
+                        fullName: Stitch.computed(function() {
+                            return this.firstName + ' ' + this.lastName;
+                        })
+                    },
+                    {
+                        firstName: 'Jane',
+                        lastName: 'Smith',
+                        fullName: Stitch.computed(function() {
+                            return this.firstName + ' ' + this.lastName;
+                        })
+                    }
+                ]
+            });
+
+            const binder1 = new Stitch.DataBinder();
+            binder1.bind(container1, model1);
+
+            const assertions1 = [];
+            setTimeout(() => {
+                const lis1 = container1.querySelectorAll('li');
+                assertions1.push(
+                    assertEqual(lis1.length, 2, 'Rendered 2 users'),
+                    assertEqual(lis1[0].textContent, 'John Doe', 'First user fullName'),
+                    assertEqual(lis1[1].textContent, 'Jane Smith', 'Second user fullName')
+                );
+
+                model1.users[0].firstName = 'Johnny';
+                setTimeout(() => {
+                    const lis1Updated = container1.querySelectorAll('li');
+                    assertions1.push(
+                        assertEqual(lis1Updated[0].textContent, 'Johnny Doe', 'Computed updates on firstName change')
+                    );
+
+                    model1.users.push({
+                        firstName: 'Bob',
+                        lastName: 'Johnson',
+                        fullName: Stitch.computed(function() {
+                            return this.firstName + ' ' + this.lastName;
+                        })
+                    });
+
+                    setTimeout(() => {
+                        const lis1Final = container1.querySelectorAll('li');
+                        assertions1.push(
+                            assertEqual(lis1Final.length, 3, 'Added third user'),
+                            assertEqual(lis1Final[2].textContent, 'Bob Johnson', 'Third user fullName works')
+                        );
+
+                        document.body.removeChild(container1);
+                        const pass1 = renderTestCase(section, '3.1: foreach with Computed in Items', assertions1);
+                        testResults.push({ name: '3.1', passed: pass1 });
+
+                        document.getElementById('testContainer').appendChild(section);
+                        testNestedArrays();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST SUITE 4: Nested Arrays
+        function testNestedArrays() {
+            const section = createTestSection('Test 4: Nested Array Reactivity');
+
+            // Test 4.1: Nested array mutation
+            const model1 = Stitch.Observable.create({
+                categories: [
+                    {
+                        name: 'Fruits',
+                        items: ['Apple', 'Banana']
+                    },
+                    {
+                        name: 'Vegetables',
+                        items: ['Carrot', 'Broccoli']
+                    }
+                ]
+            });
+
+            const assertions1 = [
+                assertEqual(model1.categories[0].items.length, 2, 'First category has 2 items'),
+                assertEqual(model1.categories[1].items.length, 2, 'Second category has 2 items'),
+            ];
+
+            model1.categories[0].items.push('Cherry');
+            assertions1.push(
+                assertEqual(model1.categories[0].items.length, 3, 'First category now has 3 items'),
+                assertEqual(model1.categories[0].items[2], 'Cherry', 'New item added correctly')
+            );
+
+            model1.categories.push({
+                name: 'Grains',
+                items: ['Rice', 'Wheat']
+            });
+            assertions1.push(
+                assertEqual(model1.categories.length, 3, 'Added third category'),
+                assertEqual(model1.categories[2].items.length, 2, 'Third category has 2 items')
+            );
+
+            const pass1 = renderTestCase(section, '4.1: Nested Array Mutations', assertions1);
+            testResults.push({ name: '4.1', passed: pass1 });
+
+            // Test 4.2: Deep nested arrays
+            const model2 = Stitch.Observable.create({
+                level1: [
+                    {
+                        level2: [
+                            {
+                                level3: [1, 2, 3]
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            const assertions2 = [
+                assertEqual(model2.level1[0].level2[0].level3.length, 3, 'Deep nested array length'),
+            ];
+
+            model2.level1[0].level2[0].level3.push(4);
+            assertions2.push(
+                assertEqual(model2.level1[0].level2[0].level3.length, 4, 'Deep nested array mutated'),
+                assertEqual(model2.level1[0].level2[0].level3[3], 4, 'Deep nested new value correct')
+            );
+
+            const pass2 = renderTestCase(section, '4.2: Deep Nested Arrays', assertions2);
+            testResults.push({ name: '4.2', passed: pass2 });
+
+            document.getElementById('testContainer').appendChild(section);
+            testArrayEdgeCases();
+        }
+
+        // TEST SUITE 5: Array Edge Cases
+        function testArrayEdgeCases() {
+            const section = createTestSection('Test 5: Array Edge Cases');
+
+            // Test 5.1: Empty array
+            const model1 = Stitch.Observable.create({
+                items: []
+            });
+
+            const assertions1 = [
+                assertEqual(model1.items.length, 0, 'Empty array length'),
+            ];
+
+            model1.items.push('first');
+            assertions1.push(
+                assertEqual(model1.items.length, 1, 'Length after first push'),
+                assertEqual(model1.items[0], 'first', 'First item correct')
+            );
+
+            const pass1 = renderTestCase(section, '5.1: Empty Array Operations', assertions1);
+            testResults.push({ name: '5.1', passed: pass1 });
+
+            // Test 5.2: Array with null/undefined
+            const model2 = Stitch.Observable.create({
+                items: [null, undefined, 'value', null]
+            });
+
+            const assertions2 = [
+                assertEqual(model2.items.length, 4, 'Array with nulls length'),
+                assertEqual(model2.items[0], null, 'First item is null'),
+                assertEqual(model2.items[1], undefined, 'Second item is undefined'),
+                assertEqual(model2.items[2], 'value', 'Third item is value')
+            ];
+
+            const pass2 = renderTestCase(section, '5.2: Array with Null/Undefined', assertions2);
+            testResults.push({ name: '5.2', passed: pass2 });
+
+            // Test 5.3: Large array performance
+            const model3 = Stitch.Observable.create({
+                items: []
+            });
+
+            const startTime = performance.now();
+            for (let i = 0; i < 1000; i++) {
+                model3.items.push(i);
+            }
+            const endTime = performance.now();
+            const duration = endTime - startTime;
+
+            const assertions3 = [
+                assertEqual(model3.items.length, 1000, 'Added 1000 items'),
+                assert(duration < 1000, `Performance: ${duration.toFixed(2)}ms for 1000 pushes`),
+                assertEqual(model3.items[500], 500, 'Middle item correct'),
+                assertEqual(model3.items[999], 999, 'Last item correct')
+            ];
+
+            const pass3 = renderTestCase(section, '5.3: Large Array Performance', assertions3);
+            testResults.push({ name: '5.3', passed: pass3 });
+
+            document.getElementById('testContainer').appendChild(section);
+            updateSummary();
+        }
+
+        // Run all tests
+        function runAllTests() {
+            testResults = [];
+            document.getElementById('testContainer').innerHTML = '';
+            console.log('Running array reactivity tests...');
+
+            testArrayMutations();
+            testForeachSimple();
+            // testForeachComputed and others are called in sequence
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 100);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Binding Examples - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .example-section {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .example-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .example-section p {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .demo-box {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="search"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            margin-bottom: 10px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 1em;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        .event-log {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .event-log div {
+            padding: 3px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .event-log div:last-child {
+            border-bottom: none;
+        }
+
+        .event-log .timestamp {
+            color: #999;
+            margin-right: 10px;
+        }
+
+        .event-log .event-type {
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .status-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .status-box strong {
+            color: #1976D2;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #856404;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .valid {
+            border-color: #28a745 !important;
+        }
+
+        .invalid {
+            border-color: #dc3545 !important;
+        }
+
+        .helper-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: -8px;
+            margin-bottom: 10px;
+        }
+
+        .helper-text.error {
+            color: #dc3545;
+        }
+
+        .helper-text.success {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Event Binding Examples</h1>
+        <p class="subtitle">Demonstrating the event: binding type (v1.0.0+)</p>
+
+        <div id="app">
+            <!-- Example 1: Form Input Events -->
+            <div class="example-section">
+                <h3>1. Form Input Events (input, focus, blur)</h3>
+                <p>Watch real-time validation and event logging</p>
+
+                <div class="demo-box">
+                    <input
+                        data-value="username" data-event="usernameEvents, class: usernameClass"
+                        type="text"
+                        placeholder="Enter username (min 3 chars)">
+                    <div class="helper-text" data-text="usernameHelperText" data-class="usernameHelperClass"></div>
+
+                    <div class="status-box">
+                        <strong>Status:</strong> <span data-text="usernameStatus"></span><br>
+                        <strong>Length:</strong> <span data-text="usernameLength"></span> characters<br>
+                        <strong>Valid:</strong> <span data-text="isUsernameValid"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 2: Form Submission -->
+            <div class="example-section">
+                <h3>2. Form Submission (submit, reset)</h3>
+                <p>Prevent default submission and handle with custom logic</p>
+
+                <div class="demo-box">
+                    <form data-event="formEvents">
+                        <input data-value="formEmail" type="email" placeholder="Email" required>
+                        <input data-value="formPassword" type="password" placeholder="Password" required>
+
+                        <button type="submit">Submit Form</button>
+                        <button type="reset">Reset Form</button>
+                    </form>
+
+                    <div class="status-box" data-visible="formSubmitted">
+                        <strong>✓ Form Submitted!</strong><br>
+                        Email: <span data-text="formEmail"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 3: Keyboard Events -->
+            <div class="example-section">
+                <h3>3. Keyboard Events (keyup, keydown, keypress)</h3>
+                <p>Detect Enter key, character counting, and keyboard shortcuts</p>
+
+                <div class="demo-box">
+                    <input
+                        data-value="searchQuery" data-event="searchEvents"
+                        type="search"
+                        placeholder="Type and press Enter to search">
+                    <div class="helper-text">Press Enter to search, Escape to clear</div>
+
+                    <div class="status-box">
+                        <strong>Search Query:</strong> <span data-text="searchQuery"></span><br>
+                        <strong>Last Key:</strong> <span data-text="lastKeyPressed"></span><br>
+                        <strong>Search Count:</strong> <span data-text="searchCount"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 4: Select Change Event -->
+            <div class="example-section">
+                <h3>4. Select Change Event (change)</h3>
+                <p>Cascading select behavior with change events</p>
+
+                <div class="demo-box">
+                    <select data-value="selectedCategory" data-event="categoryEvents">
+                        <option value="">Select Category...</option>
+                        <option value="electronics">Electronics</option>
+                        <option value="clothing">Clothing</option>
+                        <option value="food">Food</option>
+                    </select>
+
+                    <select
+                        data-value="selectedItem, foreach: availableItems, visible: hasCategory"
+                        data-template="item-option">
+                    </select>
+                    <template id="item-option">
+                        <option data-value="id" data-text="name"></option>
+                    </template>
+
+                    <div class="status-box" data-visible="selectedItem">
+                        <strong>Selected:</strong> <span data-text="selectedItemName"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 5: Mouse Events -->
+            <div class="example-section">
+                <h3>5. Mouse Events (mouseenter, mouseleave, dblclick)</h3>
+                <p>Interactive hover and double-click behavior</p>
+
+                <div class="demo-box">
+                    <div class="grid">
+                        <button
+                            data-event="hoverEvents, class: hoverButtonClass"
+                            style="padding: 40px;">
+                            Hover Over Me
+                        </button>
+
+                        <button
+                            data-event="doubleClickEvents"
+                            style="padding: 40px;">
+                            Double Click Me
+                        </button>
+                    </div>
+
+                    <div class="status-box">
+                        <strong>Hover Count:</strong> <span data-text="hoverCount"></span><br>
+                        <strong>Double Click Count:</strong> <span data-text="doubleClickCount"></span><br>
+                        <strong>Currently Hovering:</strong> <span data-text="isHovering"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 6: Multiple Events on Single Element -->
+            <div class="example-section">
+                <h3>6. Multiple Events on Single Element</h3>
+                <p>Combine multiple event handlers on one input</p>
+
+                <div class="demo-box">
+                    <textarea
+                        data-value="commentText" data-event="commentEvents"
+                        placeholder="Type a comment..."
+                        rows="4"></textarea>
+                    <div class="helper-text">
+                        Characters: <span data-text="commentLength"></span> / 200
+                    </div>
+
+                    <div class="status-box">
+                        <strong>Focus Count:</strong> <span data-text="commentFocusCount"></span><br>
+                        <strong>Blur Count:</strong> <span data-text="commentBlurCount"></span><br>
+                        <strong>Input Events:</strong> <span data-text="commentInputCount"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event Log -->
+            <div class="example-section">
+                <h3>📋 Event Log (All Events)</h3>
+                <p>Real-time log of all event bindings</p>
+
+                <div class="event-log" data-foreach="eventLog">
+                    <div>
+                        <span class="timestamp" data-text="timestamp"></span>
+                        <span class="event-type" data-text="eventType"></span>
+                        <span data-text="message"></span>
+                    </div>
+                </div>
+
+                <button data-click="clearEventLog" class="danger">Clear Log</button>
+            </div>
+
+            <div class="info-box">
+                <h4>💡 Event Binding Features (v1.0.0)</h4>
+                <p>
+                    <strong>event:</strong> Generic event binding for any DOM event<br>
+                    <strong>Syntax:</strong> data-event="eventMapProperty"<br>
+                    <strong>Multiple Events:</strong> Bind multiple events to same element<br>
+                    <strong>Event Object:</strong> Full access to native DOM event in handlers<br>
+                    <strong>Supported:</strong> change, input, submit, blur, focus, keyup, mouseenter, dblclick, and more!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const model = Stitch.Observable.create({
+            // Example 1: Username Input
+            username: '',
+            usernameStatus: 'Not focused yet',
+
+            usernameEvents: {
+                input: 'onUsernameInput',
+                focus: 'onUsernameFocus',
+                blur: 'onUsernameBlur'
+            },
+
+            usernameLength: Stitch.computed(function() {
+                return this.username.length;
+            }),
+
+            isUsernameValid: Stitch.computed(function() {
+                return this.username.length >= 3;
+            }),
+
+            usernameClass: Stitch.computed(function() {
+                if (this.username === '') return {};
+                return {
+                    'valid': this.isUsernameValid,
+                    'invalid': !this.isUsernameValid
+                };
+            }),
+
+            usernameHelperText: Stitch.computed(function() {
+                if (this.username === '') return 'Username is required';
+                if (this.isUsernameValid) return '✓ Username is valid';
+                return '✗ Username must be at least 3 characters';
+            }),
+
+            usernameHelperClass: Stitch.computed(function() {
+                if (this.username === '') return {};
+                return {
+                    'success': this.isUsernameValid,
+                    'error': !this.isUsernameValid
+                };
+            }),
+
+            onUsernameInput(event) {
+                this.usernameStatus = 'Typing...';
+                this.logEvent('input', `Username changed to: "${this.username}"`);
+            },
+
+            onUsernameFocus(event) {
+                this.usernameStatus = 'Focused - typing...';
+                this.logEvent('focus', 'Username field focused');
+            },
+
+            onUsernameBlur(event) {
+                this.usernameStatus = this.isUsernameValid ? 'Valid ✓' : 'Invalid ✗';
+                this.logEvent('blur', 'Username field lost focus');
+            },
+
+            // Example 2: Form Submission
+            formEmail: '',
+            formPassword: '',
+            formSubmitted: false,
+
+            formEvents: {
+                submit: 'onFormSubmit',
+                reset: 'onFormReset'
+            },
+
+            onFormSubmit(event) {
+                event.preventDefault();
+                this.formSubmitted = true;
+                this.logEvent('submit', `Form submitted with email: ${this.formEmail}`);
+
+                setTimeout(() => {
+                    this.formSubmitted = false;
+                }, 3000);
+            },
+
+            onFormReset(event) {
+                this.formSubmitted = false;
+                this.formEmail = '';
+                this.formPassword = '';
+                this.logEvent('reset', 'Form reset');
+            },
+
+            // Example 3: Keyboard Events
+            searchQuery: '',
+            lastKeyPressed: '',
+            searchCount: 0,
+
+            searchEvents: {
+                keyup: 'onSearchKeyUp',
+                keydown: 'onSearchKeyDown'
+            },
+
+            onSearchKeyUp(event) {
+                this.lastKeyPressed = event.key;
+
+                if (event.key === 'Enter') {
+                    this.performSearch();
+                } else if (event.key === 'Escape') {
+                    this.searchQuery = '';
+                    this.logEvent('keyup', 'Search cleared with Escape');
+                }
+            },
+
+            onSearchKeyDown(event) {
+                // Example: Ctrl+K shortcut
+                if (event.ctrlKey && event.key === 'k') {
+                    event.preventDefault();
+                    this.logEvent('keydown', 'Ctrl+K shortcut detected');
+                }
+            },
+
+            performSearch() {
+                if (this.searchQuery.trim()) {
+                    this.searchCount++;
+                    this.logEvent('search', `Searching for: "${this.searchQuery}"`);
+                }
+            },
+
+            // Example 4: Select Change
+            selectedCategory: '',
+            selectedItem: '',
+            availableItems: [],
+
+            categoryEvents: {
+                change: 'onCategoryChange'
+            },
+
+            hasCategory: Stitch.computed(function() {
+                return this.selectedCategory !== '';
+            }),
+
+            selectedItemName: Stitch.computed(function() {
+                const item = this.availableItems.find(i => i.id === this.selectedItem);
+                return item ? item.name : '';
+            }),
+
+            onCategoryChange(event) {
+                this.selectedItem = '';
+
+                const items = {
+                    electronics: [
+                        { id: 'laptop', name: 'Laptop' },
+                        { id: 'phone', name: 'Phone' },
+                        { id: 'tablet', name: 'Tablet' }
+                    ],
+                    clothing: [
+                        { id: 'shirt', name: 'Shirt' },
+                        { id: 'pants', name: 'Pants' },
+                        { id: 'shoes', name: 'Shoes' }
+                    ],
+                    food: [
+                        { id: 'apple', name: 'Apple' },
+                        { id: 'banana', name: 'Banana' },
+                        { id: 'orange', name: 'Orange' }
+                    ]
+                };
+
+                this.availableItems = items[this.selectedCategory] || [];
+                this.logEvent('change', `Category changed to: ${this.selectedCategory}`);
+            },
+
+            // Example 5: Mouse Events
+            hoverCount: 0,
+            doubleClickCount: 0,
+            isHovering: false,
+
+            hoverEvents: {
+                mouseenter: 'onMouseEnter',
+                mouseleave: 'onMouseLeave'
+            },
+
+            doubleClickEvents: {
+                dblclick: 'onDoubleClick'
+            },
+
+            hoverButtonClass: Stitch.computed(function() {
+                return {
+                    'success': this.isHovering
+                };
+            }),
+
+            onMouseEnter(event) {
+                this.isHovering = true;
+                this.hoverCount++;
+                this.logEvent('mouseenter', 'Mouse entered button');
+            },
+
+            onMouseLeave(event) {
+                this.isHovering = false;
+                this.logEvent('mouseleave', 'Mouse left button');
+            },
+
+            onDoubleClick(event) {
+                this.doubleClickCount++;
+                this.logEvent('dblclick', 'Button double-clicked');
+            },
+
+            // Example 6: Multiple Events
+            commentText: '',
+            commentFocusCount: 0,
+            commentBlurCount: 0,
+            commentInputCount: 0,
+
+            commentEvents: {
+                input: 'onCommentInput',
+                focus: 'onCommentFocus',
+                blur: 'onCommentBlur',
+                keyup: 'onCommentKeyUp'
+            },
+
+            commentLength: Stitch.computed(function() {
+                return this.commentText.length;
+            }),
+
+            onCommentInput(event) {
+                this.commentInputCount++;
+
+                // Enforce max length
+                if (this.commentText.length > 200) {
+                    this.commentText = this.commentText.substring(0, 200);
+                }
+            },
+
+            onCommentFocus(event) {
+                this.commentFocusCount++;
+                this.logEvent('focus', 'Comment field focused');
+            },
+
+            onCommentBlur(event) {
+                this.commentBlurCount++;
+                this.logEvent('blur', 'Comment field blurred');
+            },
+
+            onCommentKeyUp(event) {
+                // Could add auto-save, word count, etc.
+            },
+
+            // Event Log
+            eventLog: [],
+
+            logEvent(eventType, message) {
+                const now = new Date();
+                const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+                this.eventLog.unshift({
+                    timestamp,
+                    eventType,
+                    message
+                });
+
+                // Keep last 50 events
+                if (this.eventLog.length > 50) {
+                    this.eventLog.pop();
+                }
+            },
+
+            clearEventLog() {
+                this.eventLog = [];
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#app', model);
+
+        console.log('✅ Event Binding Examples initialized (v1.0.0)');
+        console.log('Try interacting with the form inputs, buttons, and selects!');
+    </script>
+</body>
+</html>

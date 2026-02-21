@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Computed Properties - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 30px;
+        }
+
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .controls input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            color: #667eea;
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .users {
+            display: grid;
+            gap: 15px;
+        }
+
+        .user-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .user-card:hover {
+            border-color: #667eea;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .user-status.status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .user-status.status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .info-box code {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Nested Computed Properties</h1>
+        <p class="subtitle">Computed properties at any nesting level (v1.0.0+)</p>
+
+        <div id="example">
+            <div class="controls">
+                <label>
+                    <input type="checkbox" data-value="showInactive">
+                    Show Inactive Users
+                </label>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Active Users</div>
+                    <div class="stat-value" data-text="activeUserCount"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Inactive Users</div>
+                    <div class="stat-value" data-text="inactiveUserCount"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" data-text="totalUserCount"></div>
+                </div>
+            </div>
+
+            <div class="users" data-foreach="displayedUsers" data-template="user-template"></div>
+
+            <template id="user-template">
+                <div class="user-card">
+                    <div class="user-info">
+                        <div class="user-name" data-text="fullName"></div>
+                        <span class="user-status" data-text="statusLabel" data-class="statusClass"></span>
+                    </div>
+                    <button data-click="$parent.toggleUserStatus">Toggle Status</button>
+                </div>
+            </template>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>Nested Computed Properties:</strong> Each user object has its own <code>fullName</code>, <code>statusLabel</code>, and <code>statusClass</code> computed properties<br><br>
+                    <strong>Parent-Level Computed:</strong> Top-level <code>displayedUsers</code> computed depends on nested <code>isActive</code> properties<br><br>
+                    <strong>Deep Reactivity:</strong> Changing <code>user.isActive</code> automatically updates nested computed properties AND parent computed properties
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API - Nested Computed Properties!
+        const model = Stitch.Observable.create({
+            // Top-level state
+            showInactive: false,
+
+            // Users array with NESTED COMPUTED PROPERTIES
+            nestedUsers: [
+                {
+                    id: 1,
+                    firstName: 'Alice',
+                    lastName: 'Anderson',
+                    isActive: true,
+
+                    // v1.0.0: NESTED COMPUTED - fullName
+                    fullName: Stitch.computed(function() {
+                        return `${this.firstName} ${this.lastName}`;
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status label
+                    statusLabel: Stitch.computed(function() {
+                        return this.isActive ? 'Active' : 'Inactive';
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    statusClass: Stitch.computed(function() {
+                        return this.isActive ? 'status-active' : 'status-inactive';
+                    })
+                },
+                {
+                    id: 2,
+                    firstName: 'Bob',
+                    lastName: 'Brown',
+                    isActive: true,
+
+                    // v1.0.0: NESTED COMPUTED - fullName
+                    fullName: Stitch.computed(function() {
+                        return `${this.firstName} ${this.lastName}`;
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status label
+                    statusLabel: Stitch.computed(function() {
+                        return this.isActive ? 'Active' : 'Inactive';
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    statusClass: Stitch.computed(function() {
+                        return this.isActive ? 'status-active' : 'status-inactive';
+                    })
+                },
+                {
+                    id: 3,
+                    firstName: 'Charlie',
+                    lastName: 'Chen',
+                    isActive: false,
+
+                    // v1.0.0: NESTED COMPUTED - fullName
+                    fullName: Stitch.computed(function() {
+                        return `${this.firstName} ${this.lastName}`;
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status label
+                    statusLabel: Stitch.computed(function() {
+                        return this.isActive ? 'Active' : 'Inactive';
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    statusClass: Stitch.computed(function() {
+                        return this.isActive ? 'status-active' : 'status-inactive';
+                    })
+                },
+                {
+                    id: 4,
+                    firstName: 'Diana',
+                    lastName: 'Davis',
+                    isActive: false,
+
+                    // v1.0.0: NESTED COMPUTED - fullName
+                    fullName: Stitch.computed(function() {
+                        return `${this.firstName} ${this.lastName}`;
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status label
+                    statusLabel: Stitch.computed(function() {
+                        return this.isActive ? 'Active' : 'Inactive';
+                    }),
+
+                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    statusClass: Stitch.computed(function() {
+                        return this.isActive ? 'status-active' : 'status-inactive';
+                    })
+                }
+            ],
+
+            // v1.0.0: Top-level COMPUTED that depends on NESTED COMPUTED properties!
+            displayedUsers: Stitch.computed(function() {
+                if (this.showInactive) {
+                    return this.nestedUsers;
+                } else {
+                    return this.nestedUsers.filter(user => user.isActive);
+                }
+            }),
+
+            // v1.0.0: Top-level computed using nested computed values
+            activeUserCount: Stitch.computed(function() {
+                return this.nestedUsers.filter(user => user.isActive).length;
+            }),
+
+            // v1.0.0: Top-level computed using nested computed values
+            inactiveUserCount: Stitch.computed(function() {
+                return this.nestedUsers.filter(user => !user.isActive).length;
+            }),
+
+            // v1.0.0: Top-level computed
+            totalUserCount: Stitch.computed(function() {
+                return this.nestedUsers.length;
+            }),
+
+            // Action: Toggle user active status
+            toggleUserStatus(user) {
+                user.isActive = !user.isActive;
+                console.log(`Toggled ${user.fullName} to ${user.isActive ? 'active' : 'inactive'}`);
+            },
+
+            // Action: Toggle show inactive filter
+            toggleShowInactive() {
+                this.showInactive = !this.showInactive;
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Nested Computed Properties example initialized (v1.0.0)');
+        console.log('');
+        console.log('🎯 This example demonstrates:');
+        console.log('  1. Computed properties at the nested object level (fullName, statusLabel, statusClass)');
+        console.log('  2. Top-level computed properties that depend on nested values (displayedUsers, activeUserCount)');
+        console.log('  3. Deep reactivity - changing user.isActive updates all computed properties automatically');
+    </script>
+</body>
+</html>

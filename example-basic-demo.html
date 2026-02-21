@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js v1.0.0 - Basic Features Demo</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header .subtitle {
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .demo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-card h2 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+
+        .demo-card .description {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .demo-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .code-example {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin: 10px 0;
+        }
+
+        .result-box {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            margin: 5px 0;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px 5px 5px 0;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+        }
+
+        .active-class {
+            background-color: #28a745 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .loading {
+            opacity: 0.6;
+            cursor: wait !important;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .footer {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer p {
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🧵 Stitch.js Basic Features Demo</h1>
+            <p class="subtitle">Version 1.0.0 - Essential Bindings & Reactivity</p>
+        </div>
+
+        <!-- Demo Grid -->
+        <div class="demo-grid">
+            <!-- Section 1: Reactive Data & Computed Properties -->
+            <div id="section-1" class="demo-card">
+                <h2>1. Reactive Data & Computed Properties</h2>
+                <p class="description">Observable creation, computed properties, text binding, and automatic reactivity
+                </p>
+
+                <div class="demo-section">
+                    <label>First Name:</label>
+                    <input type="text" data-value="firstName" placeholder="Enter first name">
+
+                    <label>Last Name:</label>
+                    <input type="text" data-value="lastName" placeholder="Enter last name">
+
+                    <div class="result-box">
+                        <strong>Full Name:</strong> <span data-text="fullName"></span><br>
+                        <strong>Initials:</strong> <span data-text="initials"></span><br>
+                        <strong>Character Count:</strong> <span data-text="nameLength"></span>
+                    </div>
+                </div>
+
+                <div class="code-example">fullName: Stitch.computed(function() {
+                    return `${this.firstName} ${this.lastName}`;
+                    })</div>
+            </div>
+
+            <!-- Section 2: Two-Way Value Binding -->
+            <div id="section-2" class="demo-card">
+                <h2>2. Two-Way Value Binding</h2>
+                <p class="description">Bidirectional sync between model and various input types</p>
+
+                <div class="demo-section">
+                    <label>Text Input:</label>
+                    <input type="text" data-value="textValue" placeholder="Edit me">
+
+                    <label>Number Input:</label>
+                    <input type="number" data-value="numberValue" placeholder="Enter number">
+
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="checkboxValue">
+                        Check me
+                    </label>
+
+                    <div class="result-box">
+                        <strong>Text:</strong> <span data-text="textValue"></span><br>
+                        <strong>Number:</strong> <span data-text="numberValue"></span><br>
+                        <strong>Checked:</strong> <span data-text="checkboxValue"></span>
+                    </div>
+                </div>
+
+                <div class="code-example">&lt;input data-value="propertyName"></div>
+            </div>
+
+            <!-- Section 3: Conditional Display & Attributes -->
+            <div id="section-3" class="demo-card">
+                <h2>3. Conditional Display & Attributes</h2>
+                <p class="description">Visible, enabled, class, and attr bindings in action</p>
+
+                <div class="demo-section">
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="showContent">
+                        Show content (visible)
+                    </label>
+
+                    <div class="result-box" data-visible="showContent">
+                        ✅ Content is now visible!
+                    </div>
+
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="enableButton">
+                        Enable button (enabled)
+                    </label>
+
+                    <button data-enabled="enableButton">Conditional Button</button>
+
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="activateClass">
+                        Activate class (class)
+                    </label>
+
+                    <div class="result-box" data-class="boxClasses" style="transition: all 0.3s;">
+                        This box changes classes
+                    </div>
+
+                    <label>Link URL (attr):</label>
+                    <input type="text" data-value="linkUrl" placeholder="Enter URL">
+
+                    <a data-attr="linkAttrs" data-text="linkUrl"
+                        style="color: #667eea; display: inline-block; margin-top: 10px;">Dynamic Link</a>
+                </div>
+
+                <div class="code-example">data-visible="showContent"
+                    data-enabled="enableButton"
+                    data-class="boxClasses"
+                    data-attr="linkAttrs"</div>
+            </div>
+
+            <!-- Section 4: Event Handling -->
+            <div id="section-4" class="demo-card">
+                <h2>4. Event Handling</h2>
+                <p class="description">Click binding with proper context and event handling</p>
+
+                <div class="demo-section">
+                    <button data-click="incrementCounter">Click Me!</button>
+                    <button data-click="resetCounter">Reset</button>
+
+                    <div class="result-box">
+                        <strong>Click Count:</strong> <span data-text="clickCount"></span>
+                    </div>
+                </div>
+
+                <div class="code-example">incrementCounter() {
+                    this.clickCount++;
+                    }</div>
+            </div>
+
+            <!-- Section 5: Rendering Lists -->
+            <div id="section-5" class="demo-card">
+                <h2>5. Rendering Lists (ForEach)</h2>
+                <p class="description">ForEach binding with inline and external templates</p>
+
+                <div class="demo-section">
+                    <strong>Inline Template (Todo List):</strong>
+                    <input type="text" data-value="newTodo" placeholder="Add todo item">
+                    <button data-click="addTodo">Add</button>
+                    <button data-click="clearTodos">Clear</button>
+
+                    <ul data-foreach="todos">
+                        <li>
+                            <span data-text="$data"></span>
+                            <div class="item-actions">
+                                <span style="color: #666;">#<span data-text="$index"></span></span>
+                                <button data-click="$parent.removeTodo">Remove</button>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <strong style="margin-top: 15px; display: block;">External Template (Dropdown):</strong>
+                    <select data-foreach="countries" data-value="selectedCountry" data-template="country-template"
+                        data-default-text="Select a country...">
+                    </select>
+
+                    <div class="result-box">
+                        <strong>Selected:</strong> <span data-text="selectedCountry"></span>
+                    </div>
+                </div>
+
+                <template id="country-template">
+                    <option data-value="code" data-text="name"></option>
+                </template>
+
+                <div class="code-example">&lt;ul data-foreach="items">
+                    &lt;li data-text="$data">&lt;/li>
+                    &lt;/ul></div>
+            </div>
+
+            <!-- Section 6: Loading States -->
+            <div id="section-6" class="demo-card">
+                <h2>6. Loading States</h2>
+                <p class="description">Loading binding for async operations with accessibility</p>
+
+                <div class="demo-section">
+                    <button data-click="simulateLoading">Simulate Loading</button>
+                    <button data-loading="isLoading">Save Data</button>
+                    <input data-loading="isLoading" placeholder="Form input">
+
+                    <div class="result-box">
+                        <strong>Loading State:</strong> <span data-text="isLoading"></span>
+                    </div>
+                </div>
+
+                <div class="code-example">&lt;button data-loading="isLoading">
+                    Save
+                    &lt;/button>
+                    // Sets: disabled, class="loading", aria-busy</div>
+            </div>
+
+            <!-- Section 7: Deep Reactivity -->
+            <div id="section-7" class="demo-card">
+                <h2>7. Deep Reactivity</h2>
+                <p class="description">Nested object reactivity with eager conversion and change bubbling</p>
+
+                <div class="demo-section">
+                    <label>Name (nested.path):</label>
+                    <input type="text" data-value="user.profile.name" placeholder="Name">
+
+                    <label>Email (nested.path):</label>
+                    <input type="text" data-value="user.profile.email" placeholder="Email">
+
+                    <div class="result-box">
+                        <strong>Name:</strong> <span data-text="user.profile.name"></span><br>
+                        <strong>Email:</strong> <span data-text="user.profile.email"></span><br>
+                        <strong>Display:</strong> <span data-text="userDisplay"></span>
+                    </div>
+                </div>
+
+                <div class="code-example">user: {
+                    profile: {
+                    name: 'John',
+                    email: 'john@example.com'
+                    }
+                    }
+                    // All nested objects reactive immediately!</div>
+            </div>
+
+            <!-- Section 8: Boolean Computed -->
+            <div id="section-8" class="demo-card">
+                <h2>8. Boolean Computed Properties</h2>
+                <p class="description">is*/has* computed properties for conditional logic</p>
+
+                <div class="demo-section">
+                    <label>Username:</label>
+                    <input type="text" data-value="username" placeholder="Enter username">
+
+                    <div class="result-box">
+                        <strong>Has Username:</strong> <span data-text="hasUsername"></span><br>
+                        <strong>Is Valid (3+ chars):</strong> <span data-text="isValidUsername"></span>
+                    </div>
+
+                    <div class="result-box" data-visible="hasUsername">
+                        ✅ Username provided!
+                    </div>
+
+                    <div class="result-box" data-visible="isValidUsername" style="border-left-color: #667eea;">
+                        ✅ Username is valid!
+                    </div>
+                </div>
+
+                <div class="code-example">hasUsername: Stitch.computed(function() {
+                    return this.username.length > 0;
+                    }),
+
+                    isValidUsername: Stitch.computed(function() {
+                    return this.username.length >= 3;
+                    })</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>🧵 Stitch.js v1.0.0</strong> - Lightweight MVVM Framework</p>
+            <p>Zero dependencies • No build tools • Pure JavaScript</p>
+            <p><a href="stitch_documentation.md">View Documentation</a> | <a href="test-suite.html">Full Test Suite</a>
+            </p>
+        </div>
+    </div>
+    <script>
+        (function () {
+            // Stitch.js v1.0.0 - Basic Features Demo
+            // Consolidated model demonstrating all fundamental binding types and reactivity
+
+            console.log('%c🧵 Stitch.js Basic Features Demo - Initializing...', 'color: #667eea; font-weight: bold; font-size: 14px');
+
+            // Create unified model with all demo features
+            const model = Stitch.Observable.create({
+                // ========================================
+                // Section 1: Reactive Data & Computed Properties
+                // ========================================
+                firstName: 'John',
+                lastName: 'Doe',
+
+                fullName: Stitch.computed(function () {
+                    return `${this.firstName} ${this.lastName}`.trim() || '(empty)';
+                }),
+
+                initials: Stitch.computed(function () {
+                    const first = this.firstName.charAt(0).toUpperCase();
+                    const last = this.lastName.charAt(0).toUpperCase();
+                    return first && last ? `${first}${last}` : '(empty)';
+                }),
+
+                nameLength: Stitch.computed(function () {
+                    return this.fullName.length;
+                }),
+
+                // ========================================
+                // Section 2: Two-Way Value Binding
+                // ========================================
+                textValue: 'Hello Stitch!',
+                numberValue: 42,
+                checkboxValue: true,
+
+                // ========================================
+                // Section 3: Conditional Display & Attributes
+                // ========================================
+                showContent: true,
+                enableButton: true,
+                activateClass: false,
+                linkUrl: 'https://github.com',
+
+                boxClasses: Stitch.computed(function () {
+                    return {
+                        'active-class': this.activateClass
+                    };
+                }),
+
+                linkAttrs: Stitch.computed(function () {
+                    return {
+                        'href': this.linkUrl || '#',
+                        'target': '_blank',
+                        'rel': 'noopener noreferrer'
+                    };
+                }),
+
+                // ========================================
+                // Section 4: Event Handling
+                // ========================================
+                clickCount: 0,
+
+                incrementCounter() {
+                    this.clickCount++;
+                },
+
+                resetCounter() {
+                    this.clickCount = 0;
+                },
+
+                // ========================================
+                // Section 5: Rendering Lists (ForEach)
+                // ========================================
+                newTodo: '',
+                todos: ['Buy groceries', 'Walk the dog', 'Write code'],
+
+                countries: [
+                    { code: 'US', name: 'United States' },
+                    { code: 'CA', name: 'Canada' },
+                    { code: 'UK', name: 'United Kingdom' },
+                    { code: 'FR', name: 'France' },
+                    { code: 'DE', name: 'Germany' },
+                    { code: 'JP', name: 'Japan' },
+                    { code: 'AU', name: 'Australia' }
+                ],
+
+                selectedCountry: '',
+
+                addTodo() {
+                    if (this.newTodo.trim()) {
+                        this.todos.push(this.newTodo.trim());
+                        this.newTodo = '';
+                    }
+                },
+
+                removeTodo(event, context) {
+                    const index = context.$index;
+                    this.todos.splice(index, 1);
+                },
+
+                clearTodos() {
+                    this.todos.splice(0, this.todos.length);
+                },
+
+                // ========================================
+                // Section 6: Loading States
+                // ========================================
+                isLoading: false,
+
+                simulateLoading() {
+                    this.isLoading = true;
+                    setTimeout(() => {
+                        this.isLoading = false;
+                    }, 2000);
+                },
+
+                // ========================================
+                // Section 7: Deep Reactivity
+                // ========================================
+                user: {
+                    profile: {
+                        name: 'Alice Anderson',
+                        email: 'alice@example.com'
+                    }
+                },
+
+                userDisplay: Stitch.computed(function () {
+                    return `${this.user.profile.name} <${this.user.profile.email}>`;
+                }),
+
+                // ========================================
+                // Section 8: Boolean Computed Properties
+                // ========================================
+                username: '',
+
+                hasUsername: Stitch.computed(function () {
+                    return this.username.length > 0;
+                }),
+
+                isValidUsername: Stitch.computed(function () {
+                    return this.username.length >= 3;
+                })
+            });
+
+            // Bind the model to the page
+            const binder = new Stitch.DataBinder();
+            binder.bind('#section-1', model);
+            binder.bind('#section-2', model);
+            binder.bind('#section-3', model);
+            binder.bind('#section-4', model);
+            binder.bind('#section-5', model);
+            binder.bind('#section-6', model);
+            binder.bind('#section-7', model);
+            binder.bind('#section-8', model);
+
+            console.log('%c✅ Basic Features Demo - Ready!', 'color: #28a745; font-weight: bold; font-size: 14px');
+            console.log('Model:', model);
+
+            // Expose model globally for debugging
+            window.demoModel = model;
+
+        })();        
+    </script>
+</body>
+
+</html>

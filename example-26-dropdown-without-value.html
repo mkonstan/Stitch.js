@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dropdown Without Value Binding - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .example-box {
+            background: #f8f9ff;
+            padding: 25px;
+            border-radius: 8px;
+            border: 3px solid transparent;
+        }
+
+        .example-box.broken {
+            border-color: #dc3545;
+        }
+
+        .example-box.working {
+            border-color: #28a745;
+        }
+
+        .example-box h3 {
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .example-box h3 .icon {
+            font-size: 1.5em;
+        }
+
+        .example-box .label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .broken h3 {
+            color: #dc3545;
+        }
+
+        .working h3 {
+            color: #28a745;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            margin-bottom: 15px;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-box {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .status-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-item .label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .status-item .value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .status-item .value.empty {
+            color: #dc3545;
+        }
+
+        .status-item .value.filled {
+            color: #28a745;
+        }
+
+        button {
+            padding: 10px 16px;
+            margin: 5px 5px 5px 0;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 0.9em;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        .info-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #856404;
+            margin-bottom: 12px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .info-box ul li {
+            margin-bottom: 8px;
+        }
+
+        .explanation-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .explanation-box h4 {
+            color: #1976D2;
+            margin-bottom: 12px;
+        }
+
+        .explanation-box p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .code-box {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+        }
+
+        .highlight-broken {
+            background: #ffe0e0;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .highlight-working {
+            background: #d4edda;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .badge.broken {
+            background: #dc3545;
+            color: white;
+        }
+
+        .badge.working {
+            background: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚠️ Dropdown Without Value Binding</h1>
+        <p class="subtitle">Visual demonstration of what happens when value: binding is missing</p>
+
+        <div id="app">
+            <div class="comparison-grid">
+                <!-- LEFT: WITHOUT value binding -->
+                <div class="example-box broken">
+                    <h3>
+                        <span class="icon">❌</span>
+                        WITHOUT value: binding
+                        <span class="badge broken">BROKEN</span>
+                    </h3>
+                    <p class="label">Dropdown has foreach: but NO value: binding</p>
+
+                    <select id="brokenDropdown" data-foreach="countries" data-template="country-option"
+                        data-default-text="-- Select a country --" data-default-value="">
+                    </select>
+
+                    <div class="status-box">
+                        <h4>📊 Current State</h4>
+                        <div class="status-item">
+                            <span class="label">Model Value:</span>
+                            <span class="value empty" data-text="brokenSelectedDisplay"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">DOM Value:</span>
+                            <span class="value" data-text="brokenDomValue"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Synced:</span>
+                            <span class="value empty">❌ NO</span>
+                        </div>
+                    </div>
+
+                    <button data-click="checkBrokenModel">Check Model Value</button>
+                    <button data-click="checkBrokenDom">Check DOM Value</button>
+                    <button data-click="resetBrokenModel" class="danger">Reset via Model</button>
+                </div>
+
+                <!-- RIGHT: WITH value binding -->
+                <div class="example-box working">
+                    <h3>
+                        <span class="icon">✅</span>
+                        WITH value: binding
+                        <span class="badge working">WORKING</span>
+                    </h3>
+                    <p class="label">Dropdown has both foreach: AND value: binding</p>
+
+                    <select id="workingDropdown"
+                            data-foreach="countries"
+                            data-value="workingSelected"
+                            data-template="country-option">
+                    </select>
+
+                    <div class="status-box">
+                        <h4>📊 Current State</h4>
+                        <div class="status-item">
+                            <span class="label">Model Value:</span>
+                            <span class="value filled" data-text="workingSelectedDisplay"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">DOM Value:</span>
+                            <span class="value filled" data-text="workingDomValue"></span>
+                        </div>
+                        <div class="status-item">
+                            <span class="label">Synced:</span>
+                            <span class="value filled">✅ YES</span>
+                        </div>
+                    </div>
+
+                    <button data-click="checkWorkingModel" class="success">Check Model Value</button>
+                    <button data-click="checkWorkingDom" class="success">Check DOM Value</button>
+                    <button data-click="resetWorkingModel" class="success">Reset via Model</button>
+                </div>
+            </div>
+
+            <!-- Shared template -->
+            <template id="country-option">
+                <option data-value="code" data-text="name"></option>
+            </template>
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <h4>🔍 What's Happening?</h4>
+                <ul>
+                    <li><strong>LEFT (Broken):</strong> Dropdown renders perfectly, but selecting an option does NOT update the model property. The browser knows what you selected, but Stitch.js doesn't!</li>
+                    <li><strong>RIGHT (Working):</strong> Dropdown renders AND the model property updates when you select an option. Full two-way binding!</li>
+                    <li><strong>Try it:</strong> Select a country in both dropdowns, then click "Check Model Value" to see the difference.</li>
+                    <li><strong>Reset Test:</strong> Click "Reset via Model" to see that only the RIGHT dropdown can be controlled programmatically.</li>
+                </ul>
+            </div>
+
+            <!-- Explanation -->
+            <div class="explanation-box">
+                <h4>📚 Technical Explanation</h4>
+                <p><strong>What's Missing on the Left?</strong></p>
+                <p>Without <code>value:</code> binding, Stitch.js does NOT attach event listeners (<code>input</code>, <code>change</code>) to the dropdown. When you select an option:</p>
+                <ul style="margin-left: 20px; margin-bottom: 10px;">
+                    <li>✅ Browser updates <code>element.value</code> (native behavior)</li>
+                    <li>❌ NO event listener catches the change</li>
+                    <li>❌ Model property NEVER updates</li>
+                    <li>❌ No reactivity, no cascading, no validation possible</li>
+                </ul>
+
+                <p><strong>Code Comparison:</strong></p>
+                <div class="code-box">
+                    <div style="margin-bottom: 10px;">
+                        <strong style="color: #dc3545;">❌ BROKEN (no value binding):</strong><br>
+                        &lt;select <span class="highlight-broken">data-foreach="countries"</span>&gt;
+                    </div>
+                    <div>
+                        <strong style="color: #28a745;">✅ WORKING (with value binding):</strong><br>
+                        &lt;select <span class="highlight-working">data-foreach="countries" data-value="selectedCountry"</span>&gt;
+                    </div>
+                </div>
+
+                <p style="margin-top: 15px;"><strong>Bottom Line:</strong> Always use <code>data-value</code> attribute with <code>data-foreach</code> on dropdowns unless you have a very specific reason not to (like a pure display element).</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const model = Stitch.Observable.create({
+            // Shared data
+            countries: [
+                { code: 'US', name: 'United States' },
+                { code: 'CA', name: 'Canada' },
+                { code: 'UK', name: 'United Kingdom' },
+                { code: 'AU', name: 'Australia' },
+                { code: 'JP', name: 'Japan' }
+            ],
+
+            // LEFT: WITHOUT value binding
+            brokenSelected: '',  // This will NEVER update when user selects!
+            brokenDomValue: '',
+
+            brokenSelectedDisplay: Stitch.computed(function() {
+                return this.brokenSelected === '' ? '(empty)' : this.brokenSelected;
+            }),
+
+            checkBrokenModel() {
+                const value = this.brokenSelected;
+                //alert(`Model Value: "${value}"\n\nThis will always be empty because there's no value: binding!`);
+                console.log('❌ BROKEN Model Value:', value);
+            },
+
+            checkBrokenDom() {
+                const dropdown = document.getElementById('brokenDropdown');
+                const value = dropdown.value;
+                this.brokenDomValue = value;
+                //alert(`DOM Value: "${value}"\n\nThe browser knows what you selected, but Stitch.js doesn't!`);
+                console.log('⚠️ BROKEN DOM Value:', value);
+            },
+
+            resetBrokenModel() {
+                this.brokenSelected = '';
+                //alert('Model was reset to empty string.\n\nBut the dropdown won\'t update because there\'s no value: binding!\n\nNotice the dropdown still shows your selection.');
+                console.log('❌ BROKEN: Reset model (but dropdown unchanged)');
+            },
+
+            // RIGHT: WITH value binding
+            workingSelected: '',  // This WILL update when user selects!
+            workingDomValue: '',
+
+            workingSelectedDisplay: Stitch.computed(function() {
+                return this.workingSelected === '' ? '(empty)' : this.workingSelected;
+            }),
+
+            checkWorkingModel() {
+                const value = this.workingSelected;
+                //alert(`Model Value: "${value}"\n\nThis updates automatically when you select an option!`);
+                console.log('✅ WORKING Model Value:', value);
+            },
+
+            checkWorkingDom() {
+                const dropdown = document.getElementById('workingDropdown');
+                const value = dropdown.value;
+                this.workingDomValue = value;
+                //alert(`DOM Value: "${value}"\n\nBoth model and DOM are in sync!`);
+                console.log('✅ WORKING DOM Value:', value);
+            },
+
+            resetWorkingModel() {
+                this.workingSelected = '';
+                //alert('Model was reset to empty string.\n\nThe dropdown automatically updates to match!\n\nThis is two-way binding working correctly.');
+                console.log('✅ WORKING: Reset model (dropdown updated automatically)');
+            }
+        });
+
+        // Watch the working model to show reactivity
+        model.$watch('workingSelected', (newValue, oldValue) => {
+            console.log('✅ WORKING: Selection changed:', oldValue, '→', newValue);
+            model.workingDomValue = newValue;
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#app', model);
+
+        console.log('✅ Dropdown Comparison Example initialized (v1.0.0 - custom attributes)');
+        console.log('Try selecting countries in BOTH dropdowns and comparing the behavior!');
+        console.log('Left (❌): data-foreach only - model NEVER updates');
+        console.log('Right (✅): data-foreach + data-value - model updates automatically');
+    </script>
+</body>
+</html>

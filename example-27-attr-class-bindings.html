@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attr & Class Bindings - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #764ba2;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        h3 {
+            color: #667eea;
+            margin: 25px 0 15px 0;
+            font-size: 1.3em;
+        }
+
+        .example-section {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .demo-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 2px solid #e0e0e0;
+        }
+
+        .status-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .info-box {
+            background: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .explanation-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .explanation-box h4 {
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Form Elements */
+        input[type="text"],
+        input[type="number"],
+        input[type="url"],
+        input[type="color"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        /* Buttons */
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            margin: 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        /* Checkbox Styles */
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .checkbox-label:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        /* Demo Element Styles */
+        .demo-element {
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s;
+            margin: 15px 0;
+        }
+
+        /* Class Binding Demo Classes */
+        .active {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+
+        .highlight {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+            transform: scale(1.05);
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        /* Badge Styles */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 3px;
+        }
+
+        .badge-primary { background: #667eea; color: white; }
+        .badge-success { background: #28a745; color: white; }
+        .badge-danger { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #333; }
+        .badge-info { background: #2196F3; color: white; }
+        .badge-loading { background: #6c757d; color: white; }
+
+        /* Card Styles */
+        .card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .card.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .card.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .card.warning {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .card.info {
+            border-color: #2196F3;
+            background: #d1ecf1;
+        }
+
+        .card-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .card-text {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        /* Theme Styles */
+        .theme-demo {
+            padding: 30px;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .theme-light {
+            background: #ffffff;
+            color: #333333;
+            border: 2px solid #e0e0e0;
+        }
+
+        .theme-dark {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border: 2px solid #34495e;
+        }
+
+        /* Link Styles */
+        .demo-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+
+        .demo-link:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+
+        .demo-link[target="_blank"]::after {
+            content: " ↗";
+            font-size: 0.8em;
+        }
+
+        /* Image Demo */
+        .demo-image {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+
+        /* Styled Element Demo */
+        .styled-element {
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin: 20px 0;
+        }
+
+        /* Control Row */
+        .control-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .control-row label {
+            margin: 0;
+            min-width: 120px;
+        }
+
+        /* Code Display */
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        /* State Indicators */
+        .state-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .state-active { background: #28a745; }
+        .state-inactive { background: #dc3545; }
+        .state-pending { background: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Attr & Class Bindings</h1>
+        <p class="subtitle">Comprehensive demonstration of attribute and class binding capabilities in Stitch.js v1.0.0</p>
+
+        <div class="info-box">
+            <strong>💡 What This Example Shows:</strong>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><code>data-class</code> binding: String mode and object mode for dynamic CSS classes</li>
+                <li><code>data-attr</code> binding: All value types (null, boolean, string, number, object, array)</li>
+                <li>Style object conversion: camelCase → kebab-case</li>
+                <li>Boolean attributes: <code>true</code> sets empty string, <code>false</code> removes</li>
+                <li>Real-world patterns: Cards, forms, themes, badges, and accessible components</li>
+            </ul>
+        </div>
+
+        <div id="app">
+            <!-- ========================================
+                 SECTION 1: CLASS BINDING DEMONSTRATIONS
+                 ======================================== -->
+            <h2>📚 Section 1: Class Binding</h2>
+
+            <!-- Example 1.1: String Mode -->
+            <div class="example-section">
+                <h3>1.1 String Mode - Replace Entire ClassName</h3>
+                <p>String mode replaces the entire <code>className</code> property of the element.</p>
+
+                <div class="form-group">
+                    <label for="classString">Class String:</label>
+                    <input type="text"
+                           id="classString"
+                           data-value="classString"
+                           placeholder="e.g., active highlight">
+                </div>
+
+                <div class="demo-box">
+                    <div class="demo-element" data-class="classString">
+                        Demo Element (className replaced entirely)
+                    </div>
+                </div>
+
+                <div class="status-box">
+                    <strong>Current className:</strong> "<span data-text="classString"></span>"<br>
+                    <strong>Try:</strong> "active", "highlight", "active highlight", "disabled active"
+                </div>
+            </div>
+
+            <!-- Example 1.2: Object Mode -->
+            <div class="example-section">
+                <h3>1.2 Object Mode - Toggle Individual Classes</h3>
+                <p>Object mode uses <code>classList.toggle()</code> to add/remove classes based on boolean values.</p>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="classToggles.active">
+                        <span>active (green background)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="classToggles.highlight">
+                        <span>highlight (shadow + scale)</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="classToggles.disabled">
+                        <span>disabled (grayed out)</span>
+                    </label>
+                </div>
+
+                <div class="demo-box">
+                    <div class="demo-element" data-class="classToggles">
+                        Demo Element (individual classes toggled)
+                    </div>
+                </div>
+
+                <div class="status-box">
+                    <strong>Active Classes:</strong><br>
+                    <span data-visible="classToggles.active">✅ active</span>
+                    <span data-visible="!classToggles.active">❌ active</span><br>
+                    <span data-visible="classToggles.highlight">✅ highlight</span>
+                    <span data-visible="!classToggles.highlight">❌ highlight</span><br>
+                    <span data-visible="classToggles.disabled">✅ disabled</span>
+                    <span data-visible="!classToggles.disabled">❌ disabled</span>
+                </div>
+            </div>
+
+            <!-- Example 1.3: Computed Classes for Button States -->
+            <div class="example-section">
+                <h3>1.3 Dynamic State-Based Classes (Computed)</h3>
+                <p>Use computed properties to generate class objects based on application state.</p>
+
+                <div class="control-row">
+                    <label>Button State:</label>
+                    <button data-click="setStatePrimary">Primary</button>
+                    <button data-click="setStateSuccess">Success</button>
+                    <button data-click="setStateDanger">Danger</button>
+                    <button data-click="setStateWarning">Warning</button>
+                </div>
+
+                <div class="demo-box">
+                    <button data-class="buttonClasses">
+                        Dynamic Button (<span data-text="buttonState"></span>)
+                    </button>
+                </div>
+
+                <div class="status-box">
+                    <strong>Current State:</strong> <span data-text="buttonState"></span><br>
+                    <strong>Computed Classes:</strong> <code data-text="buttonClassesDebug"></code>
+                </div>
+            </div>
+
+            <!-- ========================================
+                 SECTION 2: ATTR BINDING DEMONSTRATIONS
+                 ======================================== -->
+            <h2>🔧 Section 2: Attr Binding</h2>
+
+            <!-- Example 2.1: Basic String/Number Attributes -->
+            <div class="example-section">
+                <h3>2.1 Basic Attributes - String & Number Values</h3>
+                <p>Set attributes with string and number values using computed properties.</p>
+
+                <div class="grid">
+                    <div>
+                        <h4>Link Attributes</h4>
+                        <div class="form-group">
+                            <label>URL:</label>
+                            <input type="url" data-value="linkUrl" placeholder="/page">
+                        </div>
+                        <div class="form-group">
+                            <label>Target:</label>
+                            <select data-value="linkTarget">
+                                <option value="_self">_self</option>
+                                <option value="_blank">_blank</option>
+                                <option value="_parent">_parent</option>
+                            </select>
+                        </div>
+                        <div class="demo-box">
+                            <a data-attr="linkAttrs" class="demo-link">Dynamic Link</a>
+                        </div>
+                        <div class="status-box" style="font-size: 0.8em;">
+                            href: <span data-text="linkUrl"></span><br>
+                            target: <span data-text="linkTarget"></span><br>
+                            rel: <span data-text="linkRel"></span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4>Input Attributes</h4>
+                        <div class="form-group">
+                            <label>Max Length:</label>
+                            <input type="number" data-value="inputMaxLength" min="1" max="500">
+                        </div>
+                        <div class="form-group">
+                            <label>Placeholder:</label>
+                            <input type="text" data-value="inputPlaceholder">
+                        </div>
+                        <div class="demo-box">
+                            <input type="text" data-attr="inputAttrs" style="width: 100%;">
+                        </div>
+                        <div class="status-box" style="font-size: 0.8em;">
+                            maxlength: <span data-text="inputMaxLength"></span><br>
+                            placeholder: <span data-text="inputPlaceholder"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 2.2: Boolean Attributes -->
+            <div class="example-section">
+                <h3>2.2 Boolean Attributes - true/false Handling</h3>
+                <p>Boolean <code>true</code> sets empty attribute, <code>false</code> removes it.</p>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="isRequired">
+                        <span>Required</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="isDisabled">
+                        <span>Disabled</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="isReadonly">
+                        <span>Readonly</span>
+                    </label>
+                </div>
+
+                <div class="demo-box">
+                    <input type="text"
+                           data-attr="booleanAttrs"
+                           value="Test Input"
+                           style="width: 100%;">
+                </div>
+
+                <div class="status-box">
+                    <strong>Attributes Present:</strong><br>
+                    <span data-visible="isRequired">✅ required=""</span>
+                    <span data-visible="!isRequired">❌ required (removed)</span><br>
+                    <span data-visible="isDisabled">✅ disabled=""</span>
+                    <span data-visible="!isDisabled">❌ disabled (removed)</span><br>
+                    <span data-visible="isReadonly">✅ readonly=""</span>
+                    <span data-visible="!isReadonly">❌ readonly (removed)</span>
+                </div>
+            </div>
+
+            <!-- Example 2.3: Null/Undefined Handling -->
+            <div class="example-section">
+                <h3>2.3 Null/Undefined - Removing Attributes</h3>
+                <p>Setting an attribute to <code>null</code> or <code>undefined</code> removes it from the element.</p>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="showTitle">
+                        <span>Show title attribute</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="showDataId">
+                        <span>Show data-id attribute</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" data-value="showAriaLabel">
+                        <span>Show aria-label attribute</span>
+                    </label>
+                </div>
+
+                <div class="demo-box">
+                    <button data-attr="conditionalAttrs">
+                        Hover/Inspect Me
+                    </button>
+                </div>
+
+                <div class="status-box">
+                    <strong>Attributes:</strong><br>
+                    title: <span data-text="showTitle ? '✅ Present' : '❌ Removed'"></span><br>
+                    data-id: <span data-text="showDataId ? '✅ Present' : '❌ Removed'"></span><br>
+                    aria-label: <span data-text="showAriaLabel ? '✅ Present' : '❌ Removed'"></span>
+                </div>
+            </div>
+
+            <!-- Example 2.4: Style Object (camelCase to kebab-case) -->
+            <div class="example-section">
+                <h3>2.4 Style Object - camelCase to kebab-case Conversion</h3>
+                <p>Style objects automatically convert camelCase properties to kebab-case CSS.</p>
+
+                <div class="grid">
+                    <div>
+                        <div class="form-group">
+                            <label>Text Color:</label>
+                            <input type="color" data-value="textColor">
+                        </div>
+                        <div class="form-group">
+                            <label>Font Size: <span data-text="fontSize"></span>px</label>
+                            <input type="range" data-value="fontSize" min="12" max="48" step="2">
+                        </div>
+                        <div class="form-group">
+                            <label>Background Color:</label>
+                            <input type="color" data-value="backgroundColor">
+                        </div>
+                    </div>
+
+                    <div class="demo-box">
+                        <div class="styled-element" data-attr="styleAttrs">
+                            Styled Element
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-box" style="font-size: 0.85em;">
+                    <strong>Generated CSS:</strong><br>
+                    <code data-text="generatedCss"></code>
+                </div>
+            </div>
+
+            <!-- Example 2.5: Array Handling -->
+            <div class="example-section">
+                <h3>2.5 Array Handling - Class vs Custom Attributes</h3>
+                <p>Arrays join with <strong>spaces</strong> for class attribute, <strong>commas</strong> for others.</p>
+
+                <div class="form-group">
+                    <label>Classes (space-separated):</label>
+                    <input type="text" data-value="classArrayInput" placeholder="badge badge-success">
+                </div>
+
+                <div class="form-group">
+                    <label>Tags (comma-separated):</label>
+                    <input type="text" data-value="tagsArrayInput" placeholder="tag1, tag2, tag3">
+                </div>
+
+                <div class="demo-box">
+                    <div data-attr="arrayAttrs">
+                        Element with Array Attributes (inspect me)
+                    </div>
+                </div>
+
+                <div class="status-box" style="font-size: 0.85em;">
+                    <strong>class attribute:</strong> "<span data-text="classArrayDebug"></span>" (space-joined)<br>
+                    <strong>data-tags attribute:</strong> "<span data-text="tagsArrayDebug"></span>" (comma-joined)
+                </div>
+            </div>
+
+            <!-- ========================================
+                 SECTION 3: ADVANCED COMBINED EXAMPLES
+                 ======================================== -->
+            <h2>🚀 Section 3: Real-World Combined Examples</h2>
+
+            <!-- Example 3.1: Dynamic Status Card -->
+            <div class="example-section">
+                <h3>3.1 Dynamic Status Card</h3>
+                <p>Combines <code>data-class</code> (object mode) and <code>data-attr</code> for a complete component.</p>
+
+                <div class="control-row">
+                    <label>Card Status:</label>
+                    <button data-click="setCardSuccess">Success</button>
+                    <button data-click="setCardError">Error</button>
+                    <button data-click="setCardWarning">Warning</button>
+                    <button data-click="setCardInfo">Info</button>
+                </div>
+
+                <div class="demo-box">
+                    <div class="card" data-class="cardClasses" data-attr="cardAttrs">
+                        <div class="card-title" data-text="cardTitle"></div>
+                        <div class="card-text" data-text="cardMessage"></div>
+                        <span class="badge" data-class="badgeClasses" data-text="cardStatus"></span>
+                    </div>
+                </div>
+
+                <div class="status-box" style="font-size: 0.85em;">
+                    <strong>Status:</strong> <span data-text="cardStatus"></span><br>
+                    <strong>Classes:</strong> <code data-text="cardClassesDebug"></code><br>
+                    <strong>Attributes:</strong> role="<span data-text="cardRole"></span>",
+                    aria-live="<span data-text="cardAriaLive"></span>"
+                </div>
+            </div>
+
+            <!-- Example 3.2: Accessible Form with Validation -->
+            <div class="example-section">
+                <h3>3.2 Accessible Form with ARIA Attributes</h3>
+                <p>Uses <code>data-attr</code> for accessibility and <code>data-class</code> for validation states.</p>
+
+                <div class="form-group">
+                    <label for="email">Email Address:</label>
+                    <input type="email"
+                           id="email"
+                           data-value="emailInput"
+                           data-attr="emailAttrs"
+                           data-class="emailClasses">
+                    <small data-visible="!isEmailValid" data-text="emailError" style="color: #dc3545;"></small>
+                    <small data-visible="isEmailValid" style="color: #28a745;">✅ Valid email</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password"
+                           id="password"
+                           data-value="passwordInput"
+                           data-attr="passwordAttrs"
+                           data-class="passwordClasses">
+                    <small data-visible="!isPasswordValid" data-text="passwordError" style="color: #dc3545;"></small>
+                    <small data-visible="isPasswordValid" style="color: #28a745;">✅ Strong password</small>
+                </div>
+
+                <button data-enabled="isFormValid" data-click="submitForm">
+                    Submit Form
+                </button>
+
+                <div class="status-box" style="font-size: 0.85em; margin-top: 15px;">
+                    <strong>ARIA Attributes:</strong><br>
+                    Email: aria-invalid="<span data-text="!isEmailValid"></span>",
+                    aria-describedby="email-error"<br>
+                    Password: aria-invalid="<span data-text="!isPasswordValid"></span>",
+                    aria-describedby="password-error"<br>
+                    <strong>Form Valid:</strong> <span data-text="isFormValid ? '✅ Yes' : '❌ No'"></span>
+                </div>
+            </div>
+
+            <!-- Example 3.3: Theme Switcher -->
+            <div class="example-section">
+                <h3>3.3 Interactive Theme Switcher</h3>
+                <p>Demonstrates synchronized updates of multiple classes and attributes together.</p>
+
+                <div class="control-row">
+                    <button data-click="toggleTheme">
+                        <span data-text="theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'"></span>
+                    </button>
+                </div>
+
+                <div class="demo-box">
+                    <div class="theme-demo" data-class="themeClasses" data-attr="themeAttrs">
+                        <h4 data-text="themeTitle"></h4>
+                        <p data-text="themeDescription"></p>
+                        <span class="badge" data-class="themeBadgeClasses" data-text="themeLabel"></span>
+                    </div>
+                </div>
+
+                <div class="status-box" style="font-size: 0.85em;">
+                    <strong>Current Theme:</strong> <span data-text="theme"></span><br>
+                    <strong>Classes:</strong> <code data-text="themeClassesDebug"></code><br>
+                    <strong>data-theme:</strong> "<span data-text="theme"></span>"
+                </div>
+            </div>
+
+            <!-- Explanation Box -->
+            <div class="explanation-box">
+                <h4>🧠 Technical Deep Dive</h4>
+
+                <h5>Class Binding Implementation:</h5>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li><strong>String mode:</strong> <code>element.className = value</code> - Replaces entire className</li>
+                    <li><strong>Object mode:</strong> <code>element.classList.toggle(className, boolean)</code> - Efficient individual class toggling</li>
+                    <li><strong>Reactive:</strong> Wrapped in <code>reactiveSystem.effect()</code> for automatic updates</li>
+                </ul>
+
+                <h5>Attr Binding Strategy Pattern:</h5>
+                <ul style="margin-left: 20px; margin-bottom: 15px;">
+                    <li><strong>null/undefined handler:</strong> Removes attribute entirely</li>
+                    <li><strong>boolean handler:</strong> <code>true</code> = empty string, <code>false</code> = remove</li>
+                    <li><strong>object handler:</strong> Special handling for <code>style</code> attribute (camelCase → kebab-case)</li>
+                    <li><strong>array handler:</strong> Space-join for <code>class</code>, comma-join for others</li>
+                    <li><strong>default handler:</strong> <code>String(value)</code> for primitives</li>
+                </ul>
+
+                <h5>When to Use:</h5>
+                <ul style="margin-left: 20px;">
+                    <li><strong>Class binding (object mode):</strong> State-based styling, validation states, theme classes</li>
+                    <li><strong>Class binding (string mode):</strong> Replacing entire className dynamically</li>
+                    <li><strong>Attr binding:</strong> Dynamic links, images, ARIA attributes, validation states, style objects</li>
+                    <li><strong>Combined:</strong> Complex components with both visual and semantic requirements</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Model Definition
+        const model = Stitch.Observable.create({
+            // ===== SECTION 1: CLASS BINDING DATA =====
+
+            // Example 1.1: String Mode
+            classString: 'active highlight',
+
+            // Example 1.2: Object Mode
+            classToggles: {
+                active: true,
+                highlight: false,
+                disabled: false
+            },
+
+            // Example 1.3: State-Based Classes
+            buttonState: 'primary', // primary, success, danger, warning
+
+            // Computed: Button classes based on state
+            buttonClasses: Stitch.computed(function() {
+                return {
+                    'btn-primary': this.buttonState === 'primary',
+                    'btn-success': this.buttonState === 'success',
+                    'btn-danger': this.buttonState === 'danger',
+                    'btn-warning': this.buttonState === 'warning'
+                };
+            }),
+
+            // Debug helper for button classes
+            buttonClassesDebug: Stitch.computed(function() {
+                const classes = this.buttonClasses;
+                return Object.keys(classes).filter(k => classes[k]).join(', ') || '(none)';
+            }),
+
+            // ===== SECTION 2: ATTR BINDING DATA =====
+
+            // Example 2.1: Link Attributes
+            linkUrl: '/page',
+            linkTarget: '_blank',
+
+            linkRel: Stitch.computed(function() {
+                return this.linkTarget === '_blank' ? 'noopener noreferrer' : '';
+            }),
+
+            linkAttrs: Stitch.computed(function() {
+                return {
+                    'href': this.linkUrl,
+                    'target': this.linkTarget,
+                    'rel': this.linkTarget === '_blank' ? 'noopener noreferrer' : null,
+                    'title': 'Dynamic link - opens in ' + this.linkTarget
+                };
+            }),
+
+            // Example 2.1: Input Attributes
+            inputMaxLength: 50,
+            inputPlaceholder: 'Type something...',
+
+            inputAttrs: Stitch.computed(function() {
+                return {
+                    'maxlength': this.inputMaxLength,
+                    'placeholder': this.inputPlaceholder,
+                    'aria-label': 'Input with dynamic attributes'
+                };
+            }),
+
+            // Example 2.2: Boolean Attributes
+            isRequired: true,
+            isDisabled: false,
+            isReadonly: false,
+
+            booleanAttrs: Stitch.computed(function() {
+                return {
+                    'required': this.isRequired,
+                    'disabled': this.isDisabled,
+                    'readonly': this.isReadonly
+                };
+            }),
+
+            // Example 2.3: Null/Undefined Handling
+            showTitle: true,
+            showDataId: true,
+            showAriaLabel: true,
+
+            conditionalAttrs: Stitch.computed(function() {
+                return {
+                    'title': this.showTitle ? 'This is a tooltip' : null,
+                    'data-id': this.showDataId ? 'element-123' : null,
+                    'aria-label': this.showAriaLabel ? 'Accessible button' : undefined
+                };
+            }),
+
+            // Example 2.4: Style Object
+            textColor: '#667eea',
+            fontSize: 24,
+            backgroundColor: '#f8f9fa',
+
+            styleAttrs: Stitch.computed(function() {
+                return {
+                    'style': {
+                        color: this.textColor,
+                        fontSize: this.fontSize + 'px',
+                        backgroundColor: this.backgroundColor,
+                        padding: '30px',
+                        borderRadius: '12px',
+                        fontWeight: 'bold'
+                    }
+                };
+            }),
+
+            generatedCss: Stitch.computed(function() {
+                return `color: ${this.textColor}; font-size: ${this.fontSize}px; background-color: ${this.backgroundColor}; padding: 30px; border-radius: 12px; font-weight: bold`;
+            }),
+
+            // Example 2.5: Array Handling
+            classArrayInput: 'badge badge-success',
+            tagsArrayInput: 'javascript, stitch.js, reactive',
+
+            classArray: Stitch.computed(function() {
+                return this.classArrayInput.split(' ').filter(s => s.trim());
+            }),
+
+            tagsArray: Stitch.computed(function() {
+                return this.tagsArrayInput.split(',').map(s => s.trim()).filter(s => s);
+            }),
+
+            arrayAttrs: Stitch.computed(function() {
+                return {
+                    'class': this.classArray,
+                    'data-tags': this.tagsArray
+                };
+            }),
+
+            classArrayDebug: Stitch.computed(function() {
+                return this.classArray.join(' ');
+            }),
+
+            tagsArrayDebug: Stitch.computed(function() {
+                return this.tagsArray.join(', ');
+            }),
+
+            // ===== SECTION 3: COMBINED EXAMPLES =====
+
+            // Example 3.1: Status Card
+            cardStatus: 'success', // success, error, warning, info
+
+            cardTitle: Stitch.computed(function() {
+                const titles = {
+                    success: '✅ Success',
+                    error: '❌ Error',
+                    warning: '⚠️ Warning',
+                    info: 'ℹ️ Information'
+                };
+                return titles[this.cardStatus] || 'Status';
+            }),
+
+            cardMessage: Stitch.computed(function() {
+                const messages = {
+                    success: 'Operation completed successfully!',
+                    error: 'An error occurred. Please try again.',
+                    warning: 'Please review your input before proceeding.',
+                    info: 'This is an informational message.'
+                };
+                return messages[this.cardStatus] || '';
+            }),
+
+            cardClasses: Stitch.computed(function() {
+                return {
+                    'success': this.cardStatus === 'success',
+                    'error': this.cardStatus === 'error',
+                    'warning': this.cardStatus === 'warning',
+                    'info': this.cardStatus === 'info'
+                };
+            }),
+
+            cardAttrs: Stitch.computed(function() {
+                return {
+                    'role': 'alert',
+                    'aria-live': this.cardStatus === 'error' ? 'assertive' : 'polite',
+                    'data-status': this.cardStatus
+                };
+            }),
+
+            badgeClasses: Stitch.computed(function() {
+                return {
+                    'badge-success': this.cardStatus === 'success',
+                    'badge-danger': this.cardStatus === 'error',
+                    'badge-warning': this.cardStatus === 'warning',
+                    'badge-info': this.cardStatus === 'info'
+                };
+            }),
+
+            cardRole: Stitch.computed(function() {
+                return 'alert';
+            }),
+
+            cardAriaLive: Stitch.computed(function() {
+                return this.cardStatus === 'error' ? 'assertive' : 'polite';
+            }),
+
+            cardClassesDebug: Stitch.computed(function() {
+                const classes = this.cardClasses;
+                return 'card ' + Object.keys(classes).filter(k => classes[k]).join(' ');
+            }),
+
+            // Example 3.2: Accessible Form
+            emailInput: '',
+            passwordInput: '',
+
+            isEmailValid: Stitch.computed(function() {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.emailInput);
+            }),
+
+            isPasswordValid: Stitch.computed(function() {
+                return this.passwordInput.length >= 8;
+            }),
+
+            isFormValid: Stitch.computed(function() {
+                return this.isEmailValid && this.isPasswordValid;
+            }),
+
+            emailError: Stitch.computed(function() {
+                return this.emailInput ? 'Please enter a valid email address' : 'Email is required';
+            }),
+
+            passwordError: Stitch.computed(function() {
+                return this.passwordInput ? 'Password must be at least 8 characters' : 'Password is required';
+            }),
+
+            emailAttrs: Stitch.computed(function() {
+                return {
+                    'aria-invalid': !this.isEmailValid && this.emailInput ? 'true' : 'false',
+                    'aria-describedby': 'email-error',
+                    'required': true
+                };
+            }),
+
+            emailClasses: Stitch.computed(function() {
+                if (!this.emailInput) return {};
+                return {
+                    'valid': this.isEmailValid,
+                    'invalid': !this.isEmailValid
+                };
+            }),
+
+            passwordAttrs: Stitch.computed(function() {
+                return {
+                    'aria-invalid': !this.isPasswordValid && this.passwordInput ? 'true' : 'false',
+                    'aria-describedby': 'password-error',
+                    'required': true,
+                    'minlength': 8
+                };
+            }),
+
+            passwordClasses: Stitch.computed(function() {
+                if (!this.passwordInput) return {};
+                return {
+                    'valid': this.isPasswordValid,
+                    'invalid': !this.isPasswordValid
+                };
+            }),
+
+            // Example 3.3: Theme Switcher
+            theme: 'light', // light, dark
+
+            themeTitle: Stitch.computed(function() {
+                return this.theme === 'light' ? 'Light Theme' : 'Dark Theme';
+            }),
+
+            themeDescription: Stitch.computed(function() {
+                return this.theme === 'light'
+                    ? 'Bright and clean interface for daytime use.'
+                    : 'Easy on the eyes for nighttime browsing.';
+            }),
+
+            themeLabel: Stitch.computed(function() {
+                return this.theme.toUpperCase();
+            }),
+
+            themeClasses: Stitch.computed(function() {
+                return {
+                    'theme-light': this.theme === 'light',
+                    'theme-dark': this.theme === 'dark'
+                };
+            }),
+
+            themeAttrs: Stitch.computed(function() {
+                return {
+                    'data-theme': this.theme,
+                    'aria-label': `${this.theme} theme preview`
+                };
+            }),
+
+            themeBadgeClasses: Stitch.computed(function() {
+                return {
+                    'badge-info': this.theme === 'light',
+                    'badge-secondary': this.theme === 'dark'
+                };
+            }),
+
+            themeClassesDebug: Stitch.computed(function() {
+                return `theme-demo theme-${this.theme}`;
+            }),
+
+            // ===== ACTION METHODS =====
+
+            // Section 1: Button state methods
+            setStatePrimary() {
+                this.buttonState = 'primary';
+            },
+
+            setStateSuccess() {
+                this.buttonState = 'success';
+            },
+
+            setStateDanger() {
+                this.buttonState = 'danger';
+            },
+
+            setStateWarning() {
+                this.buttonState = 'warning';
+            },
+
+            // Section 3: Card status methods
+            setCardSuccess() {
+                this.cardStatus = 'success';
+            },
+
+            setCardError() {
+                this.cardStatus = 'error';
+            },
+
+            setCardWarning() {
+                this.cardStatus = 'warning';
+            },
+
+            setCardInfo() {
+                this.cardStatus = 'info';
+            },
+
+            // Section 3: Form submission
+            submitForm() {
+                if (this.isFormValid) {
+                    alert(`Form submitted!\nEmail: ${this.emailInput}\nPassword: ${'*'.repeat(this.passwordInput.length)}`);
+                }
+            },
+
+            // Section 3: Theme toggle
+            toggleTheme() {
+                this.theme = this.theme === 'light' ? 'dark' : 'light';
+            }
+        });
+
+        // Initialize Data Binder
+        const binder = new Stitch.DataBinder();
+        binder.bind('#app', model);
+
+        // Console logging
+        console.log('✅ Example 27: Attr & Class Bindings initialized (v1.0.0)');
+        console.log('📚 This example demonstrates:');
+        console.log('  - Class binding: String mode and object mode');
+        console.log('  - Attr binding: All value types (null, boolean, string, number, object, array)');
+        console.log('  - Style object: camelCase to kebab-case conversion');
+        console.log('  - Real-world patterns: Cards, forms, themes, badges');
+        console.log('  - Accessibility: ARIA attributes and validation states');
+    </script>
+</body>
+</html>

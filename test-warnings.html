@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stitch.js DevMode Warnings Test</title>
+    <style>
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        .log-box { background: #f0f0f0; padding: 10px; border: 1px solid #ccc; font-family: monospace; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>DevMode Warnings Test</h1>
+    
+    <div id="output"></div>
+    <div class="log-box" id="console-log"></div>
+
+    <!-- Test Elements -->
+    <div id="app" style="display: none;">
+        <!-- Warning 1: Missing Property -->
+        <div data-text="nonExistentProperty"></div>
+
+        <!-- Warning 2: Missing Keys -->
+        <ul data-foreach="itemsNoKeys">
+            <li data-text="name"></li>
+        </ul>
+
+        <!-- Warning 3: Select Performance -->
+        <select data-foreach="largeList">
+            <option data-value="$data" data-text="$data"></option>
+        </select>
+    </div>
+
+    <script src="stitch.js"></script>
+    <script>
+        const output = document.getElementById('output');
+        const logBox = document.getElementById('console-log');
+        const capturedWarnings = [];
+
+        // Hijack console.warn
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            const msg = args.join(' ');
+            capturedWarnings.push(msg);
+            
+            const div = document.createElement('div');
+            div.textContent = "⚠️ " + msg;
+            div.style.color = "orange";
+            logBox.appendChild(div);
+            
+            originalWarn.apply(console, args);
+        };
+
+        // Hijack console.log for custom warnings (StitchDebug uses console.log with colors)
+        const originalLog = console.log;
+        console.log = function(...args) {
+            // StitchDebug uses CSS colors in args[1], so message is often in args[0] or args[2]
+            // We'll just capture everything string-like
+            const msg = args.map(a => typeof a === 'string' ? a : '').join(' ');
+            
+            if (msg.includes("[WARNING]") || msg.includes("Performance Warning")) {
+                capturedWarnings.push(msg);
+                const div = document.createElement('div');
+                div.textContent = "⚠️ " + msg.replace(/%c/g, ''); // Strip CSS codes
+                div.style.color = "orange";
+                logBox.appendChild(div);
+            }
+            
+            originalLog.apply(console, args);
+        }
+
+        // Enable Debug Mode
+        Stitch.debug.enable();
+
+        // Setup Data
+        const itemsNoKeys = [
+            { name: 'Item 1' },
+            { name: 'Item 2' }
+        ];
+
+        const largeList = [];
+        for(let i=0; i<150; i++) largeList.push(i);
+
+        const model = Stitch.Observable.create({
+            itemsNoKeys: itemsNoKeys,
+            largeList: largeList
+        });
+
+        // Initialize Binding (should trigger warnings)
+        try {
+            const binder = new Stitch.DataBinder();
+            binder.bind('#app', model);
+        } catch (e) {
+            console.error(e);
+        }
+
+        // Verify Results
+        setTimeout(() => {
+            const expectedWarnings = [
+                'Property "nonExistentProperty" not found',
+                "objects but missing 'id' or 'key'",
+                "triggers full re-render"
+            ];
+
+            let passed = true;
+            let html = '<ul>';
+
+            expectedWarnings.forEach(expect => {
+                const found = capturedWarnings.some(w => w.includes(expect));
+                if (found) {
+                    html += `<li class="pass">✅ Found warning: "${expect}"</li>`;
+                } else {
+                    html += `<li class="fail">❌ Missing warning: "${expect}"</li>`;
+                    passed = false;
+                }
+            });
+            html += '</ul>';
+
+            if (passed) {
+                html += '<h3>ALL TESTS PASSED</h3>';
+            } else {
+                html += '<h3>TESTS FAILED</h3>';
+            }
+
+            output.innerHTML = html;
+        }, 500);
+
+    </script>
+</body>
+</html>

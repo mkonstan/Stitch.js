@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Unbind Memory Leak</title>
+    <script src="stitch.js"></script>
+    <style>
+        .fail { color: red; font-weight: bold; }
+        .pass { color: green; font-weight: bold; }
+        .test-container { margin: 10px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Test: Unbind Memory Leak (Zombie Effects)</h1>
+    <div id="results"></div>
+
+    <div id="app">
+        <div id="target" data-text="count"></div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.textContent = message;
+            div.className = type;
+            results.appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function assert(condition, message) {
+            if (condition) {
+                log(`PASS: ${message}`, 'pass');
+            } else {
+                log(`FAIL: ${message}`, 'fail');
+            }
+        }
+
+        // 1. Setup
+        const model = Stitch.Observable.create({ count: 0 });
+        const binder = new Stitch.DataBinder();
+        const target = document.getElementById('target');
+
+        binder.bind('#app', model);
+        
+        // 2. Verify Bound
+        model.count = 1;
+        
+        // Need to wait for async batching
+        setTimeout(() => {
+            const boundText = target.textContent;
+            if (boundText === "1") {
+                log("Setup verified: Element is bound and reactive.", 'pass');
+            } else {
+                log(`Setup failed: Expected "1", got "${boundText}"`, 'fail');
+                return; // Stop test
+            }
+
+            // 3. Perform Unbind
+            log("Executing: binder.unbind(target)...");
+            binder.unbind(target);
+
+            // 4. Modify Model
+            log("Modifying model: model.count = 999...");
+            model.count = 999;
+
+            // 5. Verify Unbound (Wait for batching again)
+            setTimeout(() => {
+                const currentText = target.textContent;
+                log(`Current DOM text: "${currentText}"`);
+
+                if (currentText === "1") {
+                    assert(true, "Zombie Killed: DOM did NOT update after unbind.");
+                } else if (currentText === "999") {
+                    assert(false, "Zombie Alive: DOM updated after unbind! (Memory Leak/Zombie Effect)");
+                } else {
+                    assert(false, `Unexpected state: "${currentText}"`);
+                }
+            }, 50);
+
+        }, 50);
+    </script>
+</body>
+</html>

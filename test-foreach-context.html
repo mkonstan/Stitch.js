@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Foreach Context Pollution</title>
+    <script src="stitch.js"></script>
+    <style>
+        .fail { color: red; font-weight: bold; }
+        .pass { color: green; font-weight: bold; }
+        .test-container { margin: 10px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Test: Foreach Context Pollution</h1>
+    <div id="results"></div>
+
+    <!-- 
+        SCENARIO:
+        Two lists rendering the SAME objects.
+        List 1: All Items (Index 0, 1, 2)
+        List 2: Selected Items (subset, e.g., Item 2 becomes Index 0 in this list)
+        
+        BUG: If context ($index) is written to the object, List 2 overwrites List 1's index.
+    -->
+
+    <div id="app">
+        <!-- List 1: All Items -->
+        <div id="list1" data-foreach="allItems">
+            <div class="item-row">
+                <span data-text="name"></span>
+                <span data-text="$index"></span>
+            </div>
+        </div>
+
+        <!-- List 2: Selected Items (subset) -->
+        <div id="list2" data-foreach="selectedItems">
+            <div class="item-row">
+                <span data-text="name"></span>
+                <span data-text="$index"></span>
+                <button data-click="$parent.selectItem">Select</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.textContent = message;
+            div.className = type;
+            results.appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function assert(condition, message) {
+            if (condition) {
+                log(`PASS: ${message}`, 'pass');
+            } else {
+                log(`FAIL: ${message}`, 'fail');
+            }
+        }
+
+        // Setup Data
+        const itemA = { id: 1, name: 'Item A' };
+        const itemB = { id: 2, name: 'Item B' };
+        const itemC = { id: 3, name: 'Item C' };
+
+        // Model
+        const model = Stitch.Observable.create({
+            allItems: [itemA, itemB, itemC],
+            selectedItems: [itemC, itemA], // C is index 0 here, A is index 1
+
+            selectItem(item) {
+                log(`Clicked: ${item.name} (ID: ${item.id})`, 'info');
+                // Check identity
+                if (item === itemA || item === itemB || item === itemC) {
+                    log('Identity Check: Handler received RAW DATA object', 'pass');
+                } else if (item.$data === itemA || item.$data === itemB || item.$data === itemC) {
+                    log('Identity Check: Handler received CONTEXT WRAPPER (acceptable if unwrap documented)', 'info');
+                } else {
+                    log('Identity Check: Handler received UNKNOWN object', 'fail');
+                }
+            }
+        });
+
+        // Bind
+        try {
+            const binder = new Stitch.DataBinder();
+            binder.bind('#app', model);
+            
+            // Allow render to complete
+            setTimeout(() => {
+                verifyContextPollution();
+            }, 100);
+        } catch (e) {
+            log(`Error during binding: ${e.message}`, 'fail');
+        }
+
+        function verifyContextPollution() {
+            log('--- Verifying Context Isolation ---');
+
+            // 1. Check if objects are polluted
+            // If bug exists, itemA.$index will be 1 (from selectedItems), overwriting 0 (from allItems)
+            // Wait... allItems renders first (0,1,2). selectedItems renders second (0,1).
+            // itemA is index 0 in allItems. itemA is index 1 in selectedItems.
+            // If polluted, itemA.$index will be 1.
+            
+            // Check DOM output in List 1 (should be 0)
+            const list1Rows = document.querySelectorAll('#list1 .item-row');
+            const itemARow_List1 = list1Rows[0]; // Item A
+            const indexSpan_List1 = itemARow_List1.querySelectorAll('span')[1];
+            
+            const renderedIndex_List1 = indexSpan_List1.textContent;
+            
+            log(`List 1 (Item A) Rendered Index: ${renderedIndex_List1} (Expected: 0)`);
+            
+            if (renderedIndex_List1 === "0") {
+                assert(true, "List 1 index verified correct (DOM)");
+            } else {
+                assert(false, `List 1 index corrupted! Got ${renderedIndex_List1}, Expected 0`);
+            }
+
+            // Check Object Pollution directly
+            if (itemA.$index !== undefined) {
+                log(`Object Pollution Detected: itemA.$index = ${itemA.$index}`, 'fail');
+            } else {
+                log('No Object Pollution detected on raw item (Excellent!)', 'pass');
+            }
+
+            // 2. Check List 2
+            const list2Rows = document.querySelectorAll('#list2 .item-row');
+            const itemARow_List2 = list2Rows[1]; // Item A is second here
+            const indexSpan_List2 = itemARow_List2.querySelectorAll('span')[1];
+            const renderedIndex_List2 = indexSpan_List2.textContent;
+
+            log(`List 2 (Item A) Rendered Index: ${renderedIndex_List2} (Expected: 1)`);
+            assert(renderedIndex_List2 === "1", "List 2 index verified correct");
+        }
+    </script>
+</body>
+</html>

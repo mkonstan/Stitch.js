@@ -1,0 +1,33 @@
+{
+  "name": "stitch-js",
+  "version": "2.1.0",
+  "private": false,
+  "description": "Drop-in reactive data binding for browser apps.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "validate:browser": "node _scratch/run-browser-validation.js",
+    "build:assembly": "node _tools/build-stitch-assembly.js",
+    "build:assembly:all": "node _tools/build-stitch-assembly.js --mode=all",
+    "build:min": "node minify.js",
+    "build:all": "npm run build:assembly && npm run build:min",
+    "kpi:gate": "node _tools/check-kpi-gate.js _scratch/browser-validation-report-assembly.json",
+    "validate:assembly": "npm run build:assembly && node _scratch/run-browser-validation.js > _scratch/browser-validation-report-assembly.json && npm run kpi:gate",
+    "validate:release-candidate": "npm run build:assembly && node _scratch/run-browser-validation-release-candidate.js > _scratch/browser-validation-report-release-candidate.json",
+    "compare:build-output": "node _tools/compare-build-output.js _scratch/browser-validation-report-source.json _scratch/browser-validation-report-release-candidate.json _scratch/build-output-delta.json",
+    "pipeline:build-compare": "node _tools/run-build-compare-pipeline.js"
+  },
+  "license": "MIT",
+  "keywords": [
+    "stitch",
+    "mvvm",
+    "reactivity",
+    "data-binding",
+    "browser"
+  ],
+  "devDependencies": {
+    "playwright": "^1.58.2",
+    "terser": "^5.44.0"
+  }
+}

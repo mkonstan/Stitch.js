@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js Property Hooks Test Suite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+        }
+
+        .test-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .test-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .test-case {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .test-case h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .test-result {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-left: 10px;
+        }
+
+        .test-result.pending {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .test-result.pass {
+            background: #28a745;
+            color: white;
+        }
+
+        .test-result.fail {
+            background: #dc3545;
+            color: white;
+        }
+
+        .test-output {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .hook-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 8px;
+            font-weight: 600;
+        }
+
+        .hook-indicator.onbind {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .hook-indicator.onchange {
+            background: #ffc107;
+            color: #000;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin: 5px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            color: #555;
+            font-size: 0.85rem;
+        }
+
+        .log-entry.onbind-log {
+            color: #17a2b8;
+            font-weight: 600;
+        }
+
+        .log-entry.onchange-log {
+            color: #ffc107;
+            font-weight: 600;
+        }
+
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            font-size: 1.2rem;
+            margin-top: 40px;
+        }
+
+        .summary h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Stitch.js Property Hooks Test Suite</h1>
+        <p class="subtitle">Testing property hook restoration from commit 41549b3 (Oct 29, 2025)</p>
+
+        <!-- Test 1: Basic onBind Hook -->
+        <div class="test-section">
+            <h2>Test 1: Basic onBind Hook <span class="test-result pending" id="test1-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: onBind hook should execute once on initial binding</h3>
+                <p>Expected: Custom styling applied via onBind hook</p>
+                <div class="test-output">
+                    <div>Status: <span data-text="status" id="test1-status-text">loading</span></div>
+                    <div id="test1-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 2: Basic onChange Hook -->
+        <div class="test-section">
+            <h2>Test 2: Basic onChange Hook <span class="test-result pending" id="test2-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: onChange hook should execute on reactive updates</h3>
+                <p>Expected: Hook executes when value changes</p>
+                <div class="test-output">
+                    <div>Counter: <span data-text="counter" id="test2-counter">0</span></div>
+                    <button data-click="incrementCounter">Increment Counter</button>
+                    <div id="test2-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 3: Hook Lookup by Property Name -->
+        <div class="test-section">
+            <h2>Test 3: Hook Lookup by Property Name <span class="test-result pending" id="test3-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Hook registered by simple property name ('message')</h3>
+                <p>Expected: Hook found and executed for property 'message'</p>
+                <div class="test-output">
+                    <div>Message: <span data-text="message" id="test3-message">Hello</span></div>
+                    <input type="text" data-value="message" placeholder="Change message">
+                    <div id="test3-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 4: Hook Lookup by Full Path -->
+        <div class="test-section">
+            <h2>Test 4: Hook Lookup by Full Path <span class="test-result pending" id="test4-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Hook registered by full path ('user.profile.name')</h3>
+                <p>Expected: Hook found and executed for nested property</p>
+                <div class="test-output">
+                    <div>User Name: <span data-text="user.profile.name" id="test4-username">John</span></div>
+                    <input type="text" data-value="user.profile.name" placeholder="Change name">
+                    <div id="test4-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 5: Fallback to Default Binding -->
+        <div class="test-section">
+            <h2>Test 5: Fallback to Default Binding <span class="test-result pending" id="test5-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Property with no hooks should use default binding</h3>
+                <p>Expected: Normal text binding works without hooks</p>
+                <div class="test-output">
+                    <div>Default: <span data-text="defaultValue" id="test5-default">No hooks here</span></div>
+                    <button data-click="changeDefault">Change Default Value</button>
+                    <div id="test5-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 6: Multiple Properties with Different Hooks -->
+        <div class="test-section">
+            <h2>Test 6: Multiple Properties with Different Hooks <span class="test-result pending" id="test6-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Multiple properties, each with different hooks</h3>
+                <p>Expected: Each property triggers its own hook</p>
+                <div class="test-output">
+                    <div>Title: <span data-text="title" id="test6-title">Important</span></div>
+                    <div>Priority: <span data-text="priority" id="test6-priority">high</span></div>
+                    <button data-click="changeTitle">Change Title</button>
+                    <button data-click="changePriority">Change Priority</button>
+                    <div id="test6-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 7: Hook Parameters -->
+        <div class="test-section">
+            <h2>Test 7: Hook Parameters <span class="test-result pending" id="test7-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: All hook parameters passed correctly</h3>
+                <p>Expected: element, value, binding, fullPath all present</p>
+                <div class="test-output">
+                    <div>Test Value: <span data-text="testValue" id="test7-value">initial</span></div>
+                    <button data-click="changeTestValue">Change Value</button>
+                    <div id="test7-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 8: Hooks with Different Binding Types -->
+        <div class="test-section">
+            <h2>Test 8: Hooks with Different Binding Types <span class="test-result pending" id="test8-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Hooks work with text, value, class bindings</h3>
+                <p>Expected: Hooks execute for various binding types</p>
+                <div class="test-output">
+                    <div>Text: <span data-text="multiText" id="test8-text">Text Value</span></div>
+                    <div>Value: <input type="text" data-value="multiValue" id="test8-value"></div>
+                    <div>Class: <div data-class="multiClass" id="test8-class" style="padding:10px; border-radius:4px;">Class Binding</div></div>
+                    <button data-click="changeMultiBindings">Change All</button>
+                    <div id="test8-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 9: Missing Hooks Don't Error -->
+        <div class="test-section">
+            <h2>Test 9: Missing Hooks Don't Cause Errors <span class="test-result pending" id="test9-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: Properties without hooks should not throw errors</h3>
+                <p>Expected: Normal operation, no console errors</p>
+                <div class="test-output">
+                    <div>Safe Property: <span data-text="safeProperty" id="test9-safe">Safe Value</span></div>
+                    <button data-click="changeSafe">Change Safe Property</button>
+                    <div id="test9-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test 10: this Context in Hooks -->
+        <div class="test-section">
+            <h2>Test 10: 'this' Context in Hooks <span class="test-result pending" id="test10-status">PENDING</span></h2>
+            <div class="test-case">
+                <h3>Scenario: 'this' should refer to DataBinder instance in hooks</h3>
+                <p>Expected: Hooks can access DataBinder methods via 'this'</p>
+                <div class="test-output">
+                    <div>Context Test: <span data-text="contextValue" id="test10-context">initial</span></div>
+                    <button data-click="changeContext">Change Context Value</button>
+                    <div id="test10-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary">
+            <h2>📊 Test Results Summary</h2>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number" id="total-tests">10</div>
+                    <div class="stat-label">Total Tests</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="passed-tests">0</div>
+                    <div class="stat-label">Passed</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="failed-tests">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="stitch.js"></script>
+    <script>
+        console.log('🧪 Property Hooks Test Suite Starting...');
+        console.log('📋 Testing restoration of deleted _applyBinding() functionality');
+        console.log('');
+
+        let totalTests = 10;
+        let passedTests = 0;
+        let failedTests = 0;
+
+        function markTestPassed(testId) {
+            const statusEl = document.getElementById(`${testId}-status`);
+            statusEl.textContent = 'PASS';
+            statusEl.classList.remove('pending', 'fail');
+            statusEl.classList.add('pass');
+            passedTests++;
+            updateSummary();
+        }
+
+        function markTestFailed(testId) {
+            const statusEl = document.getElementById(`${testId}-status`);
+            statusEl.textContent = 'FAIL';
+            statusEl.classList.remove('pending', 'pass');
+            statusEl.classList.add('fail');
+            failedTests++;
+            updateSummary();
+        }
+
+        function updateSummary() {
+            document.getElementById('passed-tests').textContent = passedTests;
+            document.getElementById('failed-tests').textContent = failedTests;
+        }
+
+        function addLog(testId, message, type = '') {
+            const logEl = document.getElementById(`${testId}-log`);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            logEl.appendChild(entry);
+        }
+
+        // Test 1: Basic onBind Hook
+        try {
+            let onBindCalled = false;
+            const model1 = Stitch.Observable.create({
+                status: 'loading'
+            });
+
+            const binder1 = new Stitch.DataBinder({
+                properties: {
+                    'status': {
+                        onBind(element, value, binding, fullPath) {
+                            console.log('✅ Test 1: onBind called', { element, value, binding, fullPath });
+                            addLog('test1', `onBind called: value="${value}", path="${fullPath}"`, 'onbind-log');
+                            element.style.fontWeight = 'bold';
+                            element.style.color = '#17a2b8';
+                            onBindCalled = true;
+                        }
+                    }
+                }
+            });
+
+            const test1Container = document.querySelector('#test1-status-text').parentElement.parentElement;
+            binder1.bind(test1Container, model1);
+
+            setTimeout(() => {
+                if (onBindCalled) {
+                    markTestPassed('test1');
+                    console.log('✅ Test 1 PASSED: onBind hook executed');
+                } else {
+                    markTestFailed('test1');
+                    console.error('❌ Test 1 FAILED: onBind hook NOT executed');
+                    addLog('test1', '❌ FAILED: onBind hook was not called', 'onchange-log');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test1');
+            console.error('❌ Test 1 ERROR:', error);
+            addLog('test1', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 2: Basic onChange Hook
+        try {
+            let onChangeCalled = false;
+            const model2 = Stitch.Observable.create({
+                counter: 0,
+                incrementCounter() {
+                    this.counter++;
+                }
+            });
+
+            const binder2 = new Stitch.DataBinder({
+                properties: {
+                    'counter': {
+                        onChange(element, newValue, oldValue, binding, fullPath) {
+                            console.log('✅ Test 2: onChange called', { newValue, oldValue, fullPath });
+                            addLog('test2', `onChange: ${oldValue} → ${newValue}`, 'onchange-log');
+                            onChangeCalled = true;
+                        }
+                    }
+                }
+            });
+
+            const test2Container = document.querySelector('#test2-counter').parentElement.parentElement;
+            binder2.bind(test2Container, model2);
+
+            setTimeout(() => {
+                model2.counter = 1; // Trigger change
+                setTimeout(() => {
+                    if (onChangeCalled) {
+                        markTestPassed('test2');
+                        console.log('✅ Test 2 PASSED: onChange hook executed');
+                    } else {
+                        markTestFailed('test2');
+                        console.error('❌ Test 2 FAILED: onChange hook NOT executed');
+                        addLog('test2', '❌ FAILED: onChange hook was not called', 'onchange-log');
+                    }
+                }, 100);
+            }, 100);
+        } catch (error) {
+            markTestFailed('test2');
+            console.error('❌ Test 2 ERROR:', error);
+            addLog('test2', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 3: Hook Lookup by Property Name
+        try {
+            let hookFound = false;
+            const model3 = Stitch.Observable.create({
+                message: 'Hello'
+            });
+
+            const binder3 = new Stitch.DataBinder({
+                properties: {
+                    'message': { // Simple property name, no full path
+                        onBind(element, value, binding, fullPath) {
+                            console.log('✅ Test 3: Hook found by property name', { value, fullPath });
+                            addLog('test3', `Hook found by name "message"`, 'onbind-log');
+                            hookFound = true;
+                        }
+                    }
+                }
+            });
+
+            const test3Container = document.querySelector('#test3-message').parentElement.parentElement;
+            binder3.bind(test3Container, model3);
+
+            setTimeout(() => {
+                if (hookFound) {
+                    markTestPassed('test3');
+                    console.log('✅ Test 3 PASSED: Hook lookup by property name works');
+                } else {
+                    markTestFailed('test3');
+                    console.error('❌ Test 3 FAILED: Hook NOT found by property name');
+                    addLog('test3', '❌ FAILED: Hook not found', 'onchange-log');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test3');
+            console.error('❌ Test 3 ERROR:', error);
+            addLog('test3', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 4: Hook Lookup by Full Path
+        try {
+            let hookFound = false;
+            const model4 = Stitch.Observable.create({
+                user: {
+                    profile: {
+                        name: 'John'
+                    }
+                }
+            });
+
+            const binder4 = new Stitch.DataBinder({
+                properties: {
+                    'user.profile.name': { // Full path
+                        onBind(element, value, binding, fullPath) {
+                            console.log('✅ Test 4: Hook found by full path', { value, fullPath });
+                            addLog('test4', `Hook found by path "user.profile.name"`, 'onbind-log');
+                            hookFound = true;
+                        }
+                    }
+                }
+            });
+
+            const test4Container = document.querySelector('#test4-username').parentElement.parentElement;
+            binder4.bind(test4Container, model4);
+
+            setTimeout(() => {
+                if (hookFound) {
+                    markTestPassed('test4');
+                    console.log('✅ Test 4 PASSED: Hook lookup by full path works');
+                } else {
+                    markTestFailed('test4');
+                    console.error('❌ Test 4 FAILED: Hook NOT found by full path');
+                    addLog('test4', '❌ FAILED: Hook not found', 'onchange-log');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test4');
+            console.error('❌ Test 4 ERROR:', error);
+            addLog('test4', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 5: Fallback to Default Binding
+        try {
+            let bindingWorks = false;
+            const model5 = Stitch.Observable.create({
+                defaultValue: 'No hooks here',
+                changeDefault() {
+                    this.defaultValue = 'Changed without hooks!';
+                    bindingWorks = true;
+                }
+            });
+
+            const binder5 = new Stitch.DataBinder({
+                properties: {
+                    // Deliberately no hooks for 'defaultValue'
+                }
+            });
+
+            const test5Container = document.querySelector('#test5-default').parentElement.parentElement;
+            binder5.bind(test5Container, model5);
+
+            setTimeout(() => {
+                const initialText = document.getElementById('test5-default').textContent;
+                model5.changeDefault();
+                setTimeout(() => {
+                    const newText = document.getElementById('test5-default').textContent;
+                    if (bindingWorks && newText === 'Changed without hooks!') {
+                        markTestPassed('test5');
+                        console.log('✅ Test 5 PASSED: Default binding works without hooks');
+                        addLog('test5', `Default binding works: "${newText}"`, 'onbind-log');
+                    } else {
+                        markTestFailed('test5');
+                        console.error('❌ Test 5 FAILED: Default binding not working');
+                        addLog('test5', '❌ FAILED: Text did not update', 'onchange-log');
+                    }
+                }, 100);
+            }, 100);
+        } catch (error) {
+            markTestFailed('test5');
+            console.error('❌ Test 5 ERROR:', error);
+            addLog('test5', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 6: Multiple Properties with Different Hooks
+        try {
+            let titleHookCalled = false;
+            let priorityHookCalled = false;
+            const model6 = Stitch.Observable.create({
+                title: 'Important',
+                priority: 'high',
+                changeTitle() {
+                    this.title = 'Updated Title';
+                },
+                changePriority() {
+                    this.priority = 'urgent';
+                }
+            });
+
+            const binder6 = new Stitch.DataBinder({
+                properties: {
+                    'title': {
+                        onBind(element, value) {
+                            addLog('test6', `Title onBind: "${value}"`, 'onbind-log');
+                            titleHookCalled = true;
+                        }
+                    },
+                    'priority': {
+                        onBind(element, value) {
+                            addLog('test6', `Priority onBind: "${value}"`, 'onbind-log');
+                            priorityHookCalled = true;
+                        }
+                    }
+                }
+            });
+
+            const test6Container = document.querySelector('#test6-title').parentElement.parentElement;
+            binder6.bind(test6Container, model6);
+
+            setTimeout(() => {
+                if (titleHookCalled && priorityHookCalled) {
+                    markTestPassed('test6');
+                    console.log('✅ Test 6 PASSED: Multiple property hooks work independently');
+                } else {
+                    markTestFailed('test6');
+                    console.error('❌ Test 6 FAILED: Not all hooks executed');
+                    addLog('test6', `❌ FAILED: title=${titleHookCalled}, priority=${priorityHookCalled}`, 'onchange-log');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test6');
+            console.error('❌ Test 6 ERROR:', error);
+            addLog('test6', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 7: Hook Parameters
+        try {
+            let paramsCorrect = false;
+            const model7 = Stitch.Observable.create({
+                testValue: 'initial',
+                changeTestValue() {
+                    this.testValue = 'updated';
+                }
+            });
+
+            const binder7 = new Stitch.DataBinder({
+                properties: {
+                    'testValue': {
+                        onBind(element, value, binding, fullPath) {
+                            const hasElement = element && element.nodeType === 1;
+                            const hasValue = value !== undefined;
+                            const hasBinding = binding !== undefined;
+                            const hasPath = fullPath !== undefined;
+                            paramsCorrect = hasElement && hasValue && hasBinding && hasPath;
+
+                            addLog('test7', `Parameters check:`, 'onbind-log');
+                            addLog('test7', `  element: ${hasElement ? '✓' : '✗'}`, '');
+                            addLog('test7', `  value: ${hasValue ? '✓' : '✗'} ("${value}")`, '');
+                            addLog('test7', `  binding: ${hasBinding ? '✓' : '✗'}`, '');
+                            addLog('test7', `  fullPath: ${hasPath ? '✓' : '✗'} ("${fullPath}")`, '');
+
+                            console.log('Test 7 params:', { element, value, binding, fullPath });
+                        }
+                    }
+                }
+            });
+
+            const test7Container = document.querySelector('#test7-value').parentElement.parentElement;
+            binder7.bind(test7Container, model7);
+
+            setTimeout(() => {
+                if (paramsCorrect) {
+                    markTestPassed('test7');
+                    console.log('✅ Test 7 PASSED: All hook parameters present');
+                } else {
+                    markTestFailed('test7');
+                    console.error('❌ Test 7 FAILED: Missing hook parameters');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test7');
+            console.error('❌ Test 7 ERROR:', error);
+            addLog('test7', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 8: Hooks with Different Binding Types
+        try {
+            let textHook = false;
+            let valueHook = false;
+            let classHook = false;
+            const model8 = Stitch.Observable.create({
+                multiText: 'Text Value',
+                multiValue: 'Value Input',
+                multiClass: { active: false },
+                changeMultiBindings() {
+                    this.multiText = 'Updated Text';
+                    this.multiValue = 'Updated Value';
+                    this.multiClass = { active: true };
+                }
+            });
+
+            const binder8 = new Stitch.DataBinder({
+                properties: {
+                    'multiText': {
+                        onBind() {
+                            textHook = true;
+                            addLog('test8', 'Text binding hook ✓', 'onbind-log');
+                        }
+                    },
+                    'multiValue': {
+                        onBind() {
+                            valueHook = true;
+                            addLog('test8', 'Value binding hook ✓', 'onbind-log');
+                        }
+                    },
+                    'multiClass': {
+                        onBind() {
+                            classHook = true;
+                            addLog('test8', 'Class binding hook ✓', 'onbind-log');
+                        }
+                    }
+                }
+            });
+
+            const test8Container = document.querySelector('#test8-text').parentElement.parentElement;
+            binder8.bind(test8Container, model8);
+
+            setTimeout(() => {
+                if (textHook && valueHook && classHook) {
+                    markTestPassed('test8');
+                    console.log('✅ Test 8 PASSED: Hooks work with different binding types');
+                } else {
+                    markTestFailed('test8');
+                    console.error('❌ Test 8 FAILED: Not all binding types supported');
+                    addLog('test8', `❌ FAILED: text=${textHook}, value=${valueHook}, class=${classHook}`, 'onchange-log');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test8');
+            console.error('❌ Test 8 ERROR:', error);
+            addLog('test8', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 9: Missing Hooks Don't Error
+        try {
+            const model9 = Stitch.Observable.create({
+                safeProperty: 'Safe Value',
+                changeSafe() {
+                    this.safeProperty = 'Changed Safely';
+                }
+            });
+
+            const binder9 = new Stitch.DataBinder({
+                properties: {} // No hooks at all
+            });
+
+            const test9Container = document.querySelector('#test9-safe').parentElement.parentElement;
+            binder9.bind(test9Container, model9);
+
+            setTimeout(() => {
+                model9.changeSafe();
+                setTimeout(() => {
+                    const newText = document.getElementById('test9-safe').textContent;
+                    if (newText === 'Changed Safely') {
+                        markTestPassed('test9');
+                        console.log('✅ Test 9 PASSED: Missing hooks don\'t cause errors');
+                        addLog('test9', 'No errors, binding works normally ✓', 'onbind-log');
+                    } else {
+                        markTestFailed('test9');
+                        console.error('❌ Test 9 FAILED: Binding not working');
+                        addLog('test9', '❌ FAILED: Binding did not update', 'onchange-log');
+                    }
+                }, 100);
+            }, 100);
+        } catch (error) {
+            markTestFailed('test9');
+            console.error('❌ Test 9 ERROR:', error);
+            addLog('test9', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        // Test 10: this Context in Hooks
+        try {
+            let contextCorrect = false;
+            const model10 = Stitch.Observable.create({
+                contextValue: 'initial',
+                changeContext() {
+                    this.contextValue = 'updated';
+                }
+            });
+
+            const binder10 = new Stitch.DataBinder({
+                properties: {
+                    'contextValue': {
+                        onBind(element, value) {
+                            // 'this' should refer to DataBinder instance
+                            const hasBindMethod = typeof this.bind === 'function';
+                            const hasHooks = this.hooks !== undefined;
+                            contextCorrect = hasBindMethod && hasHooks;
+
+                            addLog('test10', `Context check:`, 'onbind-log');
+                            addLog('test10', `  this.bind exists: ${hasBindMethod ? '✓' : '✗'}`, '');
+                            addLog('test10', `  this.hooks exists: ${hasHooks ? '✓' : '✗'}`, '');
+
+                            console.log('Test 10 context:', {
+                                hasBindMethod,
+                                hasHooks,
+                                thisType: this.constructor.name
+                            });
+                        }
+                    }
+                }
+            });
+
+            const test10Container = document.querySelector('#test10-context').parentElement.parentElement;
+            binder10.bind(test10Container, model10);
+
+            setTimeout(() => {
+                if (contextCorrect) {
+                    markTestPassed('test10');
+                    console.log('✅ Test 10 PASSED: this context is DataBinder instance');
+                } else {
+                    markTestFailed('test10');
+                    console.error('❌ Test 10 FAILED: Incorrect this context');
+                }
+            }, 100);
+        } catch (error) {
+            markTestFailed('test10');
+            console.error('❌ Test 10 ERROR:', error);
+            addLog('test10', `❌ ERROR: ${error.message}`, 'onchange-log');
+        }
+
+        console.log('');
+        console.log('⏳ All tests initiated. Results will appear shortly...');
+    </script>
+</body>
+</html>

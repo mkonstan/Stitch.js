@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - Dispose Test Suite</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .test-header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .test-section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-section h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-case { margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #95a5a6; border-radius: 4px; }
+        .test-case.pass { border-left-color: #27ae60; background: #d5f4e6; }
+        .test-case.fail { border-left-color: #e74c3c; background: #fadbd8; }
+        .test-title { font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+        .assertion { margin: 5px 0; padding: 8px; border-radius: 3px; }
+        .assertion.pass { background: #d5f4e6; color: #27ae60; }
+        .assertion.pass::before { content: "✓ "; font-weight: bold; }
+        .assertion.fail { background: #fadbd8; color: #e74c3c; }
+        .assertion.fail::before { content: "✗ "; font-weight: bold; }
+        .summary { position: sticky; top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-bottom: 20px; }
+        .summary-stats { display: flex; justify-content: space-around; margin-top: 15px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .stat-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>🧹 Stitch.js Dispose Test Suite</h1>
+        <p>Testing binder.dispose() for SPA interplay cleanup</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total"><div class="stat-value" id="totalTests">0</div><div class="stat-label">Total Tests</div></div>
+            <div class="stat pass"><div class="stat-value" id="passedTests">0</div><div class="stat-label">Passed</div></div>
+            <div class="stat fail"><div class="stat-value" id="failedTests">0</div><div class="stat-label">Failed</div></div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+    <script src="stitch.js"></script>
+
+    <script>
+        let testResults = [];
+
+        function assert(condition, message) {
+            return { pass: !!condition, message: message };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return {
+                pass: pass,
+                message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`
+            };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement("div");
+            section.className = "test-section";
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement("div");
+            testCase.className = `test-case ${allPass ? "pass" : "fail"}`;
+
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? "pass" : "fail"}">${assertion.message}</div>`;
+            });
+
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = total - passed;
+            document.getElementById("totalTests").textContent = total;
+            document.getElementById("passedTests").textContent = passed;
+            document.getElementById("failedTests").textContent = failed;
+        }
+
+        function nextTick() {
+            return new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        function createSandbox(html) {
+            const container = document.createElement("div");
+            container.innerHTML = html;
+            document.body.appendChild(container);
+            return container;
+        }
+
+        function destroySandbox(container) {
+            if (container && container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }
+
+        async function testDisposeApi() {
+            const section = createTestSection("Test 1: Public API");
+            document.getElementById("testContainer").appendChild(section);
+
+            const binder = new Stitch.DataBinder();
+            const assertions = [
+                assert(typeof binder.bind === "function", "DataBinder.bind() exists"),
+                assert(typeof binder.unbind === "function", "DataBinder.unbind() exists"),
+                assert(typeof binder.dispose === "function", "DataBinder.dispose() exists")
+            ];
+
+            const passed = renderTestCase(section, "1.1: Public API availability", assertions);
+            testResults.push({ name: "1.1", passed });
+        }
+
+        async function testEffectsStopAfterDispose() {
+            const section = createTestSection("Test 2: Effects Stop After Dispose");
+            document.getElementById("testContainer").appendChild(section);
+
+            const container = createSandbox('<span id="t2-text" data-text="counter"></span>');
+            const model = Stitch.Observable.create({ counter: 0 });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+            await nextTick();
+
+            const span = container.querySelector("#t2-text");
+            const initialText = span.textContent;
+
+            model.counter = 1;
+            await nextTick();
+            const updatedText = span.textContent;
+
+            binder.dispose();
+            model.counter = 2;
+            await nextTick();
+            const afterDisposeText = span.textContent;
+
+            const assertions = [
+                assertEqual(initialText, "0", "Initial render"),
+                assertEqual(updatedText, "1", "DOM updates before dispose"),
+                assertEqual(afterDisposeText, "1", "DOM does not update after dispose")
+            ];
+
+            destroySandbox(container);
+            const passed = renderTestCase(section, "2.1: Reactive effects are detached", assertions);
+            testResults.push({ name: "2.1", passed });
+        }
+
+        async function testClickListenerCleanup() {
+            const section = createTestSection("Test 3: Click Listener Cleanup");
+            document.getElementById("testContainer").appendChild(section);
+
+            const container = createSandbox('<button id="t3-btn" data-click="increment">Click</button>');
+            const model = Stitch.Observable.create({
+                count: 0,
+                increment: function () {
+                    this.count++;
+                }
+            });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            const btn = container.querySelector("#t3-btn");
+            btn.click();
+            const beforeDispose = model.count;
+
+            binder.dispose();
+            btn.click();
+            const afterDispose = model.count;
+
+            const assertions = [
+                assertEqual(beforeDispose, 1, "Click updates model before dispose"),
+                assertEqual(afterDispose, 1, "Click does not update model after dispose")
+            ];
+
+            destroySandbox(container);
+            const passed = renderTestCase(section, "3.1: data-click listener removed", assertions);
+            testResults.push({ name: "3.1", passed });
+        }
+
+        async function testValueListenerCleanup() {
+            const section = createTestSection("Test 4: Value Listener Cleanup");
+            document.getElementById("testContainer").appendChild(section);
+
+            const container = createSandbox('<input id="t4-input" type="text" data-value="text">');
+            const model = Stitch.Observable.create({ text: "initial" });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+            await nextTick();
+
+            const input = container.querySelector("#t4-input");
+            input.value = "changed";
+            input.dispatchEvent(new Event("input"));
+            await nextTick();
+            const beforeDispose = model.text;
+
+            binder.dispose();
+            input.value = "after-dispose";
+            input.dispatchEvent(new Event("input"));
+            await nextTick();
+            const afterDispose = model.text;
+
+            const assertions = [
+                assertEqual(beforeDispose, "changed", "Two-way binding works before dispose"),
+                assertEqual(afterDispose, "changed", "Two-way binding is detached after dispose")
+            ];
+
+            destroySandbox(container);
+            const passed = renderTestCase(section, "4.1: data-value listeners removed", assertions);
+            testResults.push({ name: "4.1", passed });
+        }
+
+        async function testGlobalHooksBehavior() {
+            const section = createTestSection("Test 5: Global Hooks Behavior");
+            document.getElementById("testContainer").appendChild(section);
+
+            const container = createSandbox(`
+                <span id="t5-text" data-text="msg"></span>
+                <input id="t5-input" data-value="msg">
+            `);
+
+            const hookCalls = {
+                onBindElements: [],
+                onChange: []
+            };
+
+            const model = Stitch.Observable.create({ msg: "a" });
+            const binder = new Stitch.DataBinder({
+                onBind: function (element) {
+                    hookCalls.onBindElements.push(element.tagName);
+                },
+                onChange: function (change, viewModel, rootElement) {
+                    hookCalls.onChange.push({
+                        field: change.field,
+                        rootTag: rootElement ? rootElement.tagName : null
+                    });
+                }
+            });
+
+            binder.bind(container, model);
+            model.msg = "b";
+            await nextTick();
+
+            const changeCountBeforeDispose = hookCalls.onChange.length;
+
+            binder.dispose();
+            model.msg = "c";
+            await nextTick();
+
+            const assertions = [
+                assert(hookCalls.onBindElements.length >= 2, "onBind called for bound elements"),
+                assert(changeCountBeforeDispose >= 1, "onChange called on model update before dispose"),
+                assert(hookCalls.onChange.every(c => c.rootTag === "DIV"), "onChange receives root element context"),
+                assertEqual(hookCalls.onChange.length, changeCountBeforeDispose, "onChange stops after dispose")
+            ];
+
+            destroySandbox(container);
+            const passed = renderTestCase(section, "5.1: onBind/onChange lifecycle behavior", assertions);
+            testResults.push({ name: "5.1", passed });
+        }
+
+        async function testDoubleDispose() {
+            const section = createTestSection("Test 6: Idempotent Dispose");
+            document.getElementById("testContainer").appendChild(section);
+
+            const container = createSandbox('<span id="t6-text" data-text="msg"></span>');
+            const model = Stitch.Observable.create({ msg: "x" });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            let error = null;
+            try {
+                binder.dispose();
+                binder.dispose();
+                binder.dispose();
+            } catch (e) {
+                error = e;
+            }
+
+            const assertions = [
+                assert(error === null, "Multiple dispose() calls do not throw"),
+                assertEqual(binder._disposed, true, "_disposed remains true after repeated dispose")
+            ];
+
+            destroySandbox(container);
+            const passed = renderTestCase(section, "6.1: dispose() is idempotent", assertions);
+            testResults.push({ name: "6.1", passed });
+        }
+
+        async function testDisposeUnboundBinder() {
+            const section = createTestSection("Test 7: Dispose Without Bind");
+            document.getElementById("testContainer").appendChild(section);
+
+            const binder = new Stitch.DataBinder();
+            let error = null;
+            try {
+                binder.dispose();
+            } catch (e) {
+                error = e;
+            }
+
+            const assertions = [
+                assert(error === null, "dispose() on unbound binder does not throw"),
+                assertEqual(binder._disposed, true, "Unbound binder marks disposed")
+            ];
+
+            const passed = renderTestCase(section, "7.1: Safe without prior bind()", assertions);
+            testResults.push({ name: "7.1", passed });
+        }
+
+        async function runAllTests() {
+            testResults = [];
+            document.getElementById("testContainer").innerHTML = "";
+
+            await testDisposeApi();
+            await testEffectsStopAfterDispose();
+            await testClickListenerCleanup();
+            await testValueListenerCleanup();
+            await testGlobalHooksBehavior();
+            await testDoubleDispose();
+            await testDisposeUnboundBinder();
+
+            updateSummary();
+        }
+
+        // Auto-run tests on load
+        window.onload = function () {
+            setTimeout(function () {
+                runAllTests();
+            }, 50);
+        };
+    </script>
+</body>
+</html>

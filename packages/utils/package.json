@@ -1,0 +1,7 @@
+{
+  "name": "@stitch/utils",
+  "version": "2.1.0",
+  "private": true,
+  "main": "index.js",
+  "description": "Stitch.js utility facade package during Phase 2 modularization"
+}

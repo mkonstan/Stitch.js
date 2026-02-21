@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js Test Suite - Orchestrator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 36px;
+        }
+        .header p {
+            margin: 0;
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px;
+        }
+        .test-suite {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #3498db;
+        }
+        .test-suite h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .test-suite p {
+            margin: 10px 0;
+            color: #555;
+        }
+        .test-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 5px 5px 5px 0;
+            transition: background 0.3s;
+        }
+        .test-link:hover {
+            background: #2980b9;
+        }
+        .test-link.v2 {
+            background: #9b59b6;
+        }
+        .test-link.v2:hover {
+            background: #8e44ad;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .instructions h2 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .instructions ol {
+            color: #856404;
+        }
+        .instructions code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #e83e8c;
+            font-family: 'Courier New', monospace;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .comparison-table th,
+        .comparison-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .comparison-table th {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .comparison-table tr:hover {
+            background: #f5f5f5;
+        }
+        .version-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .version-badge.v1 {
+            background: #3498db;
+            color: white;
+        }
+        .version-badge.v2 {
+            background: #9b59b6;
+            color: white;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .automation-section {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .automation-section h2 {
+            margin-top: 0;
+            color: #155724;
+        }
+        .automation-section p {
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Stitch.js Test Suite Orchestrator</h1>
+            <p>Comprehensive automated testing for v1 (stitch.js) vs v2 (stitch-new.js)</p>
+        </div>
+
+        <div class="content">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Test Suites</div>
+                    <div class="stat-value">6</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Test Categories</div>
+                    <div class="stat-value">50+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Versions Tested</div>
+                    <div class="stat-value">2</div>
+                </div>
+            </div>
+
+            <div class="automation-section">
+                <h2>🤖 MCP Chrome DevTools Automation</h2>
+                <p>This test suite is designed to work with MCP chrome-devtools for automated browser testing. Claude Code can use the MCP server to:</p>
+                <ul>
+                    <li>Open test pages in Chrome</li>
+                    <li>Take snapshots of the DOM to read test results</li>
+                    <li>Execute JavaScript to verify test outcomes</li>
+                    <li>Switch between v1 and v2 automatically</li>
+                    <li>Take screenshots of failed tests</li>
+                    <li>Generate comprehensive test reports</li>
+                </ul>
+                <p><strong>All test files are ready to be automated!</strong> Ask Claude to run the tests using MCP chrome-devtools.</p>
+            </div>
+
+            <div class="instructions">
+                <h2>📋 Manual Testing Instructions</h2>
+                <p>To manually run the tests, open each test file in your browser using the links below. Each test page can switch between v1 and v2 using the buttons at the top.</p>
+                <ol>
+                    <li>Ensure both <code>stitch.js</code> and <code>stitch-new.js</code> are in the same directory as the test files</li>
+                    <li>Open each test file below in your browser</li>
+                    <li>Click "Run All Tests" to execute the test suite</li>
+                    <li>Use the version selector to switch between v1 and v2</li>
+                    <li>Review the pass/fail results for each test case</li>
+                </ol>
+            </div>
+
+            <h2>Test Suites</h2>
+
+            <div class="test-suite">
+                <h3>1. Computed Properties Test Suite</h3>
+                <p><strong>Focus:</strong> The most critical difference between v1 and v2 - testing computed property handling at all nesting levels</p>
+                <p><strong>Tests:</strong> Top-level computed, nested computed, computed in arrays, explicit dependencies, nested effects</p>
+                <p><strong>Why Critical:</strong> v2's unified architecture vs v1's 3-path approach (96 fewer lines in array handling)</p>
+                <a href="test-computed-properties.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <div class="test-suite">
+                <h3>2. Array Reactivity Test Suite</h3>
+                <p><strong>Focus:</strong> Testing foreach binding and array mutations (v1: 161 lines vs v2: 65 lines)</p>
+                <p><strong>Tests:</strong> Array mutations (push, pop, shift, unshift, splice, sort, reverse), foreach with simple values, foreach with computed properties, nested arrays</p>
+                <p><strong>Why Critical:</strong> v2 eliminates 70 lines of eager conversion logic</p>
+                <a href="test-array-reactivity.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <div class="test-suite">
+                <h3>3. Core Reactivity Test Suite</h3>
+                <p><strong>Focus:</strong> Fundamental reactivity and data binding</p>
+                <p><strong>Tests:</strong> Basic property updates, nested object reactivity, text binding, value binding (two-way), visible binding, change bubbling</p>
+                <p><strong>Why Important:</strong> Ensures core reactivity is identical between versions</p>
+                <a href="test-core-reactivity.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <div class="test-suite">
+                <h3>4. MessageBus Test Suite</h3>
+                <p><strong>Focus:</strong> Event system (identical in both versions)</p>
+                <p><strong>Tests:</strong> Custom events ($emit/$on), event batching (70-80% reduction), multiple listeners, $once, $off, middleware, built-in change events</p>
+                <p><strong>Why Important:</strong> Validates that event batching and coordination work identically</p>
+                <a href="test-messagebus.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <div class="test-suite">
+                <h3>5. All Bindings Test Suite</h3>
+                <p><strong>Focus:</strong> Testing all 10 binding types</p>
+                <p><strong>Tests:</strong> click, enabled, class (object mode), attr, event, loading bindings</p>
+                <p><strong>Why Important:</strong> Ensures all bindings work identically in both versions</p>
+                <a href="test-all-bindings.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <div class="test-suite">
+                <h3>6. Edge Cases Test Suite</h3>
+                <p><strong>Focus:</strong> Stress testing and edge cases</p>
+                <p><strong>Tests:</strong> 10-level deep nesting, null/undefined handling, type conversions, empty objects/arrays, special characters in keys, mixed-type arrays, toJSON serialization</p>
+                <p><strong>Why Important:</strong> Ensures robustness in unusual scenarios</p>
+                <a href="test-edge-cases.html" class="test-link" target="_blank">Open Test Suite</a>
+            </div>
+
+            <h2>Architectural Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th><span class="version-badge v1">v1</span> stitch.js</th>
+                        <th><span class="version-badge v2">v2</span> stitch-new.js</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Total Lines</strong></td>
+                        <td>3,885 lines</td>
+                        <td>3,796 lines (-89, -2.3%)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Computed Code Paths</strong></td>
+                        <td>3 separate implementations</td>
+                        <td>1 unified implementation (-67%)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Array Handler Lines</strong></td>
+                        <td>161 lines</td>
+                        <td>65 lines (-96, -60%)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Eager Conversion Logic</strong></td>
+                        <td>70 lines (required)</td>
+                        <td>0 lines (eliminated)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Computed Marker Formats</strong></td>
+                        <td>2 formats (legacy + current)</td>
+                        <td>1 standardized format</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Nested Computed Support</strong></td>
+                        <td>Limited (top-level only)</td>
+                        <td>Uniform (any nesting level)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Explicit Dependencies</strong></td>
+                        <td>Top-level only</td>
+                        <td>Works everywhere</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Architecture</strong></td>
+                        <td>Fragmented (3 code paths)</td>
+                        <td>Unified (single source of truth)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>🎯 Expected Outcomes</h2>
+            <div class="instructions">
+                <p><strong>All tests should pass in both v1 and v2</strong> with these key differences:</p>
+                <ul>
+                    <li>✅ <strong>Feature Parity:</strong> v2 should match or exceed v1 functionality</li>
+                    <li>✅ <strong>Nested Computed:</strong> v2 should excel in nested computed property tests</li>
+                    <li>✅ <strong>Array Performance:</strong> v2 should show comparable or better performance despite simpler code</li>
+                    <li>✅ <strong>No Regressions:</strong> Core reactivity and bindings should be identical</li>
+                    <li>✅ <strong>Cleaner Code:</strong> v2 achieves same results with less code</li>
+                </ul>
+            </div>
+
+            <h2>🤖 Automated Testing with MCP</h2>
+            <div class="code-block">
+# Example: Ask Claude Code to run automated tests
+"Please use MCP chrome-devtools to run all the test files and generate a comparison report between v1 and v2"
+
+# Claude will:
+1. Open each test file in Chrome via MCP
+2. Switch between v1 and v2 automatically
+3. Read test results from DOM snapshots
+4. Execute JavaScript to validate outcomes
+5. Take screenshots of any failures
+6. Generate comprehensive comparison report
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3>Ready to Test! 🚀</h3>
+                <p>All test files are located in the same directory as this file.</p>
+                <p style="margin-top: 20px;">
+                    <a href="test-computed-properties.html" class="test-link" target="_blank">Start with Computed Properties Test</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

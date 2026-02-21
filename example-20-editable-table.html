@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Table Rows - Stitch.js v1.0.0</title>
+    <!-- Change line 7 to: -->
+<script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        tr:hover {
+            background: #f8f9ff;
+        }
+
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 6px 14px;
+            margin: 0 2px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #218838;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        .stats {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+        }
+
+        .stats h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Editable Table Rows</h1>
+        <p class="subtitle">Inline editing with nested computed properties</p>
+
+        <div id="example">
+            <div class="stats">
+                <h3>Table Statistics</h3>
+                <p>
+                    <strong>Total Users:</strong> <span data-text="tableUserCount"></span> |
+                    <strong>Editing:</strong> <span data-text="tableEditingCount"></span>
+                </p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody data-foreach="tableUsers" data-template="user-row-template"></tbody>
+            </table>
+
+            <template id="user-row-template">
+                <tr>
+                    <td>
+                        <span data-visible="isNotEditing" data-text="name"></span>
+                        <input data-visible="isEditing" data-value="editName" type="text">
+                    </td>
+                    <td>
+                        <span data-visible="isNotEditing" data-text="email"></span>
+                        <input data-visible="isEditing" data-value="editEmail" type="email">
+                    </td>
+                    <td>
+                        <button data-visible="isNotEditing" data-click="$parent.editTableRow">Edit</button>
+                        <button data-visible="isEditing" data-click="$parent.saveTableRow" class="success">Save</button>
+                        <button data-visible="isEditing" data-click="$parent.cancelEditTableRow">Cancel</button>
+                        <button data-click="$parent.deleteUser" class="danger">Delete</button>
+                    </td>
+                </tr>
+            </template>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>foreach:</strong> External template for table rows<br>
+                    <strong>Nested Stitch.computed():</strong> isNotEditing computed at row level<br>
+                    <strong>visible:</strong> Toggle between view/edit mode<br>
+                    <strong>$parent:</strong> Access parent methods from nested items
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enable debug mode for diagnosis
+        Stitch.debug.enable();
+
+        // Disable noisy categories for focused logging
+        Stitch.debug.disableCategory('bindings');
+        Stitch.debug.disableCategory('messageBus');
+
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Table data with NESTED COMPUTED PROPERTIES
+            tableUsers: [
+                /*
+                {
+                    id: 1,
+                    name: 'John Doe',
+                    email: 'john@example.com',
+                    isEditing: false,
+                    editName: '',
+                    editEmail: '',
+                    // v1.0.0: Nested computed property!
+                    isNotEditing: Stitch.computed(function() {
+                        return !this.isEditing;
+                    })
+                },
+                {
+                    id: 2,
+                    name: 'Jane Smith',
+                    email: 'jane@example.com',
+                    isEditing: false,
+                    editName: '',
+                    editEmail: '',
+                    // v1.0.0: Nested computed property!
+                    isNotEditing: Stitch.computed(function() {
+                        return !this.isEditing;
+                    })
+                },
+                {
+                    id: 3,
+                    name: 'Bob Johnson',
+                    email: 'bob@example.com',
+                    isEditing: false,
+                    editName: '',
+                    editEmail: '',
+                    // v1.0.0: Nested computed property!
+                    isNotEditing: Stitch.computed(function() {
+                        return !this.isEditing;
+                    })
+                }
+                */
+                {
+                    id: 1,
+                    name: 'John Doe',
+                    email: 'john@example.com',
+                    isEditing: false,
+                    editName: '',
+                    editEmail: '',
+                    // v1.0.0: Nested computed property!
+                    isNotEditing: Stitch.computed(function() {
+                        return !this.isEditing;
+                    })
+                }
+
+            ],
+
+            // v1.0.0: Computed - Count of users
+            tableUserCount: Stitch.computed(function() {
+                return this.tableUsers.length;
+            }),
+
+            // v1.0.0: Computed - Count editing
+            tableEditingCount: Stitch.computed(function() {
+                return this.tableUsers.filter(u => u.isEditing).length;
+            }),
+
+            // Action: Start editing a row
+            editTableRow(user) {
+                user.editName = user.name;
+                user.editEmail = user.email;
+                user.isEditing = true;
+                console.log(`Editing user: ${user.name}`);
+            },
+
+            // Action: Save edits
+            saveTableRow(user) {
+                user.name = user.editName;
+                user.email = user.editEmail;
+                user.isEditing = false;
+                console.log(`Saved user: ${user.name}`);
+            },
+
+            // Action: Cancel editing
+            cancelEditTableRow(user) {
+                user.editName = '';
+                user.editEmail = '';
+                user.isEditing = false;
+                console.log(`Cancelled editing for: ${user.name}`);
+            },
+
+            // Action: Delete user
+            deleteUser(user) {
+                if (confirm(`Delete user ${user.name}?`)) {
+                    const index = this.tableUsers.indexOf(user);
+                    if (index > -1) {
+                        this.tableUsers.splice(index, 1);
+                        console.log(`Deleted user: ${user.name}`);
+                    }
+                }
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Editable Table Rows example initialized (v1.0.0)');
+    </script>
+</body>
+</html>

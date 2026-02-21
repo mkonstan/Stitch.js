@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - All Bindings Test Suite</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .test-header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .version-selector { margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .version-selector button { padding: 10px 20px; margin: 0 10px; border: 2px solid #3498db; background: white; color: #3498db; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .version-selector button.active { background: #3498db; color: white; }
+        .test-section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-section h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-case { margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #95a5a6; border-radius: 4px; }
+        .test-case.pass { border-left-color: #27ae60; background: #d5f4e6; }
+        .test-case.fail { border-left-color: #e74c3c; background: #fadbd8; }
+        .test-title { font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+        .assertion { margin: 5px 0; padding: 8px; border-radius: 3px; }
+        .assertion.pass { background: #d5f4e6; color: #27ae60; }
+        .assertion.pass::before { content: "✓ "; font-weight: bold; }
+        .assertion.fail { background: #fadbd8; color: #e74c3c; }
+        .assertion.fail::before { content: "✗ "; font-weight: bold; }
+        .summary { position: sticky; top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-bottom: 20px; }
+        .summary-stats { display: flex; justify-content: space-around; margin-top: 15px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .stat-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+        .highlight { background: yellow; }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>🔗 Stitch.js All Bindings Test Suite</h1>
+        <p>Testing all 10 binding types: text, value, visible, enabled, click, event, class, attr, foreach, loading</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total"><div class="stat-value" id="totalTests">0</div><div class="stat-label">Total Tests</div></div>
+            <div class="stat pass"><div class="stat-value" id="passedTests">0</div><div class="stat-label">Passed</div></div>
+            <div class="stat fail"><div class="stat-value" id="failedTests">0</div><div class="stat-label">Failed</div></div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+    <script id="stitchScript" src="stitch.js"></script>
+
+    <script>
+        Stitch.debug.enable(); // Enable debug mode for detailed logging
+        let testResults = [];
+
+        function assert(condition, message) {
+            return { pass: condition, message: message };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return { pass: pass, message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}` };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement('div');
+            testCase.className = `test-case ${allPass ? 'pass' : 'fail'}`;
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? 'pass' : 'fail'}">${assertion.message}</div>`;
+            });
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = total - passed;
+        }
+
+        // TEST 1: Click Binding
+        function testClickBinding() {
+            const section = createTestSection('Test 1: Click Binding (data-click)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<button data-click="increment">Click Me</button>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({
+                count: 0,
+                increment: function() { this.count++; }
+            });
+
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const btn = container.querySelector('button');
+                const assertions = [assertEqual(model.count, 0, 'Initial count')];
+
+                btn.click();
+                assertions.push(assertEqual(model.count, 1, 'Count incremented on click'));
+
+                btn.click();
+                btn.click();
+                assertions.push(assertEqual(model.count, 3, 'Count incremented multiple times'));
+
+                document.body.removeChild(container);
+                testResults.push({ name: '1.1', passed: renderTestCase(section, '1.1: data-click Binding', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testEnabledBinding();
+            }, 50);
+        }
+
+        // TEST 2: Enabled Binding
+        function testEnabledBinding() {
+            const section = createTestSection('Test 2: Enabled Binding (data-enabled)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<button data-enabled="isEnabled">Submit</button>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({ isEnabled: true });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const btn = container.querySelector('button');
+                const assertions = [assert(!btn.disabled, 'Button enabled when true')];
+
+                model.isEnabled = false;
+                setTimeout(() => {
+                    assertions.push(assert(btn.disabled, 'Button disabled when false'));
+
+                    model.isEnabled = true;
+                    setTimeout(() => {
+                        assertions.push(assert(!btn.disabled, 'Button enabled again when true'));
+
+                        document.body.removeChild(container);
+                        testResults.push({ name: '2.1', passed: renderTestCase(section, '2.1: data-enabled Binding', assertions) });
+                        document.getElementById('testContainer').appendChild(section);
+                        testClassBinding();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 3: Class Binding (Object Mode)
+        function testClassBinding() {
+            const section = createTestSection('Test 3: Class Binding (data-class)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<div data-class="classBindings">Content</div>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({
+                classBindings: { highlight: false }
+            });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const elem = container.querySelector('[data-class]');
+                const assertions = [assert(!elem.classList.contains('highlight'), 'Class not applied when false')];
+
+                model.classBindings.highlight = true;
+                setTimeout(() => {
+                    assertions.push(assert(elem.classList.contains('highlight'), 'Class applied when true'));
+
+                    model.classBindings.highlight = false;
+                    setTimeout(() => {
+                        assertions.push(assert(!elem.classList.contains('highlight'), 'Class removed when false again'));
+
+                        document.body.removeChild(container);
+                        testResults.push({ name: '3.1', passed: renderTestCase(section, '3.1: data-class Object Mode', assertions) });
+                        document.getElementById('testContainer').appendChild(section);
+                        testAttrBinding();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 4: Attr Binding
+        function testAttrBinding() {
+            const section = createTestSection('Test 4: Attr Binding (data-attr)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<div data-attr="attrBindings">Hover me</div>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({
+                attrBindings: {
+                    title: 'Initial tooltip',
+                    id: 'elem1'
+                }
+            });
+
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const elem = container.querySelector('[data-attr]');
+                const assertions = [
+                    assertEqual(elem.getAttribute('title'), 'Initial tooltip', 'Initial title attribute'),
+                    assertEqual(elem.getAttribute('id'), 'elem1', 'Initial id attribute')
+                ];
+
+                model.attrBindings.title = 'Updated tooltip';
+                setTimeout(() => {
+                    assertions.push(assertEqual(elem.getAttribute('title'), 'Updated tooltip', 'Title attribute updated'));
+
+                    model.attrBindings.id = 'elem2';
+                    setTimeout(() => {
+                        assertions.push(assertEqual(elem.getAttribute('id'), 'elem2', 'Id attribute updated'));
+
+                        document.body.removeChild(container);
+                        testResults.push({ name: '4.1', passed: renderTestCase(section, '4.1: data-attr Binding', assertions) });
+                        document.getElementById('testContainer').appendChild(section);
+                        testEventBinding();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 5: Event Binding
+        function testEventBinding() {
+            const section = createTestSection('Test 5: Event Binding (data-event)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<input type="text" data-event="eventBindings">';
+            document.body.appendChild(container);
+
+            let focusCount = 0;
+            let blurCount = 0;
+
+            const model = Stitch.Observable.create({
+                eventBindings: {
+                    focus: function() { focusCount++; },
+                    blur: function() { blurCount++; }
+                }
+            });
+
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const input = container.querySelector('input');
+                const assertions = [
+                    assertEqual(focusCount, 0, 'Focus not fired yet'),
+                    assertEqual(blurCount, 0, 'Blur not fired yet')
+                ];
+
+                input.dispatchEvent(new Event('focus'));
+                assertions.push(assertEqual(focusCount, 1, 'Focus event fired'));
+
+                input.dispatchEvent(new Event('blur'));
+                assertions.push(assertEqual(blurCount, 1, 'Blur event fired'));
+
+                document.body.removeChild(container);
+                testResults.push({ name: '5.1', passed: renderTestCase(section, '5.1: data-event Binding', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testLoadingBinding();
+            }, 50);
+        }
+
+        // TEST 6: Loading Binding
+        function testLoadingBinding() {
+            const section = createTestSection('Test 6: Loading Binding (data-loading)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<div data-loading="isLoading">Content</div>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({ isLoading: false });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const elem = container.querySelector('[data-loading]');
+                const assertions = [assert(!elem.classList.contains('loading'), 'Loading class not present when false')];
+
+                model.isLoading = true;
+                setTimeout(() => {
+                    assertions.push(assert(elem.classList.contains('loading'), 'Loading class added when true'));
+
+                    document.body.removeChild(container);
+                    testResults.push({ name: '6.1', passed: renderTestCase(section, '6.1: data-loading Binding', assertions) });
+                    document.getElementById('testContainer').appendChild(section);
+                    updateSummary();
+                }, 50);
+            }, 50);
+        }
+
+        function runAllTests() {
+            testResults = [];
+            document.getElementById('testContainer').innerHTML = '';
+            testClickBinding();
+        }
+
+        window.addEventListener('load', () => { setTimeout(runAllTests, 100); });
+    </script>
+</body>
+</html>

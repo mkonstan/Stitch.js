@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conditional Form Fields - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 20px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result-display {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-top: 30px;
+        }
+
+        .result-display h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔀 Conditional Form Fields</h1>
+        <p class="subtitle">Dynamic form based on account type selection</p>
+
+        <div id="example">
+            <div class="form-group">
+                <label for="accountType">Account Type</label>
+                <select id="accountType" data-value="conditionalAccountType">
+                    <option value="individual">Individual</option>
+                    <option value="business">Business</option>
+                </select>
+            </div>
+
+            <!-- Individual Fields -->
+            <div data-visible="showIndividualFields">
+                <div class="form-group">
+                    <label for="firstName">First Name</label>
+                    <input id="firstName" type="text" placeholder="First name"
+                           data-value="conditionalFirstName">
+                </div>
+                <div class="form-group">
+                    <label for="lastName">Last Name</label>
+                    <input id="lastName" type="text" placeholder="Last name"
+                           data-value="conditionalLastName">
+                </div>
+                <div class="form-group">
+                    <label for="ssn">Social Security Number</label>
+                    <input id="ssn" type="text" placeholder="123456789" maxlength="9"
+                           data-value="conditionalSSN">
+                </div>
+            </div>
+
+            <!-- Business Fields -->
+            <div data-visible="showBusinessFields">
+                <div class="form-group">
+                    <label for="companyName">Company Name</label>
+                    <input id="companyName" type="text" placeholder="Company name"
+                           data-value="conditionalCompanyName">
+                </div>
+                <div class="form-group">
+                    <label for="ein">Employer Identification Number (EIN)</label>
+                    <input id="ein" type="text" placeholder="123456789" maxlength="9"
+                           data-value="conditionalEIN">
+                </div>
+                <div class="form-group">
+                    <label for="incorporationDate">Incorporation Date</label>
+                    <input id="incorporationDate" type="date"
+                           data-value="conditionalIncorporationDate">
+                </div>
+            </div>
+
+            <button data-enabled="isConditionalFormValid" data-click="submitConditionalForm">
+                Create Account
+            </button>
+
+            <div class="result-display">
+                <h3>Form Summary</h3>
+                <p>
+                    <strong>Account Type:</strong> <span data-text="conditionalAccountType"></span><br>
+                    <strong>Summary:</strong> <span data-text="conditionalFormSummary"></span><br>
+                    <strong>Form Valid:</strong> <span data-text="isConditionalFormValid"></span>
+                </p>
+            </div>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>visible:</strong> Conditional field visibility based on account type<br>
+                    <strong>Stitch.computed():</strong> Dynamic validation and summaries<br>
+                    <strong>enabled:</strong> Submit button only enabled when form is valid
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Account type selection
+            conditionalAccountType: 'individual',  // 'individual' or 'business'
+
+            // Individual fields
+            conditionalFirstName: '',
+            conditionalLastName: '',
+            conditionalSSN: '',
+
+            // Business fields
+            conditionalCompanyName: '',
+            conditionalEIN: '',
+            conditionalIncorporationDate: '',
+
+            // v1.0.0: Computed - Show individual fields
+            showIndividualFields: Stitch.computed(function() {
+                return this.conditionalAccountType === 'individual';
+            }),
+
+            // v1.0.0: Computed - Show business fields
+            showBusinessFields: Stitch.computed(function() {
+                return this.conditionalAccountType === 'business';
+            }),
+
+            // v1.0.0: Computed - Individual form valid
+            isIndividualFormValid: Stitch.computed(function() {
+                return this.conditionalFirstName.length > 0 &&
+                       this.conditionalLastName.length > 0 &&
+                       this.conditionalSSN.length === 9;
+            }),
+
+            // v1.0.0: Computed - Business form valid
+            isBusinessFormValid: Stitch.computed(function() {
+                return this.conditionalCompanyName.length > 0 &&
+                       this.conditionalEIN.length === 9 &&
+                       this.conditionalIncorporationDate.length > 0;
+            }),
+
+            // v1.0.0: Computed - Current form valid
+            isConditionalFormValid: Stitch.computed(function() {
+                if (this.conditionalAccountType === 'individual') {
+                    return this.isIndividualFormValid;
+                } else {
+                    return this.isBusinessFormValid;
+                }
+            }),
+
+            // v1.0.0: Computed - Form summary
+            conditionalFormSummary: Stitch.computed(function() {
+                if (this.conditionalAccountType === 'individual') {
+                    return `Individual: ${this.conditionalFirstName} ${this.conditionalLastName}`.trim() || 'No name entered';
+                } else {
+                    return `Business: ${this.conditionalCompanyName}` || 'No company name entered';
+                }
+            }),
+
+            // Action: Submit conditional form
+            submitConditionalForm() {
+                if (this.isConditionalFormValid) {
+                    alert(`✅ Account created: ${this.conditionalFormSummary}`);
+                    console.log('Account data:', {
+                        type: this.conditionalAccountType,
+                        individual: {
+                            firstName: this.conditionalFirstName,
+                            lastName: this.conditionalLastName,
+                            ssn: this.conditionalSSN
+                        },
+                        business: {
+                            companyName: this.conditionalCompanyName,
+                            ein: this.conditionalEIN,
+                            incorporationDate: this.conditionalIncorporationDate
+                        }
+                    });
+                    this.resetConditionalForm();
+                }
+            },
+
+            // Action: Reset form
+            resetConditionalForm() {
+                this.conditionalFirstName = '';
+                this.conditionalLastName = '';
+                this.conditionalSSN = '';
+                this.conditionalCompanyName = '';
+                this.conditionalEIN = '';
+                this.conditionalIncorporationDate = '';
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Conditional Form Fields example initialized (v1.0.0)');
+    </script>
+</body>
+</html>

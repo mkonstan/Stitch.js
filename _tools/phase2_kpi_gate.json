@@ -1,0 +1,25 @@
+{
+  "validation": {
+    "max_failed_tests_per_suite": 0,
+    "max_targeted_console_errors": 0,
+    "max_targeted_page_errors": 0
+  },
+  "assembly": {
+    "artifact": "dist/stitch.assembled.js",
+    "source": "stitch.js",
+    "mode": "reachable",
+    "min_inlined_modules": 23,
+    "min_available_modules": 23,
+    "max_size_growth_ratio": 0.65
+  },
+  "smoke": {
+    "required_exports": [
+      "Observable",
+      "DataBinder",
+      "MessageBus",
+      "computed",
+      "version",
+      "debug"
+    ]
+  }
+}

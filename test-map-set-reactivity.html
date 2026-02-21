@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stitch.js Map/Set Reactivity Test</title>
+    <style>
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Map/Set Reactivity Test</h1>
+
+    <div id="app">
+        <section id="map-section">
+            <h2>Map Test</h2>
+            <div id="map-size" stitch-text="myMap.size"></div>
+            <div id="map-value" stitch-text="myMap.get('key1')"></div>
+            <div id="map-iter" stitch-text="mapEntries"></div>
+        </section>
+
+        <section id="set-section">
+            <h2>Set Test</h2>
+            <div id="set-size" stitch-text="mySet.size"></div>
+            <div id="set-has" stitch-text="mySet.has('item1')"></div>
+            <div id="set-iter" stitch-text="setValues"></div>
+        </section>
+    </div>
+
+    <script src="stitch.js"></script>
+    <script>
+        const app = Stitch.createApp({
+            myMap: new Map([['key1', 'initial']]),
+            mySet: new Set(['item1']),
+            
+            get mapEntries() {
+                // Dependency on iteration
+                return Array.from(this.myMap.entries()).map(e => e[0] + ':' + e[1]).join(', ');
+            },
+
+            get setValues() {
+                // Dependency on iteration
+                return Array.from(this.mySet.values()).join(', ');
+            }
+        });
+
+        async function runTests() {
+            const mapSize = document.getElementById('map-size');
+            const mapValue = document.getElementById('map-value');
+            const mapIter = document.getElementById('map-iter');
+            
+            const setSize = document.getElementById('set-size');
+            const setHas = document.getElementById('set-has');
+            const setIter = document.getElementById('set-iter');
+
+            console.log("Starting Tests...");
+
+            // --- MAP TESTS ---
+            // 1. Initial State
+            assert(mapSize.textContent === '1', "Map Initial Size", "1", mapSize.textContent);
+            assert(mapValue.textContent === 'initial', "Map Initial Value", "initial", mapValue.textContent);
+
+            // 2. Map.set (New Key)
+            console.log("Action: myMap.set('key2', 'new')");
+            app.myMap.set('key2', 'new');
+            await nextTick();
+            assert(mapSize.textContent === '2', "Map Size Update (Add)", "2", mapSize.textContent);
+            assert(mapIter.textContent.includes('key2:new'), "Map Iter Update (Add)", "contains key2:new", mapIter.textContent);
+
+            // 3. Map.set (Update Key)
+            console.log("Action: myMap.set('key1', 'updated')");
+            app.myMap.set('key1', 'updated');
+            await nextTick();
+            assert(mapValue.textContent === 'updated', "Map Value Update", "updated", mapValue.textContent);
+            assert(mapIter.textContent.includes('key1:updated'), "Map Iter Update (Change)", "contains key1:updated", mapIter.textContent);
+
+            // 4. Map.delete
+            console.log("Action: myMap.delete('key1')");
+            app.myMap.delete('key1');
+            await nextTick();
+            assert(mapSize.textContent === '1', "Map Size Update (Delete)", "1", mapSize.textContent);
+            assert(mapValue.textContent === '', "Map Value Cleared", "", mapValue.textContent); // Should be undefined -> empty string
+
+            // --- SET TESTS ---
+            // 5. Initial State
+            assert(setSize.textContent === '1', "Set Initial Size", "1", setSize.textContent);
+            assert(setHas.textContent === 'true', "Set Initial Has", "true", setHas.textContent);
+
+            // 6. Set.add
+            console.log("Action: mySet.add('item2')");
+            app.mySet.add('item2');
+            await nextTick();
+            assert(setSize.textContent === '2', "Set Size Update (Add)", "2", setSize.textContent);
+            assert(setIter.textContent.includes('item2'), "Set Iter Update (Add)", "contains item2", setIter.textContent);
+
+            // 7. Set.delete
+            console.log("Action: mySet.delete('item1')");
+            app.mySet.delete('item1');
+            await nextTick();
+            assert(setSize.textContent === '1', "Set Size Update (Delete)", "1", setSize.textContent);
+            assert(setHas.textContent === 'false', "Set Has Update", "false", setHas.textContent);
+        }
+
+        function assert(condition, label, expected, actual) {
+            if (condition) {
+                console.log(`%c[PASS] ${label}`, "color: green");
+            } else {
+                console.error(`[FAIL] ${label}. Expected: ${expected}, Got: ${actual}`);
+            }
+        }
+
+        function nextTick() {
+            return new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        app.mount("#app").then(() => {
+            setTimeout(runTests, 100);
+        });
+    </script>
+</body>
+</html>

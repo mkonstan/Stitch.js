@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stitch.js Bubble Up Performance Test</title>
+</head>
+<body>
+    <h1>Bubble Up Performance</h1>
+    <div id="output"></div>
+    <script src="stitch.js"></script>
+    <script>
+        // Create deep object
+        function createDeepObject(depth) {
+            const root = { value: 0 };
+            let current = root;
+            for (let i = 0; i < depth; i++) {
+                current.next = { value: i + 1 };
+                current = current.next;
+            }
+            return root;
+        }
+
+        const DEPTH = 100; // 100 levels deep
+        const ITERATIONS = 1000;
+        
+        const data = createDeepObject(DEPTH);
+        const app = Stitch.Observable.create(data);
+
+        // Find leaf
+        let leaf = app;
+        while (leaf.next) {
+            leaf = leaf.next;
+        }
+
+        // Benchmark
+        const start = performance.now();
+        for (let i = 0; i < ITERATIONS; i++) {
+            leaf.value = i;
+        }
+        const end = performance.now();
+        
+        const duration = end - start;
+        document.getElementById('output').textContent = `Depth: ${DEPTH}, Iterations: ${ITERATIONS}, Time: ${duration.toFixed(2)}ms`;
+        console.log(`Depth: ${DEPTH}, Iterations: ${ITERATIONS}, Time: ${duration.toFixed(2)}ms`);
+        
+        // Validation check
+        if (duration > 500) {
+            console.warn("Performance warning: Updates are taking too long.");
+        } else {
+            console.log("Performance OK.");
+        }
+    </script>
+</body>
+</html>

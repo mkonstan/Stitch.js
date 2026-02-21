@@ -1,0 +1,7 @@
+{
+  "name": "@stitch/api",
+  "version": "2.1.0",
+  "private": true,
+  "main": "index.js",
+  "description": "Stitch.js API facade package during Phase 2 modularization"
+}

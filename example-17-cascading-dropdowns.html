@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cascading Dropdowns - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        select:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .result-display {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-top: 30px;
+        }
+
+        .result-display h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .result-display p {
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Cascading Dropdowns</h1>
+        <p class="subtitle">Country → State → City selection with automatic cascade</p>
+
+        <div id="example">
+            <div class="form-group">
+                <label for="country">Country</label>
+                <select id="country" data-value="cascadeSelectedCountry">
+                    <option value="">Select a country...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="state">State / Province</label>
+                <select id="state"
+                        data-foreach="cascadeAvailableStates"
+                        data-value="cascadeSelectedState"
+                        data-template="state-template"
+                        data-default-text="Select a state...">
+                </select>
+            </div>
+
+            <template id="state-template">
+                <option data-value="code" data-text="name"></option>
+            </template>
+
+            <div class="form-group">
+                <label for="city">City</label>
+                <select id="city"
+                        data-foreach="cascadeAvailableCities"
+                        data-value="cascadeSelectedCity"
+                        data-template="city-template"
+                        data-default-text="Select a city...">
+                </select>
+            </div>
+
+            <template id="city-template">
+                <option data-value="name" data-text="name"></option>
+            </template>
+
+            <div class="result-display">
+                <h3>Selected Location</h3>
+                <p data-text="cascadeFullLocation"></p>
+            </div>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>data-foreach:</strong> Custom attribute for external templates<br>
+                    <strong>Stitch.computed():</strong> Available states/cities auto-update<br>
+                    <strong>Message Bus API:</strong> $watch() for cascade reset logic
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Data structures
+            cascadeCountries: [
+                { code: 'us', name: 'United States' },
+                { code: 'ca', name: 'Canada' },
+                { code: 'uk', name: 'United Kingdom' }
+            ],
+            cascadeStates: [
+                { countryCode: 'us', code: 'ca', name: 'California' },
+                { countryCode: 'us', code: 'ny', name: 'New York' },
+                { countryCode: 'us', code: 'tx', name: 'Texas' },
+                { countryCode: 'ca', code: 'on', name: 'Ontario' },
+                { countryCode: 'ca', code: 'bc', name: 'British Columbia' },
+                { countryCode: 'ca', code: 'qc', name: 'Quebec' },
+                { countryCode: 'uk', code: 'eng', name: 'England' },
+                { countryCode: 'uk', code: 'sct', name: 'Scotland' },
+                { countryCode: 'uk', code: 'wls', name: 'Wales' }
+            ],
+            cascadeCities: [
+                { stateCode: 'ca', name: 'Los Angeles' },
+                { stateCode: 'ca', name: 'San Francisco' },
+                { stateCode: 'ca', name: 'San Diego' },
+                { stateCode: 'ny', name: 'New York City' },
+                { stateCode: 'ny', name: 'Buffalo' },
+                { stateCode: 'ny', name: 'Rochester' },
+                { stateCode: 'tx', name: 'Houston' },
+                { stateCode: 'tx', name: 'Dallas' },
+                { stateCode: 'tx', name: 'Austin' },
+                { stateCode: 'on', name: 'Toronto' },
+                { stateCode: 'on', name: 'Ottawa' },
+                { stateCode: 'on', name: 'Mississauga' },
+                { stateCode: 'bc', name: 'Vancouver' },
+                { stateCode: 'bc', name: 'Victoria' },
+                { stateCode: 'bc', name: 'Surrey' },
+                { stateCode: 'qc', name: 'Montreal' },
+                { stateCode: 'qc', name: 'Quebec City' },
+                { stateCode: 'qc', name: 'Laval' },
+                { stateCode: 'eng', name: 'London' },
+                { stateCode: 'eng', name: 'Manchester' },
+                { stateCode: 'eng', name: 'Birmingham' },
+                { stateCode: 'sct', name: 'Edinburgh' },
+                { stateCode: 'sct', name: 'Glasgow' },
+                { stateCode: 'sct', name: 'Aberdeen' },
+                { stateCode: 'wls', name: 'Cardiff' },
+                { stateCode: 'wls', name: 'Swansea' },
+                { stateCode: 'wls', name: 'Newport' }
+            ],
+
+            // Selections
+            cascadeSelectedCountry: '',
+            cascadeSelectedState: '',
+            cascadeSelectedCity: '',
+
+            // v1.0.0: Computed - Available states based on selected country
+            cascadeAvailableStates: Stitch.computed(function() {
+                if (!this.cascadeSelectedCountry) return [];
+                return this.cascadeStates.filter(state =>
+                    state.countryCode === this.cascadeSelectedCountry
+                );
+            }),
+
+            // v1.0.0: Computed - Available cities based on selected state
+            cascadeAvailableCities: Stitch.computed(function() {
+                if (!this.cascadeSelectedState) return [];
+                return this.cascadeCities.filter(city =>
+                    city.stateCode === this.cascadeSelectedState
+                );
+            }),
+
+            // v1.0.0: Computed - Display selected location
+            cascadeFullLocation: Stitch.computed(function() {
+                const parts = [];
+                if (this.cascadeSelectedCity) {
+                    const city = this.cascadeCities.find(c => c.name === this.cascadeSelectedCity);
+                    if (city) parts.push(city.name);
+                }
+                if (this.cascadeSelectedState) {
+                    const state = this.cascadeStates.find(s => s.code === this.cascadeSelectedState);
+                    if (state) parts.push(state.name);
+                }
+                if (this.cascadeSelectedCountry) {
+                    const country = this.cascadeCountries.find(c => c.code === this.cascadeSelectedCountry);
+                    if (country) parts.push(country.name);
+                }
+                return parts.length > 0 ? parts.join(', ') : 'No location selected';
+            })
+        });
+
+        // v1.0.0: Message Bus API - Watch for country changes and auto-reset children
+        model.$watch('cascadeSelectedCountry', (newCountry, oldCountry) => {
+            console.log(`Country changed: ${oldCountry} → ${newCountry}`);
+            model.cascadeSelectedState = '';
+            model.cascadeSelectedCity = '';
+        });
+
+        // v1.0.0: Message Bus API - Watch for state changes and auto-reset city
+        model.$watch('cascadeSelectedState', (newState, oldState) => {
+            console.log(`State changed: ${oldState} → ${newState}`);
+            model.cascadeSelectedCity = '';
+        });
+
+        // Populate countries dropdown
+        const countrySelect = document.getElementById('country');
+        model.cascadeCountries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.code;
+            option.textContent = country.name;
+            countrySelect.appendChild(option);
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Cascading Dropdowns example initialized (v1.0.0 - custom attributes)');
+    </script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - MessageBus & $watch Test Suite</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .test-header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .version-selector { margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .version-selector button { padding: 10px 20px; margin: 0 10px; border: 2px solid #3498db; background: white; color: #3498db; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .version-selector button.active { background: #3498db; color: white; }
+        .test-section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-section h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-case { margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #95a5a6; border-radius: 4px; }
+        .test-case.pass { border-left-color: #27ae60; background: #d5f4e6; }
+        .test-case.fail { border-left-color: #e74c3c; background: #fadbd8; }
+        .test-title { font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+        .assertion { margin: 5px 0; padding: 8px; border-radius: 3px; }
+        .assertion.pass { background: #d5f4e6; color: #27ae60; }
+        .assertion.pass::before { content: "✓ "; font-weight: bold; }
+        .assertion.fail { background: #fadbd8; color: #e74c3c; }
+        .assertion.fail::before { content: "✗ "; font-weight: bold; }
+        .summary { position: sticky; top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-bottom: 20px; }
+        .summary-stats { display: flex; justify-content: space-around; margin-top: 15px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .stat-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>📡 Stitch.js MessageBus & $watch Test Suite</h1>
+        <p>Testing MessageBus (custom events, middleware) and $watch API (property reactivity with batching)</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total"><div class="stat-value" id="totalTests">0</div><div class="stat-label">Total Tests</div></div>
+            <div class="stat pass"><div class="stat-value" id="passedTests">0</div><div class="stat-label">Passed</div></div>
+            <div class="stat fail"><div class="stat-value" id="failedTests">0</div><div class="stat-label">Failed</div></div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+    <script id="stitchScript" src="stitch.js"></script>
+
+    <script>
+        Stitch.debug.enable(); // Enable debug mode for detailed logging
+        let testResults = [];
+
+        function assert(condition, message) {
+            return { pass: condition, message: message };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return { pass: pass, message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}` };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement('div');
+            testCase.className = `test-case ${allPass ? 'pass' : 'fail'}`;
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? 'pass' : 'fail'}">${assertion.message}</div>`;
+            });
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = total - passed;
+        }
+
+        // TEST 1: Custom Events ($emit / $on)
+        function testCustomEvents() {
+            const section = createTestSection('Test 1: Custom Events ($emit / $on)');
+
+            const model = Stitch.Observable.create({ count: 0 });
+            let eventFired = false;
+            let eventData = null;
+
+            model.$on('custom', (data) => {
+                eventFired = true;
+                eventData = data;
+            });
+
+            model.$emit('custom', { value: 123 });
+
+            setTimeout(() => {
+                const assertions = [
+                    assert(eventFired, 'Custom event fired'),
+                    assertEqual(eventData?.value, 123, 'Event data passed correctly')
+                ];
+
+                testResults.push({ name: '1.1', passed: renderTestCase(section, '1.1: $emit and $on', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testEventBatching();
+            }, 50);
+        }
+
+        // TEST 2: $watch Batching (V2.0 API)
+        function testEventBatching() {
+            const section = createTestSection('Test 2: $watch Batching (70-80% reduction)');
+
+            const model = Stitch.Observable.create({ value: 0 });
+            let changeCount = 0;
+
+            // V2.0: Use $watch with { batch: true } for batched property watching
+            model.$watch('value', () => { changeCount++; }, { batch: true });
+
+            // Make multiple rapid changes
+            model.value = 1;
+            model.value = 2;
+            model.value = 3;
+            model.value = 4;
+            model.value = 5;
+
+            setTimeout(() => {
+                const assertions = [
+                    assert(changeCount < 5, `Batching reduced watch callbacks (got ${changeCount} instead of 5)`),
+                    assert(changeCount >= 1, 'At least one batched callback fired')
+                ];
+
+                testResults.push({ name: '2.1', passed: renderTestCase(section, '2.1: Batched $watch Mechanism', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testMultipleListeners();
+            }, 100);
+        }
+
+        // TEST 3: Multiple Listeners
+        function testMultipleListeners() {
+            const section = createTestSection('Test 3: Multiple Event Listeners');
+
+            const model = Stitch.Observable.create({ data: 'test' });
+            let listener1Fired = false;
+            let listener2Fired = false;
+            let listener3Fired = false;
+
+            model.$on('custom', () => { listener1Fired = true; });
+            model.$on('custom', () => { listener2Fired = true; });
+            model.$on('custom', () => { listener3Fired = true; });
+
+            model.$emit('custom');
+
+            setTimeout(() => {
+                const assertions = [
+                    assert(listener1Fired, 'First listener fired'),
+                    assert(listener2Fired, 'Second listener fired'),
+                    assert(listener3Fired, 'Third listener fired')
+                ];
+
+                testResults.push({ name: '3.1', passed: renderTestCase(section, '3.1: Multiple Listeners on Same Event', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testOnceListener();
+            }, 50);
+        }
+
+        // TEST 4: $once Listener
+        function testOnceListener() {
+            const section = createTestSection('Test 4: $once Listener');
+
+            const model = Stitch.Observable.create({});
+            let callCount = 0;
+
+            model.$once('event', () => { callCount++; });
+
+            model.$emit('event');
+            model.$emit('event');
+            model.$emit('event');
+
+            setTimeout(() => {
+                const assertions = [
+                    assertEqual(callCount, 1, '$once listener fired only once despite 3 emits')
+                ];
+
+                testResults.push({ name: '4.1', passed: renderTestCase(section, '4.1: $once Auto-Unsubscribe', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testOffListener();
+            }, 50);
+        }
+
+        // TEST 5: $off Listener Removal
+        function testOffListener() {
+            const section = createTestSection('Test 5: $off Listener Removal');
+
+            const model = Stitch.Observable.create({});
+            let callCount = 0;
+
+            const handler = () => { callCount++; };
+            model.$on('event', handler);
+
+            model.$emit('event');
+
+            setTimeout(() => {
+                model.$off('event', handler);
+                model.$emit('event');
+
+                setTimeout(() => {
+                    const assertions = [
+                        assertEqual(callCount, 1, 'Listener removed after $off (only first emit counted)')
+                    ];
+
+                    testResults.push({ name: '5.1', passed: renderTestCase(section, '5.1: $off Unsubscribe', assertions) });
+                    document.getElementById('testContainer').appendChild(section);
+                    testMiddleware();
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 6: Middleware
+        function testMiddleware() {
+            const section = createTestSection('Test 6: MessageBus Middleware');
+
+            const model = Stitch.Observable.create({});
+            let middlewareCalled = false;
+            let eventName = null;
+
+            // V2.0.0 middleware API: receives eventData object, returns modified eventData
+            model.$use((eventData) => {
+                middlewareCalled = true;
+                eventName = eventData.event;  // Extract event name from eventData
+                return eventData;  // Return to continue middleware chain
+            });
+
+            model.$emit('test-event', { data: 'test' });
+
+            setTimeout(() => {
+                const assertions = [
+                    assert(middlewareCalled, 'Middleware was called'),
+                    assertEqual(eventName, 'test-event', 'Middleware received correct event name')
+                ];
+
+                testResults.push({ name: '6.1', passed: renderTestCase(section, '6.1: Middleware Execution', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                testChangeEvent();
+            }, 50);
+        }
+
+        // TEST 7: Immediate $watch (V2.0 API)
+        function testChangeEvent() {
+            const section = createTestSection('Test 7: Immediate $watch Execution');
+
+            const model = Stitch.Observable.create({ value: 10 });
+            let watchFired = false;
+
+            // V2.0: Use $watch for property change detection (immediate by default)
+            model.$watch('value', () => { watchFired = true; });
+
+            model.value = 20;
+
+            setTimeout(() => {
+                const assertions = [
+                    assert(watchFired, '$watch callback fired immediately on property update')
+                ];
+
+                testResults.push({ name: '7.1', passed: renderTestCase(section, '7.1: Immediate $watch Execution', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                updateSummary();
+            }, 50);
+        }
+
+        function runAllTests() {
+            testResults = [];
+            document.getElementById('testContainer').innerHTML = '';
+            testCustomEvents();
+        }
+
+        window.addEventListener('load', () => { setTimeout(runAllTests, 100); });
+    </script>
+</body>
+</html>

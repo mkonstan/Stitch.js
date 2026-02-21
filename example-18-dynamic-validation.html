@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Form Validation - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input.valid {
+            border-color: #28a745;
+        }
+
+        input.invalid {
+            border-color: #dc3545;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 0.85em;
+            margin-top: 5px;
+            min-height: 20px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .validation-summary {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-top: 30px;
+        }
+
+        .validation-summary h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ Dynamic Form Validation</h1>
+        <p class="subtitle">Real-time field validation with live feedback</p>
+
+        <div id="example">
+            <form>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input
+                        id="username"
+                        type="text"
+                        placeholder="At least 3 characters"
+                        data-value="validationUsername"
+                        data-event="usernameEvents"
+                        data-class="usernameClass">
+                    <div class="error-message" data-text="usernameError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        data-value="validationEmail"
+                        data-event="emailEvents"
+                        data-class="emailClass">
+                    <div class="error-message" data-text="emailError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input
+                        id="password"
+                        type="password"
+                        placeholder="At least 8 characters"
+                        data-value="validationPassword"
+                        data-event="passwordEvents"
+                        data-class="passwordClass">
+                    <div class="error-message" data-text="passwordError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="Re-enter password"
+                        data-value="validationConfirmPassword"
+                        data-event="confirmEvents"
+                        data-class="confirmClass">
+                    <div class="error-message" data-text="confirmPasswordError"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input
+                        id="age"
+                        type="number"
+                        placeholder="18-120"
+                        data-value="validationAge"
+                        data-event="ageEvents"
+                        data-class="ageClass">
+                    <div class="error-message" data-text="ageError"></div>
+                </div>
+
+                <button type="button"
+                        data-enabled="isFormValidForSubmit"
+                        data-click="submitValidationForm">
+                    Submit Form
+                </button>
+            </form>
+
+            <div class="validation-summary">
+                <h3>Validation Status</h3>
+                <p data-text="validationSummary"></p>
+            </div>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>data-event:</strong> Custom attribute for input validation<br>
+                    <strong>Stitch.computed():</strong> Live validation status<br>
+                    <strong>data-class:</strong> Dynamic CSS classes for visual feedback
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Form fields
+            validationUsername: '',
+            validationEmail: '',
+            validationPassword: '',
+            validationConfirmPassword: '',
+            validationAge: '',
+
+            // v1.0.0: Event bindings for validation
+            usernameEvents: { input: 'validateUsername' },
+            emailEvents: { input: 'validateEmail' },
+            passwordEvents: { input: 'validatePassword' },
+            confirmEvents: { input: 'validateConfirmPassword' },
+            ageEvents: { input: 'validateAge' },
+
+            // v1.0.0: Computed - Field validations
+            isUsernameValid: Stitch.computed(function() {
+                return this.validationUsername.length >= 3;
+            }),
+
+            isEmailValid: Stitch.computed(function() {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.validationEmail);
+            }),
+
+            isPasswordValid: Stitch.computed(function() {
+                return this.validationPassword.length >= 8;
+            }),
+
+            isConfirmPasswordValid: Stitch.computed(function() {
+                return this.validationPassword === this.validationConfirmPassword &&
+                       this.validationConfirmPassword.length > 0;
+            }),
+
+            isAgeValid: Stitch.computed(function() {
+                const age = parseInt(this.validationAge);
+                return !isNaN(age) && age >= 18 && age <= 120;
+            }),
+
+            // v1.0.0: Computed - CSS classes for visual feedback
+            usernameClass: Stitch.computed(function() {
+                if (this.validationUsername.length === 0) return '';
+                return this.isUsernameValid ? 'valid' : 'invalid';
+            }),
+
+            emailClass: Stitch.computed(function() {
+                if (this.validationEmail.length === 0) return '';
+                return this.isEmailValid ? 'valid' : 'invalid';
+            }),
+
+            passwordClass: Stitch.computed(function() {
+                if (this.validationPassword.length === 0) return '';
+                return this.isPasswordValid ? 'valid' : 'invalid';
+            }),
+
+            confirmClass: Stitch.computed(function() {
+                if (this.validationConfirmPassword.length === 0) return '';
+                return this.isConfirmPasswordValid ? 'valid' : 'invalid';
+            }),
+
+            ageClass: Stitch.computed(function() {
+                if (this.validationAge.length === 0) return '';
+                return this.isAgeValid ? 'valid' : 'invalid';
+            }),
+
+            // v1.0.0: Computed - Error messages
+            usernameError: Stitch.computed(function() {
+                if (this.validationUsername.length === 0) return '';
+                return this.isUsernameValid ? '' : 'Username must be at least 3 characters';
+            }),
+
+            emailError: Stitch.computed(function() {
+                if (this.validationEmail.length === 0) return '';
+                return this.isEmailValid ? '' : 'Invalid email format';
+            }),
+
+            passwordError: Stitch.computed(function() {
+                if (this.validationPassword.length === 0) return '';
+                return this.isPasswordValid ? '' : 'Password must be at least 8 characters';
+            }),
+
+            confirmPasswordError: Stitch.computed(function() {
+                if (this.validationConfirmPassword.length === 0) return '';
+                return this.isConfirmPasswordValid ? '' : 'Passwords do not match';
+            }),
+
+            ageError: Stitch.computed(function() {
+                if (this.validationAge.length === 0) return '';
+                return this.isAgeValid ? '' : 'Age must be between 18 and 120';
+            }),
+
+            // v1.0.0: Computed - Overall form validation
+            isFormValidForSubmit: Stitch.computed(function() {
+                return this.isUsernameValid &&
+                       this.isEmailValid &&
+                       this.isPasswordValid &&
+                       this.isConfirmPasswordValid &&
+                       this.isAgeValid;
+            }),
+
+            // v1.0.0: Computed - Validation summary
+            validationSummary: Stitch.computed(function() {
+                const valid = [
+                    this.isUsernameValid,
+                    this.isEmailValid,
+                    this.isPasswordValid,
+                    this.isConfirmPasswordValid,
+                    this.isAgeValid
+                ].filter(v => v).length;
+                return `${valid} of 5 fields valid`;
+            }),
+
+            // Event handlers
+            validateUsername() {
+                // Validation happens automatically via computed properties
+            },
+
+            validateEmail() {
+                // Validation happens automatically via computed properties
+            },
+
+            validatePassword() {
+                // Validation happens automatically via computed properties
+            },
+
+            validateConfirmPassword() {
+                // Validation happens automatically via computed properties
+            },
+
+            validateAge() {
+                // Validation happens automatically via computed properties
+            },
+
+            // Action: Submit form
+            submitValidationForm() {
+                if (this.isFormValidForSubmit) {
+                    alert('✅ Form submitted successfully!');
+                    console.log('Form data:', {
+                        username: this.validationUsername,
+                        email: this.validationEmail,
+                        age: this.validationAge
+                    });
+                    this.resetValidationForm();
+                }
+            },
+
+            resetValidationForm() {
+                this.validationUsername = '';
+                this.validationEmail = '';
+                this.validationPassword = '';
+                this.validationConfirmPassword = '';
+                this.validationAge = '';
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Dynamic Form Validation example initialized (v1.0.0)');
+    </script>
+</body>
+</html>

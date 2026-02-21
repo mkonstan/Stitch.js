@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Search/Filter - Stitch.js v1.0.0</title>
+    <script src="stitch.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .filters {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin-bottom: 30px;
+        }
+
+        .filters h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            cursor: pointer;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .results-summary {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .products {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .product-card {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .product-card:hover {
+            border-color: #667eea;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .product-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-bottom: 8px;
+        }
+
+        .product-price {
+            font-size: 1.2em;
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box h4 {
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Interactive Search & Filter</h1>
+        <p class="subtitle">Multi-criteria product filtering with live results</p>
+
+        <div id="example">
+            <div class="filters">
+                <h3>Filters</h3>
+
+                <div class="filter-group">
+                    <label>Search by Name</label>
+                    <input type="text" placeholder="Search products..."
+                           data-value="searchQuery" data-event="searchEvents">
+                </div>
+
+                <div class="filter-group">
+                    <label>Categories</label>
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" data-value="filterElectronics">
+                            Electronics
+                        </label>
+                        <label>
+                            <input type="checkbox" data-value="filterClothing">
+                            Clothing
+                        </label>
+                        <label>
+                            <input type="checkbox" data-value="filterFood">
+                            Food
+                        </label>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Min Price</label>
+                        <input type="number" placeholder="$0" min="0"
+                               data-value="filterMinPrice">
+                    </div>
+                    <div class="filter-group">
+                        <label>Max Price</label>
+                        <input type="number" placeholder="$1000" min="0"
+                               data-value="filterMaxPrice">
+                    </div>
+                </div>
+
+                <button data-click="clearSearchFilters">Clear All Filters</button>
+            </div>
+
+            <div class="results-summary">
+                <strong>Results:</strong> <span data-text="filteredCount"></span> products |
+                <span data-text="filterSummary"></span>
+            </div>
+
+            <div class="products" data-foreach="filteredProducts" data-template="product-template"></div>
+
+            <template id="product-template">
+                <div class="product-card">
+                    <div class="product-name" data-text="name"></div>
+                    <div class="product-category" data-text="category"></div>
+                    <div class="product-price">$<span data-text="price"></span></div>
+                </div>
+            </template>
+
+            <div class="info-box">
+                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <p>
+                    <strong>event:</strong> Binding for search input (v1.0.0)<br>
+                    <strong>Stitch.computed():</strong> Live filtering with multiple criteria<br>
+                    <strong>foreach:</strong> External template for product cards
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Model definition with v1.0.0 API
+        const model = Stitch.Observable.create({
+            // Search/filter state
+            searchQuery: '',
+            filterElectronics: false,
+            filterClothing: false,
+            filterFood: false,
+            filterMinPrice: '',
+            filterMaxPrice: '',
+
+            // v1.0.0: Event binding for search
+            searchEvents: {
+                input: 'onSearchInput'
+            },
+
+            // Product data
+            searchProducts: [
+                { id: 1, name: 'Laptop Computer', category: 'electronics', price: 999.99 },
+                { id: 2, name: 'Wireless Mouse', category: 'electronics', price: 29.99 },
+                { id: 3, name: 'T-Shirt', category: 'clothing', price: 19.99 },
+                { id: 4, name: 'Jeans', category: 'clothing', price: 59.99 },
+                { id: 5, name: 'Organic Apples', category: 'food', price: 39.99 },
+                { id: 6, name: 'Artisan Bread', category: 'food', price: 44.99 },
+                { id: 7, name: 'Mechanical Keyboard', category: 'electronics', price: 129.99 },
+                { id: 8, name: 'Running Shoes', category: 'clothing', price: 89.99 },
+                { id: 9, name: 'Pasta Sauce', category: 'food', price: 34.99 },
+                { id: 10, name: 'USB Cable', category: 'electronics', price: 9.99 }
+            ],
+
+            // v1.0.0: Computed - Filtered products
+            filteredProducts: Stitch.computed(function() {
+                let results = this.searchProducts;
+
+                // Filter by search query
+                if (this.searchQuery.trim().length > 0) {
+                    const query = this.searchQuery.toLowerCase();
+                    results = results.filter(p =>
+                        p.name.toLowerCase().includes(query)
+                    );
+                }
+
+                // Filter by category checkboxes
+                const hasAnyCategoryFilter = this.filterElectronics || this.filterClothing || this.filterFood;
+                if (hasAnyCategoryFilter) {
+                    results = results.filter(p => {
+                        if (this.filterElectronics && p.category === 'electronics') return true;
+                        if (this.filterClothing && p.category === 'clothing') return true;
+                        if (this.filterFood && p.category === 'food') return true;
+                        return false;
+                    });
+                }
+
+                // Filter by min price
+                if (this.filterMinPrice.length > 0) {
+                    const minPrice = parseFloat(this.filterMinPrice);
+                    if (!isNaN(minPrice)) {
+                        results = results.filter(p => p.price >= minPrice);
+                    }
+                }
+
+                // Filter by max price
+                if (this.filterMaxPrice.length > 0) {
+                    const maxPrice = parseFloat(this.filterMaxPrice);
+                    if (!isNaN(maxPrice)) {
+                        results = results.filter(p => p.price <= maxPrice);
+                    }
+                }
+
+                return results;
+            }),
+
+            // v1.0.0: Computed - Result count
+            filteredCount: Stitch.computed(function() {
+                return this.filteredProducts.length;
+            }),
+
+            // v1.0.0: Computed - Has active filters
+            hasActiveFilters: Stitch.computed(function() {
+                return this.searchQuery.length > 0 ||
+                       this.filterElectronics ||
+                       this.filterClothing ||
+                       this.filterFood ||
+                       this.filterMinPrice.length > 0 ||
+                       this.filterMaxPrice.length > 0;
+            }),
+
+            // v1.0.0: Computed - Filter summary
+            filterSummary: Stitch.computed(function() {
+                const parts = [];
+                if (this.searchQuery) parts.push(`Query: "${this.searchQuery}"`);
+
+                const categories = [];
+                if (this.filterElectronics) categories.push('electronics');
+                if (this.filterClothing) categories.push('clothing');
+                if (this.filterFood) categories.push('food');
+                if (categories.length > 0) parts.push(`Categories: ${categories.join(', ')}`);
+
+                if (this.filterMinPrice) parts.push(`Min: $${this.filterMinPrice}`);
+                if (this.filterMaxPrice) parts.push(`Max: $${this.filterMaxPrice}`);
+                return parts.length > 0 ? parts.join(' | ') : 'No filters applied';
+            }),
+
+            // Event handler for search input
+            onSearchInput() {
+                console.log(`Searching for: ${this.searchQuery}`);
+            },
+
+            // Action: Clear all filters
+            clearSearchFilters() {
+                this.searchQuery = '';
+                this.filterElectronics = false;
+                this.filterClothing = false;
+                this.filterFood = false;
+                this.filterMinPrice = '';
+                this.filterMaxPrice = '';
+                console.log('Filters cleared');
+            }
+        });
+
+        // Bind to DOM
+        const binder = new Stitch.DataBinder();
+        binder.bind('#example', model);
+
+        console.log('✅ Interactive Search/Filter example initialized (v1.0.0)');
+    </script>
+</body>
+</html>

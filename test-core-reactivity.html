@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - Core Reactivity Test Suite</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .test-header { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .version-selector { margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .version-selector button { padding: 10px 20px; margin: 0 10px; border: 2px solid #3498db; background: white; color: #3498db; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .version-selector button.active { background: #3498db; color: white; }
+        .test-section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-section h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-case { margin: 15px 0; padding: 15px; background: #f8f9fa; border-left: 4px solid #95a5a6; border-radius: 4px; }
+        .test-case.pass { border-left-color: #27ae60; background: #d5f4e6; }
+        .test-case.fail { border-left-color: #e74c3c; background: #fadbd8; }
+        .test-title { font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+        .assertion { margin: 5px 0; padding: 8px; border-radius: 3px; }
+        .assertion.pass { background: #d5f4e6; color: #27ae60; }
+        .assertion.pass::before { content: "✓ "; font-weight: bold; }
+        .assertion.fail { background: #fadbd8; color: #e74c3c; }
+        .assertion.fail::before { content: "✗ "; font-weight: bold; }
+        .summary { position: sticky; top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin-bottom: 20px; }
+        .summary-stats { display: flex; justify-content: space-around; margin-top: 15px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .stat-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>⚡ Stitch.js Core Reactivity Test Suite</h1>
+        <p>Testing fundamental reactivity, data binding, and change propagation</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total"><div class="stat-value" id="totalTests">0</div><div class="stat-label">Total Tests</div></div>
+            <div class="stat pass"><div class="stat-value" id="passedTests">0</div><div class="stat-label">Passed</div></div>
+            <div class="stat fail"><div class="stat-value" id="failedTests">0</div><div class="stat-label">Failed</div></div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+    <script id="stitchScript" src="stitch.js"></script>
+
+    <script>
+        Stitch.debug.enable(); // Enable debug mode for detailed logging
+        let testResults = [];
+
+        function assert(condition, message) {
+            return { pass: condition, message: message };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return { pass: pass, message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}` };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement('div');
+            testCase.className = `test-case ${allPass ? 'pass' : 'fail'}`;
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? 'pass' : 'fail'}">${assertion.message}</div>`;
+            });
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = total - passed;
+        }
+
+        // TEST 1: Basic Reactivity
+        function testBasicReactivity() {
+            const section = createTestSection('Test 1: Basic Reactivity');
+
+            const model = Stitch.Observable.create({ count: 0, name: 'Test' });
+            const assertions = [
+                assertEqual(model.count, 0, 'Initial count value'),
+                assertEqual(model.name, 'Test', 'Initial name value')
+            ];
+
+            model.count = 5;
+            assertions.push(assertEqual(model.count, 5, 'Count updated'));
+
+            model.name = 'Updated';
+            assertions.push(assertEqual(model.name, 'Updated', 'Name updated'));
+
+            testResults.push({ name: '1.1', passed: renderTestCase(section, '1.1: Property Updates', assertions) });
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST 2: Nested Object Reactivity
+        function testNestedReactivity() {
+            const section = createTestSection('Test 2: Nested Object Reactivity');
+
+            const model = Stitch.Observable.create({
+                user: { name: 'Alice', profile: { age: 30, city: 'NYC' } }
+            });
+
+            const assertions = [
+                assertEqual(model.user.name, 'Alice', 'Nested property access'),
+                assertEqual(model.user.profile.age, 30, 'Deep nested property'),
+                assertEqual(model.user.profile.city, 'NYC', 'Deep nested property 2')
+            ];
+
+            model.user.name = 'Bob';
+            assertions.push(assertEqual(model.user.name, 'Bob', 'Nested property updated'));
+
+            model.user.profile.age = 31;
+            assertions.push(assertEqual(model.user.profile.age, 31, 'Deep nested updated'));
+
+            testResults.push({ name: '2.1', passed: renderTestCase(section, '2.1: Nested Property Updates', assertions) });
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST 3: Text Binding
+        function testTextBinding() {
+            const section = createTestSection('Test 3: Text Binding (data-text)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<div data-text="message"></div>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({ message: 'Hello' });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const assertions = [
+                    assertEqual(container.querySelector('[data-text]').textContent, 'Hello', 'Initial text binding')
+                ];
+
+                model.message = 'World';
+                setTimeout(() => {
+                    assertions.push(
+                        assertEqual(container.querySelector('[data-text]').textContent, 'World', 'Text binding updated')
+                    );
+                    document.body.removeChild(container);
+                    testResults.push({ name: '3.1', passed: renderTestCase(section, '3.1: data-text Binding', assertions) });
+                    document.getElementById('testContainer').appendChild(section);
+                    testValueBinding();
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 4: Value Binding (Two-Way)
+        function testValueBinding() {
+            const section = createTestSection('Test 4: Value Binding (data-value)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<input type="text" data-value="name">';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({ name: 'Alice' });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const input = container.querySelector('input');
+                const assertions = [
+                    assertEqual(input.value, 'Alice', 'Initial value binding')
+                ];
+
+                model.name = 'Bob';
+                setTimeout(() => {
+                    assertions.push(
+                        assertEqual(input.value, 'Bob', 'Value updated from model')
+                    );
+
+                    input.value = 'Charlie';
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(() => {
+                        assertions.push(
+                            assertEqual(model.name, 'Charlie', 'Model updated from input (two-way binding)')
+                        );
+                        document.body.removeChild(container);
+                        testResults.push({ name: '4.1', passed: renderTestCase(section, '4.1: Two-Way Value Binding', assertions) });
+                        document.getElementById('testContainer').appendChild(section);
+                        testVisibleBinding();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 5: Visible Binding
+        function testVisibleBinding() {
+            const section = createTestSection('Test 5: Visible Binding (data-visible)');
+
+            const container = document.createElement('div');
+            container.innerHTML = '<div data-visible="isVisible">Content</div>';
+            document.body.appendChild(container);
+
+            const model = Stitch.Observable.create({ isVisible: true });
+            const binder = new Stitch.DataBinder();
+            binder.bind(container, model);
+
+            setTimeout(() => {
+                const elem = container.querySelector('[data-visible]');
+                const assertions = [
+                    assert(elem.style.display !== 'none', 'Element visible when true')
+                ];
+
+                model.isVisible = false;
+                setTimeout(() => {
+                    assertions.push(
+                        assertEqual(elem.style.display, 'none', 'Element hidden when false')
+                    );
+
+                    model.isVisible = true;
+                    setTimeout(() => {
+                        assertions.push(
+                            assert(elem.style.display !== 'none', 'Element visible again when true')
+                        );
+                        document.body.removeChild(container);
+                        testResults.push({ name: '5.1', passed: renderTestCase(section, '5.1: data-visible Binding', assertions) });
+                        document.getElementById('testContainer').appendChild(section);
+                        testChangeBubbling();
+                    }, 50);
+                }, 50);
+            }, 50);
+        }
+
+        // TEST 6: Nested Property Watching (V2.0 API)
+        function testChangeBubbling() {
+            const section = createTestSection('Test 6: Nested Property Watching');
+
+            const model = Stitch.Observable.create({
+                parent: { child: { value: 10 } }
+            });
+
+            let changeCount = 0;
+            // V2.0: Use $watch for nested property change detection
+            model.$watch('parent.child.value', () => { changeCount++; });
+
+            const assertions = [];
+            model.parent.child.value = 20;
+
+            setTimeout(() => {
+                assertions.push(
+                    assert(changeCount > 0, '$watch fired for nested property change')
+                );
+
+                testResults.push({ name: '6.1', passed: renderTestCase(section, '6.1: Nested Property $watch', assertions) });
+                document.getElementById('testContainer').appendChild(section);
+                updateSummary();
+            }, 50);
+        }
+
+        function runAllTests() {
+            testResults = [];
+            document.getElementById('testContainer').innerHTML = '';
+            testBasicReactivity();
+            testNestedReactivity();
+            testTextBinding();
+        }
+
+        window.addEventListener('load', () => { setTimeout(runAllTests, 100); });
+    </script>
+</body>
+</html>

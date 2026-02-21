@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitch.js - Computed Properties Test Suite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .test-case {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #95a5a6;
+            border-radius: 4px;
+        }
+        .test-case.pass {
+            border-left-color: #27ae60;
+            background: #d5f4e6;
+        }
+        .test-case.fail {
+            border-left-color: #e74c3c;
+            background: #fadbd8;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .assertion {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 3px;
+        }
+        .assertion.pass {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        .assertion.pass::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+        .assertion.fail {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+        .assertion.fail::before {
+            content: "✗ ";
+            font-weight: bold;
+        }
+        .summary {
+            position: sticky;
+            top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            margin-bottom: 20px;
+        }
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        .stat {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+        .stat.pass .stat-value { color: #27ae60; }
+        .stat.fail .stat-value { color: #e74c3c; }
+        .stat.total .stat-value { color: #3498db; }
+        .interactive-demo {
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        input, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .debug-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fffbea;
+            border-left: 3px solid #f39c12;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-header">
+        <h1>🧪 Stitch.js Computed Properties Test Suite</h1>
+        <p>Comprehensive validation of computed property functionality</p>
+    </div>
+
+    <div class="test-controls" style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">▶️ Run All Tests</button>
+    </div>
+
+    <div class="summary" id="summary">
+        <h3 style="margin-top: 0;">Test Summary</h3>
+        <div class="summary-stats">
+            <div class="stat total">
+                <div class="stat-value" id="totalTests">0</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat pass">
+                <div class="stat-value" id="passedTests">0</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat fail">
+                <div class="stat-value" id="failedTests">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="testContainer"></div>
+
+    <!-- Load Stitch.js -->
+    <script id="stitchScript" src="stitch.js"></script>
+
+    <script>
+        Stitch.debug.enable(); // Enable debug mode for detailed logs
+        // Test Framework
+        let testResults = [];
+
+        function assert(condition, message) {
+            return {
+                pass: condition,
+                message: message,
+                actual: condition
+            };
+        }
+
+        function assertEqual(actual, expected, description) {
+            const pass = actual === expected;
+            return {
+                pass: pass,
+                message: `${description}: Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+                actual: actual,
+                expected: expected
+            };
+        }
+
+        function createTestSection(title) {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `<h2>${title}</h2>`;
+            return section;
+        }
+
+        function renderTestCase(section, testName, assertions) {
+            const allPass = assertions.every(a => a.pass);
+            const testCase = document.createElement('div');
+            testCase.className = `test-case ${allPass ? 'pass' : 'fail'}`;
+
+            let html = `<div class="test-title">${testName}</div>`;
+            assertions.forEach(assertion => {
+                html += `<div class="assertion ${assertion.pass ? 'pass' : 'fail'}">${assertion.message}</div>`;
+            });
+
+            testCase.innerHTML = html;
+            section.appendChild(testCase);
+
+            return allPass;
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = total - passed;
+
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = failed;
+        }
+
+        // TEST SUITE 1: Top-Level Computed Properties
+        function testTopLevelComputed() {
+            const section = createTestSection('Test 1: Top-Level Computed Properties');
+
+            // Test 1.1: Simple computed property
+            const model1 = Stitch.Observable.create({
+                firstName: 'John',
+                lastName: 'Doe',
+                fullName: Stitch.computed(function() {
+                    console.log('Computing fullName', this.firstName, this.lastName);
+                    return this.firstName + ' ' + this.lastName;
+                })
+            });
+
+            const assertions1 = [
+                assertEqual(model1.fullName, 'John Doe', 'Initial computed value'),
+                assert(typeof model1.fullName === 'string', 'Computed returns string')
+            ];
+
+            model1.firstName = 'Jane';
+            assertions1.push(
+                assertEqual(model1.fullName, 'Jane Doe', 'Computed updates on firstName change')
+            );
+
+            model1.lastName = 'Smith';
+            assertions1.push(
+                assertEqual(model1.fullName, 'Jane Smith', 'Computed updates on lastName change')
+            );
+
+            const pass1 = renderTestCase(section, '1.1: Simple Computed Property', assertions1);
+            testResults.push({ name: '1.1', passed: pass1 });
+
+            // Test 1.2: Computed with explicit dependencies
+            const model2 = Stitch.Observable.create({
+                count: 5,
+                doubleCount: Stitch.computed({
+                    get() { return this.count * 2; },
+                    deps: ['count']
+                })
+            });
+
+            const assertions2 = [
+                assertEqual(model2.doubleCount, 10, 'Explicit deps: Initial value'),
+            ];
+
+            model2.count = 7;
+            assertions2.push(
+                assertEqual(model2.doubleCount, 14, 'Explicit deps: Updates correctly')
+            );
+
+            const pass2 = renderTestCase(section, '1.2: Computed with Explicit Dependencies', assertions2);
+            testResults.push({ name: '1.2', passed: pass2 });
+
+            // Test 1.3: Computed calling another computed (nested effects)
+            const model3 = Stitch.Observable.create({
+                base: 10,
+                doubled: Stitch.computed(function() {
+                    return this.base * 2;
+                }),
+                quadrupled: Stitch.computed(function() {
+                    return this.doubled * 2;
+                })
+            });
+
+            const assertions3 = [
+                assertEqual(model3.doubled, 20, 'First computed: Initial value'),
+                assertEqual(model3.quadrupled, 40, 'Second computed: Initial value'),
+            ];
+
+            model3.base = 5;
+            assertions3.push(
+                assertEqual(model3.doubled, 10, 'First computed: Updates on base change'),
+                assertEqual(model3.quadrupled, 20, 'Second computed: Updates via first computed')
+            );
+
+            const pass3 = renderTestCase(section, '1.3: Computed Calling Another Computed', assertions3);
+            testResults.push({ name: '1.3', passed: pass3 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST SUITE 2: Nested Computed Properties (v2's key improvement)
+        function testNestedComputed() {
+            const section = createTestSection('Test 2: Nested Computed Properties (v2 Improvement)');
+
+            // Test 2.1: Computed in nested object
+            const model1 = Stitch.Observable.create({
+                user: {
+                    firstName: 'Alice',
+                    lastName: 'Johnson',
+                    fullName: Stitch.computed(function() {
+                        return this.firstName + ' ' + this.lastName;
+                    })
+                }
+            });
+
+            const assertions1 = [
+                assertEqual(model1.user.fullName, 'Alice Johnson', 'Nested computed: Initial value'),
+                assert(typeof model1.user.fullName === 'string', 'Nested computed: Returns string')
+            ];
+
+            model1.user.firstName = 'Bob';
+            assertions1.push(
+                assertEqual(model1.user.fullName, 'Bob Johnson', 'Nested computed: Updates on firstName change')
+            );
+
+            const pass1 = renderTestCase(section, '2.1: Computed in Nested Object', assertions1);
+            testResults.push({ name: '2.1', passed: pass1 });
+
+            // Test 2.2: Deeply nested computed (3 levels)
+            const model2 = Stitch.Observable.create({
+                company: {
+                    department: {
+                        name: 'Engineering',
+                        size: 50,
+                        description: Stitch.computed(function() {
+                            return `${this.name} (${this.size} people)`;
+                        })
+                    }
+                }
+            });
+
+            const assertions2 = [
+                assertEqual(model2.company.department.description, 'Engineering (50 people)',
+                    'Deep nested computed: Initial value'),
+            ];
+
+            model2.company.department.size = 75;
+            assertions2.push(
+                assertEqual(model2.company.department.description, 'Engineering (75 people)',
+                    'Deep nested computed: Updates correctly')
+            );
+
+            const pass2 = renderTestCase(section, '2.2: Deeply Nested Computed (3 levels)', assertions2);
+            testResults.push({ name: '2.2', passed: pass2 });
+
+            // Test 2.3: Nested computed with explicit dependencies
+            const model3 = Stitch.Observable.create({
+                settings: {
+                    width: 100,
+                    height: 50,
+                    area: Stitch.computed({
+                        get() { return this.width * this.height; },
+                        deps: ['width', 'height']
+                    })
+                }
+            });
+
+            const assertions3 = [
+                assertEqual(model3.settings.area, 5000, 'Nested explicit deps: Initial value'),
+            ];
+
+            model3.settings.width = 200;
+            assertions3.push(
+                assertEqual(model3.settings.area, 10000, 'Nested explicit deps: Width change')
+            );
+
+            model3.settings.height = 100;
+            assertions3.push(
+                assertEqual(model3.settings.area, 20000, 'Nested explicit deps: Height change')
+            );
+
+            const pass3 = renderTestCase(section, '2.3: Nested Computed with Explicit Deps', assertions3);
+            testResults.push({ name: '2.3', passed: pass3 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST SUITE 3: Computed Properties in Arrays (Critical for v1 vs v2)
+        function testArrayComputed() {
+            const section = createTestSection('Test 3: Computed Properties in Arrays (v1 vs v2 Difference)');
+
+            // Test 3.1: Array items with computed properties
+            const model1 = Stitch.Observable.create({
+                users: [
+                    {
+                        firstName: 'Alice',
+                        lastName: 'Smith',
+                        fullName: Stitch.computed(function() {
+                            return this.firstName + ' ' + this.lastName;
+                        })
+                    },
+                    {
+                        firstName: 'Bob',
+                        lastName: 'Jones',
+                        fullName: Stitch.computed(function() {
+                            return this.firstName + ' ' + this.lastName;
+                        })
+                    }
+                ]
+            });
+
+            const assertions1 = [
+                assertEqual(model1.users[0].fullName, 'Alice Smith', 'Array item 0: Initial computed'),
+                assertEqual(model1.users[1].fullName, 'Bob Jones', 'Array item 1: Initial computed'),
+            ];
+
+            model1.users[0].firstName = 'Alicia';
+            assertions1.push(
+                assertEqual(model1.users[0].fullName, 'Alicia Smith', 'Array item 0: Computed updates')
+            );
+
+            const pass1 = renderTestCase(section, '3.1: Array Items with Computed Properties', assertions1);
+            testResults.push({ name: '3.1', passed: pass1 });
+
+            // Test 3.2: Pushing new item with computed property
+            const model2 = Stitch.Observable.create({
+                items: [
+                    {
+                        price: 10,
+                        quantity: 5,
+                        total: Stitch.computed(function() {
+                            return this.price * this.quantity;
+                        })
+                    }
+                ]
+            });
+
+            const assertions2 = [
+                assertEqual(model2.items[0].total, 50, 'Initial item: Computed works'),
+            ];
+
+            model2.items.push({
+                price: 20,
+                quantity: 3,
+                total: Stitch.computed(function() {
+                    return this.price * this.quantity;
+                })
+            });
+
+            assertions2.push(
+                assertEqual(model2.items[1].total, 60, 'Pushed item: Computed works'),
+                assertEqual(model2.items.length, 2, 'Array length is correct')
+            );
+
+            model2.items[1].quantity = 4;
+            assertions2.push(
+                assertEqual(model2.items[1].total, 80, 'Pushed item: Computed updates')
+            );
+
+            const pass2 = renderTestCase(section, '3.2: Pushing Items with Computed Properties', assertions2);
+            testResults.push({ name: '3.2', passed: pass2 });
+
+            // Test 3.3: Nested array with computed properties
+            const model3 = Stitch.Observable.create({
+                categories: [
+                    {
+                        name: 'Electronics',
+                        products: [
+                            {
+                                name: 'Laptop',
+                                price: 999,
+                                discountPercent: 10,
+                                finalPrice: Stitch.computed(function() {
+                                    return this.price * (1 - this.discountPercent / 100);
+                                })
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            const assertions3 = [
+                assertEqual(model3.categories[0].products[0].finalPrice, 899.1,
+                    'Nested array computed: Initial value'),
+            ];
+
+            model3.categories[0].products[0].discountPercent = 20;
+            assertions3.push(
+                assertEqual(model3.categories[0].products[0].finalPrice, 799.2,
+                    'Nested array computed: Updates correctly')
+            );
+
+            const pass3 = renderTestCase(section, '3.3: Nested Array with Computed Properties', assertions3);
+            testResults.push({ name: '3.3', passed: pass3 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST SUITE 4: Complex Computed Scenarios
+        function testComplexComputed() {
+            const section = createTestSection('Test 4: Complex Computed Scenarios');
+
+            // Test 4.1: Computed with multiple dependencies
+            const model1 = Stitch.Observable.create({
+                cart: {
+                    items: [],
+                    taxRate: 0.08,
+                    subtotal: Stitch.computed(function() {
+                        return this.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                    }),
+                    tax: Stitch.computed(function() {
+                        return this.subtotal * this.taxRate;
+                    }),
+                    total: Stitch.computed(function() {
+                        return this.subtotal + this.tax;
+                    })
+                }
+            });
+
+            const assertions1 = [
+                assertEqual(model1.cart.subtotal, 0, 'Empty cart: subtotal = 0'),
+                assertEqual(model1.cart.tax, 0, 'Empty cart: tax = 0'),
+                assertEqual(model1.cart.total, 0, 'Empty cart: total = 0'),
+            ];
+
+            model1.cart.items.push({ price: 100, qty: 2 });
+            model1.cart.items.push({ price: 50, qty: 1 });
+
+            assertions1.push(
+                assertEqual(model1.cart.subtotal, 250, 'With items: subtotal = 250'),
+                assertEqual(model1.cart.tax, 20, 'With items: tax = 20'),
+                assertEqual(model1.cart.total, 270, 'With items: total = 270')
+            );
+
+            model1.cart.taxRate = 0.10;
+            assertions1.push(
+                assertEqual(model1.cart.tax, 25, 'Tax rate change: tax = 25'),
+                assertEqual(model1.cart.total, 275, 'Tax rate change: total = 275')
+            );
+
+            const pass1 = renderTestCase(section, '4.1: Computed with Array Dependencies', assertions1);
+            testResults.push({ name: '4.1', passed: pass1 });
+
+            // Test 4.2: Computed accessing parent properties
+            const model2 = Stitch.Observable.create({
+                globalMultiplier: 2,
+                product: {
+                    basePrice: 100,
+                    finalPrice: Stitch.computed(function() {
+                        // Note: In real nested context, accessing parent is complex
+                        // This tests if computed can access sibling properties
+                        return this.basePrice * 1.5;
+                    })
+                }
+            });
+
+            const assertions2 = [
+                assertEqual(model2.product.finalPrice, 150, 'Computed accesses own properties'),
+            ];
+
+            model2.product.basePrice = 200;
+            assertions2.push(
+                assertEqual(model2.product.finalPrice, 300, 'Computed updates on property change')
+            );
+
+            const pass2 = renderTestCase(section, '4.2: Computed Accessing Context Properties', assertions2);
+            testResults.push({ name: '4.2', passed: pass2 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // TEST SUITE 5: Edge Cases
+        function testEdgeCases() {
+            const section = createTestSection('Test 5: Edge Cases');
+
+            // Test 5.1: Computed returning different types
+            const model1 = Stitch.Observable.create({
+                value: 5,
+                computed1: Stitch.computed(function() { return this.value * 2; }), // number
+                computed2: Stitch.computed(function() { return String(this.value); }), // string
+                computed3: Stitch.computed(function() { return this.value > 3; }), // boolean
+                computed4: Stitch.computed(function() { return [this.value]; }), // array
+                computed5: Stitch.computed(function() { return { val: this.value }; }) // object
+            });
+
+            const assertions1 = [
+                assert(typeof model1.computed1 === 'number', 'Computed returns number'),
+                assert(typeof model1.computed2 === 'string', 'Computed returns string'),
+                assert(typeof model1.computed3 === 'boolean', 'Computed returns boolean'),
+                assert(Array.isArray(model1.computed4), 'Computed returns array'),
+                assert(typeof model1.computed5 === 'object', 'Computed returns object'),
+            ];
+
+            const pass1 = renderTestCase(section, '5.1: Computed Returning Different Types', assertions1);
+            testResults.push({ name: '5.1', passed: pass1 });
+
+            // Test 5.2: Computed with null/undefined handling
+            const model2 = Stitch.Observable.create({
+                nullable: null,
+                computed1: Stitch.computed(function() {
+                    return this.nullable || 'default';
+                })
+            });
+
+            const assertions2 = [
+                assertEqual(model2.computed1, 'default', 'Computed handles null'),
+            ];
+
+            model2.nullable = 'value';
+            assertions2.push(
+                assertEqual(model2.computed1, 'value', 'Computed updates from null to value')
+            );
+
+            const pass2 = renderTestCase(section, '5.2: Computed with Null/Undefined', assertions2);
+            testResults.push({ name: '5.2', passed: pass2 });
+
+            // Test 5.3: Empty computed (returns undefined)
+            const model3 = Stitch.Observable.create({
+                emptyComputed: Stitch.computed(function() {
+                    // Returns undefined
+                })
+            });
+
+            const assertions3 = [
+                assertEqual(model3.emptyComputed, undefined, 'Empty computed returns undefined'),
+            ];
+
+            const pass3 = renderTestCase(section, '5.3: Empty Computed Function', assertions3);
+            testResults.push({ name: '5.3', passed: pass3 });
+
+            document.getElementById('testContainer').appendChild(section);
+        }
+
+        // Run all tests
+        function runAllTests() {
+            testResults = [];
+            document.getElementById('testContainer').innerHTML = '';
+
+            console.log('Running computed properties tests...');
+
+            testTopLevelComputed();
+            testNestedComputed();
+            testArrayComputed();
+            testComplexComputed();
+            testEdgeCases();
+
+            updateSummary();
+
+            console.log(`Tests complete: ${testResults.filter(r => r.passed).length}/${testResults.length} passed`);
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 100);
+        });
+    </script>
+</body>
+</html>
