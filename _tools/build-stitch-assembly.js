@@ -67,13 +67,17 @@ function resolveRequireId(fromModuleId, requestId) {
     return normalized.endsWith(".js") ? normalized : `${normalized}.js`;
 }
 
-function transformModuleSource(moduleId, source, knownIds) {
+function transformModuleSource(moduleId, source, knownIds, pathToNumericId) {
     return source.replace(/require\((['"])([^'"]+)\1\)/g, (fullMatch, _quote, rawId) => {
         const resolved = resolveRequireId(moduleId, rawId);
         if (!knownIds.has(resolved)) {
             return fullMatch;
         }
-        return `__stitchRequire(${JSON.stringify(resolved)})`;
+        const numId = pathToNumericId.get(resolved);
+        if (numId === undefined) {
+            return `__stitchRequire(${JSON.stringify(resolved)})`;
+        }
+        return `__stitchRequire(${numId})`;
     });
 }
 
@@ -121,24 +125,17 @@ function buildInlinePrelude(modules) {
     lines.push("(function(root){");
     lines.push("  var __stitchModuleFactories = Object.create(null);");
     for (const mod of modules) {
-        lines.push(`  __stitchModuleFactories[${JSON.stringify(mod.id)}] = function(module, exports, __stitchRequire){`);
+        lines.push(`  __stitchModuleFactories[${mod.numericId}] = function(module, exports, __stitchRequire){`);
         lines.push(mod.source);
         lines.push("  };");
     }
     lines.push("  var __stitchModuleCache = Object.create(null);");
-    lines.push("  function __stitchNormalize(id){");
-    lines.push("    if (!id) return id;");
-    lines.push("    var normalized = String(id).replace(/\\\\/g, '/');");
-    lines.push("    if (normalized.indexOf('./') === 0) normalized = normalized.slice(2);");
-    lines.push("    return normalized;");
-    lines.push("  }");
     lines.push("  function __stitchRequire(id){");
-    lines.push("    var normalized = __stitchNormalize(id);");
-    lines.push("    var factory = __stitchModuleFactories[normalized];");
-    lines.push("    if (!factory) throw new Error('Stitch assembly missing inline module: ' + normalized);");
-    lines.push("    if (__stitchModuleCache[normalized]) return __stitchModuleCache[normalized].exports;");
+    lines.push("    var factory = __stitchModuleFactories[id];");
+    lines.push("    if (!factory) throw new Error('Stitch assembly missing inline module: ' + id);");
+    lines.push("    if (__stitchModuleCache[id]) return __stitchModuleCache[id].exports;");
     lines.push("    var module = { exports: {} };");
-    lines.push("    __stitchModuleCache[normalized] = module;");
+    lines.push("    __stitchModuleCache[id] = module;");
     lines.push("    factory(module, module.exports, __stitchRequire);");
     lines.push("    return module.exports;");
     lines.push("  }");
@@ -155,9 +152,16 @@ function buildInlinePrelude(modules) {
     return lines.join("\n");
 }
 
-function patchEntrySourceForInlineRequire(entrySource) {
+function patchEntrySourceForInlineRequire(entrySource, pathToNumericId) {
     return entrySource.replace(/require\((['"])(\.\/packages\/[^'"]+)\1\)/g, (_match, _quote, reqId) => {
+        const normalized = normalizeModuleId(reqId).endsWith(".js")
+            ? normalizeModuleId(reqId)
+            : `${normalizeModuleId(reqId)}.js`;
+        const numId = pathToNumericId.get(normalized);
         const lit = JSON.stringify(reqId);
+        if (numId !== undefined) {
+            return `(typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(${numId}) || require(${lit})) : require(${lit}))`;
+        }
         return `(typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(${lit}) || require(${lit})) : require(${lit}))`;
     });
 }
@@ -186,14 +190,25 @@ function main() {
         selectedModuleIds = collectTransitiveModuleIds(initialIds, moduleSourceById, knownIds);
     }
 
-    const modules = [...selectedModuleIds].sort().map((id) => {
+    const sortedSelectedIds = [...selectedModuleIds].sort();
+    const pathToNumericId = new Map();
+    for (let i = 0; i < sortedSelectedIds.length; i++) {
+        pathToNumericId.set(sortedSelectedIds[i], i);
+    }
+
+    const modules = sortedSelectedIds.map((id, index) => {
         const rawSource = moduleSourceById.get(id);
-        const transformed = transformModuleSource(id, rawSource, knownIds);
-        return { id, source: transformed };
+        const transformed = transformModuleSource(id, rawSource, knownIds, pathToNumericId);
+        return { id, numericId: index, source: transformed };
     });
 
     const prelude = buildInlinePrelude(modules);
-    const patchedEntrySource = patchEntrySourceForInlineRequire(entrySource);
+    const patchedEntrySource = patchEntrySourceForInlineRequire(entrySource, pathToNumericId);
+
+    const moduleMap = {};
+    for (const mod of modules) {
+        moduleMap[String(mod.numericId)] = mod.id;
+    }
 
     const metadata = {
         generatedAt: new Date().toISOString(),
@@ -201,7 +216,8 @@ function main() {
         mode,
         availableModuleCount: moduleFiles.length,
         moduleCount: modules.length,
-        modules: modules.map(m => m.id)
+        modules: modules.map(m => m.id),
+        moduleMap
     };
 
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));

@@ -1,13 +1,13 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T02:43:02.381Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T02:46:02.896Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js"}} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
-  __stitchModuleFactories["packages/api/index.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
 const VERSION = "2.1.0";
-const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
-const { Observable, computed } = __stitchRequire("packages/api/src/observable.js");
+const { createReactiveFactory } = __stitchRequire(2);
+const { Observable, computed } = __stitchRequire(1);
 
 module.exports = {
     Observable,
@@ -19,11 +19,11 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/api/src/observable.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[1] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
-const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
+const { createReactiveFactory } = __stitchRequire(2);
+const runtimeHelpers = __stitchRequire(20);
 
 const Version = "v2.1.0";
 const getProperty = runtimeHelpers.getProperty;
@@ -318,13 +318,13 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/api/src/reactive-factory.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[2] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { ReactiveSystem } = __stitchRequire("packages/core/src/reactive-system.js");
-const { ComputedRef } = __stitchRequire("packages/core/src/computed-ref.js");
-const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
-const objectHelpers = __stitchRequire("packages/utils/src/reactive-object-helpers.js");
+const { ReactiveSystem } = __stitchRequire(13);
+const { ComputedRef } = __stitchRequire(11);
+const runtimeHelpers = __stitchRequire(20);
+const objectHelpers = __stitchRequire(19);
 
 const NOOP_DEBUG = {
     enabled: false,
@@ -444,7 +444,7 @@ function createReactiveFactory(options = {}) {
             configurable: true,
             get() {
                 reactiveSystem.track(target, key);
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     value: internal[key],
                     hasEffect: !!reactiveSystem.currentEffect,
                     effectId: reactiveSystem.currentEffect?.id
@@ -454,10 +454,10 @@ function createReactiveFactory(options = {}) {
             set(newValue) {
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
-                    StitchDebug.enabled && StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
+                    StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
                     return;
                 }
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     oldValue: oldValue,
                     newValue: newValue
                 });
@@ -494,11 +494,11 @@ function createReactiveFactory(options = {}) {
         );
 
         if (explicitDeps) {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
+            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
                 deps: explicitDeps
             });
         } else {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
+            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
         }
 
         return {
@@ -591,7 +591,7 @@ function createReactiveFactory(options = {}) {
         for (const [childKey, value] of Object.entries(obj)) {
             // Detect computed properties (standardized marker)
             if (value && typeof value === "object" && value.__isStitchComputed) {
-                StitchDebug.enabled && StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
+                StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
                     hasExplicitDeps: !!value.__explicitDeps
                 });
                 computedProps.set(childKey, value);
@@ -681,7 +681,7 @@ function createReactiveFactory(options = {}) {
         
         // ⭐ OPTION 7 KEY CHANGE: Process computed properties
         computedProps.forEach((computedMarker, propKey) => {
-            StitchDebug.enabled && StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
+            StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
                 hasExplicitDeps: !!computedMarker.__explicitDeps
             });
             
@@ -693,7 +693,7 @@ function createReactiveFactory(options = {}) {
             let resolvedDeps = null;
             if (explicitDeps) {
                 resolvedDeps = resolveDependencies(explicitDeps, target);
-                StitchDebug.enabled && StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
+                StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
                     declared: explicitDeps,
                     resolved: resolvedDeps
                 });
@@ -1175,22 +1175,22 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/index.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
 const VERSION = "2.1.0";
-const foreachRenderingDelegates = __stitchRequire("packages/browser/src/foreach-rendering-delegates.js");
-const foreachBindingOrchestrator = __stitchRequire("packages/browser/src/foreach-binding-orchestrator.js");
-const bindingScanHelpers = __stitchRequire("packages/browser/src/binding-scan-helpers.js");
-const bindingRuntime = __stitchRequire("packages/browser/src/binding-runtime.js");
-const dataBinderFactory = __stitchRequire("packages/browser/src/data-binder.js");
-const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
-const debugConfig = __stitchRequire("packages/utils/src/debug-config.js");
-const attrValueHandlers = __stitchRequire("packages/utils/src/attr-value-handlers.js");
-const valueBindingHelpers = __stitchRequire("packages/utils/src/value-binding-helpers.js");
-const typeConverters = __stitchRequire("packages/utils/src/type-converters.js");
-const foreachTemplateHelpers = __stitchRequire("packages/utils/src/foreach-template-helpers.js");
-const foreachReconcileHelpers = __stitchRequire("packages/utils/src/foreach-reconcile-helpers.js");
+const foreachRenderingDelegates = __stitchRequire(8);
+const foreachBindingOrchestrator = __stitchRequire(7);
+const bindingScanHelpers = __stitchRequire(5);
+const bindingRuntime = __stitchRequire(4);
+const dataBinderFactory = __stitchRequire(6);
+const runtimeHelpers = __stitchRequire(20);
+const debugConfig = __stitchRequire(16);
+const attrValueHandlers = __stitchRequire(15);
+const valueBindingHelpers = __stitchRequire(22);
+const typeConverters = __stitchRequire(21);
+const foreachTemplateHelpers = __stitchRequire(18);
+const foreachReconcileHelpers = __stitchRequire(17);
 
 const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
 const stitchDebug = {
@@ -1278,7 +1278,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/src/binding-runtime.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[4] = function(module, exports, __stitchRequire){
 "use strict";
 
 const NOOP_DEBUG = {
@@ -1372,20 +1372,20 @@ const BINDING_HANDLERS = {
     value: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "value", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
+            StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
                 element: element.tagName,
                 type: element.type
             });
             const handler = getValueHandler(element);
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
+                StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
                 handler.modelToView(element, value, viewModel, path);
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
             const updateModel = () => {
                 const value = handler.viewToModel(element);
-                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
+                StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
@@ -1467,7 +1467,7 @@ const BINDING_HANDLERS = {
     event: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "event", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
+            StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
                 element: element.tagName
             });
             // Track active listeners so each effect run can replace prior registrations.
@@ -1490,7 +1490,7 @@ const BINDING_HANDLERS = {
                 for (const [eventName, handlerPath] of Object.entries(eventConfig)) {
                     const handler = typeof handlerPath === "string" ? getProperty(viewModel, handlerPath) : handlerPath;
                     if (typeof handler === "function") {
-                        StitchDebug.enabled && StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
+                        StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
                             event: eventName
                         });
                         const wrappedHandler = e => handler.call(viewModel, e);
@@ -1555,27 +1555,27 @@ const BINDING_HANDLERS = {
     class: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "class", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
+            StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
                 element: element.tagName,
                 initialClasses: Array.from(element.classList)
             });
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.enabled && StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
+                StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
                     element: element.tagName,
                     valueType: typeof value,
                     value: value
                 });
                 if (typeof value === "string") {
                     element.className = value;
-                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Set className to: "${value}"`);
+                    StitchDebug.log("bindings", `  → Set className to: "${value}"`);
                 } else if (value && typeof value === "object") {
                     Object.keys(value).forEach(className => {
                         const shouldHaveClass = !!value[className];
                         element.classList.toggle(className, shouldHaveClass);
-                        StitchDebug.enabled && StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
+                        StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
                     });
-                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
+                    StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
                 }
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
@@ -1790,7 +1790,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/src/binding-scan-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[5] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -1853,7 +1853,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/src/data-binder.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[6] = function(module, exports, __stitchRequire){
 "use strict";
 
 const NOOP_DEBUG = {
@@ -1979,7 +1979,7 @@ class DataBinder {
     _isBindingBoundary(element) {
         // foreach boundaries: manage their own child rendering
         if (element.hasAttribute("data-foreach")) {
-            StitchDebug.enabled && StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
+            StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
             return true;
         }
 
@@ -2026,7 +2026,7 @@ class DataBinder {
         // Construct full path from context
         const fullPath = contextPath.length > 0 ? `${contextPath.join('.')}.${path}` : path;
 
-        StitchDebug.enabled && StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
+        StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
             element: element.tagName
         });
 
@@ -2040,7 +2040,7 @@ class DataBinder {
 
         // If onBind hook exists, call it instead of default binding
         if (propertyHooks && propertyHooks.onBind) {
-            StitchDebug.enabled && StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
+            StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
                 propertyName: propertyName,
                 hasOnChange: !!propertyHooks.onChange
             });
@@ -2066,7 +2066,7 @@ class DataBinder {
 
         // Set up onChange hook if it exists (always, even if onBind exists)
         if (propertyHooks && propertyHooks.onChange) {
-            StitchDebug.enabled && StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
+            StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
 
             // Create binding object for hook
             const binding = { type, path, attributeName: `data-${type}` };
@@ -2176,7 +2176,7 @@ class DataBinder {
         this.boundElements.clear();
         this.reactiveSystem = null;
 
-        StitchDebug.enabled && StitchDebug.log("bindings", "DataBinder disposed");
+        StitchDebug.log("bindings", "DataBinder disposed");
     }
 }
 
@@ -2219,7 +2219,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/src/foreach-binding-orchestrator.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[7] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -2278,7 +2278,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/browser/src/foreach-rendering-delegates.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[8] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -2509,14 +2509,14 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/core/index.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
 const VERSION = "2.1.0";
-const { MessageBus } = __stitchRequire("packages/core/src/message-bus.js");
-const { BatchScheduler } = __stitchRequire("packages/core/src/batch-scheduler.js");
-const { ComputedRef } = __stitchRequire("packages/core/src/computed-ref.js");
-const { ReactiveSystem } = __stitchRequire("packages/core/src/reactive-system.js");
+const { MessageBus } = __stitchRequire(12);
+const { BatchScheduler } = __stitchRequire(10);
+const { ComputedRef } = __stitchRequire(11);
+const { ReactiveSystem } = __stitchRequire(13);
 
 module.exports = {
     MessageBus,
@@ -2528,7 +2528,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/core/src/batch-scheduler.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[10] = function(module, exports, __stitchRequire){
 "use strict";
 
 const NOOP_DEBUG = {
@@ -2585,7 +2585,7 @@ class BatchScheduler {
         this.flushScheduled = false;
         this.flushDepth++;
 
-        this.debug.enabled && this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
+        this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
 
         const effectsToRun = Array.from(this._pendingEffects);
         this._pendingEffects.clear();
@@ -2598,11 +2598,11 @@ class BatchScheduler {
             }
         });
 
-        this.debug.enabled && this.debug.groupEnd("effects");
+        this.debug.groupEnd("effects");
 
         this.flushing = false;
         if (this._pendingEffects.size > 0) {
-            this.debug.enabled && this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
+            this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
             this.scheduleFlush();
         } else {
             this.flushDepth = 0;
@@ -2624,7 +2624,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/core/src/computed-ref.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[11] = function(module, exports, __stitchRequire){
 "use strict";
 
 class ComputedRef {
@@ -2640,7 +2640,7 @@ class ComputedRef {
         this.id = Math.random().toString(36).substr(2, 9);
         this.isComputedRef = true;
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
+        this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
             hasExplicitDeps: !!explicitDeps,
             explicitDeps
         });
@@ -2651,7 +2651,7 @@ class ComputedRef {
             return;
         }
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
+        this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
         this.dependents.forEach((dependent) => {
@@ -2666,7 +2666,7 @@ class ComputedRef {
     }
 
     evaluate() {
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
+        this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
         this.cleanup();
         this.reactiveSystem.effectStack.push(this);
 
@@ -2680,7 +2680,7 @@ class ComputedRef {
             this.value = this.getter.call(this.context);
             this.dirty = false;
 
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
+            this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
                 value: this.value,
                 deps: this.deps.size
             });
@@ -2695,7 +2695,7 @@ class ComputedRef {
         const currentEffect = this.reactiveSystem.currentEffect;
         if (currentEffect) {
             this.dependents.add(currentEffect);
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log(
+            this.reactiveSystem.debug.log(
                 "computed",
                 `COMPUTED TRACKED (id: ${this.id}) by effect ${currentEffect.id || "unknown"}`
             );
@@ -2705,7 +2705,7 @@ class ComputedRef {
             return this.evaluate();
         }
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
+        this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
             value: this.value
         });
         return this.value;
@@ -2724,7 +2724,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/core/src/message-bus.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[12] = function(module, exports, __stitchRequire){
 "use strict";
 
 const NOOP_DEBUG = {
@@ -2752,7 +2752,7 @@ class MessageBus {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        this.debug.enabled && this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
+        this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
             subscriberCount: this.subscribers.get(event).size
         });
         return () => this.unsubscribe(event, callback);
@@ -2771,7 +2771,7 @@ class MessageBus {
             payload,
             timestamp: Date.now()
         });
-        this.debug.enabled && this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
+        this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
             payload,
             queueLength: this.queue.length
         });
@@ -2805,15 +2805,15 @@ class MessageBus {
         const eventsToProcess = [...this.queue];
         this.queue = [];
 
-        this.debug.enabled && this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
+        this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
         eventsToProcess.forEach((eventData) => {
             this._executeEvent(eventData);
         });
-        this.debug.enabled && this.debug.groupEnd("messageBus");
+        this.debug.groupEnd("messageBus");
 
         this.isFlushing = false;
         if (this.queue.length > 0) {
-            this.debug.enabled && this.debug.log(
+            this.debug.log(
                 "messageBus",
                 `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
             );
@@ -2836,7 +2836,7 @@ class MessageBus {
         const payload = processedData.payload;
         const subscribers = this.subscribers.get(event);
 
-        this.debug.enabled && this.debug.log("messageBus", `Executing event: "${event}"`, {
+        this.debug.log("messageBus", `Executing event: "${event}"`, {
             payload,
             subscriberCount: subscribers ? subscribers.size : 0
         });
@@ -2878,11 +2878,11 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/core/src/reactive-system.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[13] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { MessageBus, NOOP_DEBUG } = __stitchRequire("packages/core/src/message-bus.js");
-const { BatchScheduler } = __stitchRequire("packages/core/src/batch-scheduler.js");
+const { MessageBus, NOOP_DEBUG } = __stitchRequire(12);
+const { BatchScheduler } = __stitchRequire(10);
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
@@ -2960,7 +2960,7 @@ class ReactiveSystem {
         const currentEffect = this.currentEffect;
 
         if (!currentEffect) {
-            this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
@@ -2981,7 +2981,7 @@ class ReactiveSystem {
             currentEffect.deps.add(dep);
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
+        this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
             effectId: currentEffect.id,
             isComputed: !!currentEffect.isComputedRef,
             dependencyCount: dep.size
@@ -2993,11 +2993,11 @@ class ReactiveSystem {
         const dep = deps?.get(key);
 
         if (!dep || dep.size === 0) {
-            this.debug.enabled && this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+        this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
             oldValue,
             newValue
         });
@@ -3032,7 +3032,7 @@ class ReactiveSystem {
             this.cleanup(effect);
             this.effectStack.push(effect);
 
-            this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
+            this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
                 stackDepth: this.effectStack.length,
                 batch: !!options.batch
             });
@@ -3048,7 +3048,7 @@ class ReactiveSystem {
         effect.options = options;
         effect.id = effectId;
 
-        this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
+        this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
             lazy: !!options.lazy,
             batch: !!options.batch
         });
@@ -3073,18 +3073,18 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/index.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
 const VERSION = "2.1.0";
-const helpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
-const debugConfig = __stitchRequire("packages/utils/src/debug-config.js");
-const attrValueHandlers = __stitchRequire("packages/utils/src/attr-value-handlers.js");
-const valueBindingHelpers = __stitchRequire("packages/utils/src/value-binding-helpers.js");
-const typeConverters = __stitchRequire("packages/utils/src/type-converters.js");
-const foreachTemplateHelpers = __stitchRequire("packages/utils/src/foreach-template-helpers.js");
-const foreachReconcileHelpers = __stitchRequire("packages/utils/src/foreach-reconcile-helpers.js");
-const reactiveObjectHelpers = __stitchRequire("packages/utils/src/reactive-object-helpers.js");
+const helpers = __stitchRequire(20);
+const debugConfig = __stitchRequire(16);
+const attrValueHandlers = __stitchRequire(15);
+const valueBindingHelpers = __stitchRequire(22);
+const typeConverters = __stitchRequire(21);
+const foreachTemplateHelpers = __stitchRequire(18);
+const foreachReconcileHelpers = __stitchRequire(17);
+const reactiveObjectHelpers = __stitchRequire(19);
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -3132,7 +3132,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/attr-value-handlers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[15] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3219,7 +3219,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/debug-config.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3303,10 +3303,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/foreach-reconcile-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createTemplateElement: defaultCreateTemplateElement } = __stitchRequire("packages/utils/src/foreach-template-helpers.js");
+const { createTemplateElement: defaultCreateTemplateElement } = __stitchRequire(18);
 
 /**
  * Creates item context object with $data, $index, $parent for foreach templates.
@@ -3405,7 +3405,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/foreach-template-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3512,7 +3512,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/reactive-object-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
 function addChangeHandler(handler) {
@@ -3549,7 +3549,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/runtime-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3690,7 +3690,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/type-converters.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
 const DEFAULT_VERSION = "2.1.0";
@@ -3906,7 +3906,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories["packages/utils/src/value-binding-helpers.js"] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4134,19 +4134,12 @@ module.exports = {
 
   };
   var __stitchModuleCache = Object.create(null);
-  function __stitchNormalize(id){
-    if (!id) return id;
-    var normalized = String(id).replace(/\\/g, '/');
-    if (normalized.indexOf('./') === 0) normalized = normalized.slice(2);
-    return normalized;
-  }
   function __stitchRequire(id){
-    var normalized = __stitchNormalize(id);
-    var factory = __stitchModuleFactories[normalized];
-    if (!factory) throw new Error('Stitch assembly missing inline module: ' + normalized);
-    if (__stitchModuleCache[normalized]) return __stitchModuleCache[normalized].exports;
+    var factory = __stitchModuleFactories[id];
+    if (!factory) throw new Error('Stitch assembly missing inline module: ' + id);
+    if (__stitchModuleCache[id]) return __stitchModuleCache[id].exports;
     var module = { exports: {} };
-    __stitchModuleCache[normalized] = module;
+    __stitchModuleCache[id] = module;
     factory(module, module.exports, __stitchRequire);
     return module.exports;
   }
@@ -4168,10 +4161,10 @@ module.exports = {
 (function () {
     "use strict";
 
-    const api = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire("./packages/api/index.js") || require("./packages/api/index.js")) : require("./packages/api/index.js"));
-    const browser = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire("./packages/browser/index.js") || require("./packages/browser/index.js")) : require("./packages/browser/index.js"));
-    const core = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire("./packages/core/index.js") || require("./packages/core/index.js")) : require("./packages/core/index.js"));
-    const utils = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire("./packages/utils/index.js") || require("./packages/utils/index.js")) : require("./packages/utils/index.js"));
+    const api = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(0) || require("./packages/api/index.js")) : require("./packages/api/index.js"));
+    const browser = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(3) || require("./packages/browser/index.js")) : require("./packages/browser/index.js"));
+    const core = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(9) || require("./packages/core/index.js")) : require("./packages/core/index.js"));
+    const utils = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(14) || require("./packages/utils/index.js")) : require("./packages/utils/index.js"));
 
     if (!api || !browser || !core || !utils) {
         throw new Error("Stitch.js bootstrap failed: one or more package modules could not be resolved.");
