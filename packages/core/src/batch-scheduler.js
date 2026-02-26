@@ -48,7 +48,7 @@ class BatchScheduler {
         this.flushScheduled = false;
         this.flushDepth++;
 
-        this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
+        this.debug.enabled && this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
 
         const effectsToRun = Array.from(this._pendingEffects);
         this._pendingEffects.clear();
@@ -61,11 +61,11 @@ class BatchScheduler {
             }
         });
 
-        this.debug.groupEnd("effects");
+        this.debug.enabled && this.debug.groupEnd("effects");
 
         this.flushing = false;
         if (this._pendingEffects.size > 0) {
-            this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
+            this.debug.enabled && this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
             this.scheduleFlush();
         } else {
             this.flushDepth = 0;

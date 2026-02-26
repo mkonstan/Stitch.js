@@ -11,7 +11,8 @@ async function main() {
     const result = await terser.minify(code, {
         compress: {
             passes: 2,
-            unsafe_arrows: false
+            unsafe_arrows: false,
+            pure_getters: true
         },
         mangle: true,
         format: {

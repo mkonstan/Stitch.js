@@ -79,7 +79,7 @@ class ReactiveSystem {
         const currentEffect = this.currentEffect;
 
         if (!currentEffect) {
-            this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
@@ -100,7 +100,7 @@ class ReactiveSystem {
             currentEffect.deps.add(dep);
         }
 
-        this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
+        this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
             effectId: currentEffect.id,
             isComputed: !!currentEffect.isComputedRef,
             dependencyCount: dep.size
@@ -112,11 +112,11 @@ class ReactiveSystem {
         const dep = deps?.get(key);
 
         if (!dep || dep.size === 0) {
-            this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.enabled && this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
-        this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+        this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
             oldValue,
             newValue
         });
@@ -151,7 +151,7 @@ class ReactiveSystem {
             this.cleanup(effect);
             this.effectStack.push(effect);
 
-            this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
+            this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
                 stackDepth: this.effectStack.length,
                 batch: !!options.batch
             });
@@ -167,7 +167,7 @@ class ReactiveSystem {
         effect.options = options;
         effect.id = effectId;
 
-        this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
+        this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
             lazy: !!options.lazy,
             batch: !!options.batch
         });

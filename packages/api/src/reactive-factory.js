@@ -143,7 +143,7 @@ function createReactiveFactory(options = {}) {
             configurable: true,
             get() {
                 reactiveSystem.track(target, key);
-                StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.enabled && StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     value: internal[key],
                     hasEffect: !!reactiveSystem.currentEffect,
                     effectId: reactiveSystem.currentEffect?.id
@@ -153,10 +153,10 @@ function createReactiveFactory(options = {}) {
             set(newValue) {
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
-                    StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
+                    StitchDebug.enabled && StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
                     return;
                 }
-                StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.enabled && StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     oldValue: oldValue,
                     newValue: newValue
                 });
@@ -193,11 +193,11 @@ function createReactiveFactory(options = {}) {
         );
 
         if (explicitDeps) {
-            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
+            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
                 deps: explicitDeps
             });
         } else {
-            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
+            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
         }
 
         return {
@@ -290,7 +290,7 @@ function createReactiveFactory(options = {}) {
         for (const [childKey, value] of Object.entries(obj)) {
             // Detect computed properties (standardized marker)
             if (value && typeof value === "object" && value.__isStitchComputed) {
-                StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
+                StitchDebug.enabled && StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
                     hasExplicitDeps: !!value.__explicitDeps
                 });
                 computedProps.set(childKey, value);
@@ -365,7 +365,7 @@ function createReactiveFactory(options = {}) {
         
         // ⭐ OPTION 7 KEY CHANGE: Process computed properties
         computedProps.forEach((computedMarker, propKey) => {
-            StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
+            StitchDebug.enabled && StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
                 hasExplicitDeps: !!computedMarker.__explicitDeps
             });
             
@@ -377,7 +377,7 @@ function createReactiveFactory(options = {}) {
             let resolvedDeps = null;
             if (explicitDeps) {
                 resolvedDeps = resolveDependencies(explicitDeps, target);
-                StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
+                StitchDebug.enabled && StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
                     declared: explicitDeps,
                     resolved: resolvedDeps
                 });

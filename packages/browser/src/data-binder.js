@@ -117,7 +117,7 @@ class DataBinder {
     _isBindingBoundary(element) {
         // foreach boundaries: manage their own child rendering
         if (element.hasAttribute("data-foreach")) {
-            StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
+            StitchDebug.enabled && StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
             return true;
         }
 
@@ -164,7 +164,7 @@ class DataBinder {
         // Construct full path from context
         const fullPath = contextPath.length > 0 ? `${contextPath.join('.')}.${path}` : path;
 
-        StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
+        StitchDebug.enabled && StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
             element: element.tagName
         });
 
@@ -178,7 +178,7 @@ class DataBinder {
 
         // If onBind hook exists, call it instead of default binding
         if (propertyHooks && propertyHooks.onBind) {
-            StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
                 propertyName: propertyName,
                 hasOnChange: !!propertyHooks.onChange
             });
@@ -204,7 +204,7 @@ class DataBinder {
 
         // Set up onChange hook if it exists (always, even if onBind exists)
         if (propertyHooks && propertyHooks.onChange) {
-            StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
+            StitchDebug.enabled && StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
 
             // Create binding object for hook
             const binding = { type, path, attributeName: `data-${type}` };
@@ -314,7 +314,7 @@ class DataBinder {
         this.boundElements.clear();
         this.reactiveSystem = null;
 
-        StitchDebug.log("bindings", "DataBinder disposed");
+        StitchDebug.enabled && StitchDebug.log("bindings", "DataBinder disposed");
     }
 }
 
