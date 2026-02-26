@@ -1,6 +1,4 @@
-/*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
-
-/*! STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T03:10:42.269Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T02:31:44.472Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -24,7 +22,7 @@ module.exports = {
   __stitchModuleFactories["packages/api/src/observable.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
+const { createReactiveFactory, createComputedMarker } = __stitchRequire("packages/api/src/reactive-factory.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
 
 const Version = "v2.1.0";
@@ -263,27 +261,7 @@ class Observable {
      * console.log(model.result);  // 10
      */
     static computed(config) {
-        let fn, explicitDeps;
-        if (typeof config === "function") {
-            fn = config;
-            explicitDeps = null;
-        } else if (typeof config === "object" && config.get) {
-            fn = config.get;
-            explicitDeps = config.deps || null;
-            if (explicitDeps && !Array.isArray(explicitDeps)) {
-                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
-            }
-        } else {
-            throw new Error(`[Stitch.js ${Version}] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
-        }
-        
-        // ⭐ OPTION 7 KEY CHANGE: Return standardized marker
-        // reactive() will detect __isStitchComputed and handle uniformly
-        return {
-            __isStitchComputed: true,
-            fn: fn,
-            __explicitDeps: explicitDeps
-        };
+        return createComputedMarker(config, Version);
     }
 
     /**
@@ -335,6 +313,37 @@ const NOOP_DEBUG = {
     group() {},
     groupEnd() {}
 };
+
+/**
+ * Creates a standardized computed property marker.
+ * Shared validation/marker-creation logic used by both Observable.computed()
+ * and the factory's computed() function.
+ *
+ * @param {Function|Object} config - Compute function or config object
+ * @param {string} version - Version string for error messages
+ * @returns {Object} Computed marker { __isStitchComputed, fn, __explicitDeps }
+ */
+function createComputedMarker(config, version) {
+    let fn, explicitDeps;
+    if (typeof config === "function") {
+        fn = config;
+        explicitDeps = null;
+    } else if (typeof config === "object" && config.get) {
+        fn = config.get;
+        explicitDeps = config.deps || null;
+        if (explicitDeps && !Array.isArray(explicitDeps)) {
+            throw new Error(`[Stitch.js ${version}] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
+        }
+    } else {
+        throw new Error(`[Stitch.js ${version}] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
+    }
+
+    return {
+        __isStitchComputed: true,
+        fn: fn,
+        __explicitDeps: explicitDeps
+    };
+}
 function createReactiveFactory(options = {}) {
     const Version = options.version || "v2.1.0";
     const StitchDebug = options.debug || NOOP_DEBUG;
@@ -1105,27 +1114,7 @@ function createReactiveFactory(options = {}) {
      * });
      */
     function computed(config) {
-        let fn, explicitDeps;
-        if (typeof config === "function") {
-            fn = config;
-            explicitDeps = null;
-        } else if (typeof config === "object" && config.get) {
-            fn = config.get;
-            explicitDeps = config.deps || null;
-            if (explicitDeps && !Array.isArray(explicitDeps)) {
-                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
-            }
-        } else {
-            throw new Error(`[Stitch.js ${Version}] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
-        }
-        
-        // ⭐ OPTION 7 KEY CHANGE: Return standardized marker
-        // reactive() will detect this and handle it uniformly
-        return {
-            __isStitchComputed: true,
-            fn: fn,
-            __explicitDeps: explicitDeps
-        };
+        return createComputedMarker(config, Version);
     }
 
     /**
@@ -1173,7 +1162,8 @@ function createReactiveFactory(options = {}) {
     };
 }
 module.exports = {
-    createReactiveFactory
+    createReactiveFactory,
+    createComputedMarker
 };
 
   };

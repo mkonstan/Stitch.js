@@ -1,6 +1,6 @@
 "use strict";
 
-const { createReactiveFactory } = require("./reactive-factory");
+const { createReactiveFactory, createComputedMarker } = require("./reactive-factory");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 
 const Version = "v2.1.0";
@@ -239,27 +239,7 @@ class Observable {
      * console.log(model.result);  // 10
      */
     static computed(config) {
-        let fn, explicitDeps;
-        if (typeof config === "function") {
-            fn = config;
-            explicitDeps = null;
-        } else if (typeof config === "object" && config.get) {
-            fn = config.get;
-            explicitDeps = config.deps || null;
-            if (explicitDeps && !Array.isArray(explicitDeps)) {
-                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
-            }
-        } else {
-            throw new Error(`[Stitch.js ${Version}] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
-        }
-        
-        // ⭐ OPTION 7 KEY CHANGE: Return standardized marker
-        // reactive() will detect __isStitchComputed and handle uniformly
-        return {
-            __isStitchComputed: true,
-            fn: fn,
-            __explicitDeps: explicitDeps
-        };
+        return createComputedMarker(config, Version);
     }
 
     /**
