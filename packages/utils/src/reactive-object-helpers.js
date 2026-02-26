@@ -1,5 +1,14 @@
 "use strict";
 
+function defineHidden(target, name, value) {
+    Object.defineProperty(target, name, {
+        value: value,
+        writable: false,
+        enumerable: false,
+        configurable: false
+    });
+}
+
 function addChangeHandler(handler) {
     this._changeHandlers.add(handler);
 }
@@ -28,6 +37,7 @@ function toJSON() {
 }
 
 module.exports = {
+    defineHidden,
     addChangeHandler,
     removeChangeHandler,
     toJSON
