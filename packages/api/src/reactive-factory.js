@@ -486,7 +486,7 @@ function createReactiveFactory(options = {}) {
 
                 if (typeof value === 'function') {
                     // Check type-specific method overrides first
-                    if (prop in overrides) {
+                    if (Object.prototype.hasOwnProperty.call(overrides, prop)) {
                         return overrides[prop];
                     }
                     // Common: clear
