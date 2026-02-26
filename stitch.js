@@ -1,4 +1,4 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-21T19:44:21.958Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T05:07:26.526Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -22,7 +22,8 @@ module.exports = {
   __stitchModuleFactories["packages/api/src/observable.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
+const { createReactiveFactory, getDefaultFactory, resetDefaultFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
+const { MessageBus } = __stitchRequire("packages/core/src/message-bus.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
 
 const Version = "v2.1.0";
@@ -36,6 +37,7 @@ class Observable {
      * 
      * @param {Object} data - Data object to make reactive
      * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @param {boolean} [options.debug] - Enable debug logging for this instance
      * @returns {Object} Reactive proxy
      * @example
@@ -77,14 +79,17 @@ class Observable {
         if (!data || typeof data !== "object") {
             throw new Error("Observable.create() requires an object as input");
         }
-        
-        const factory = createReactiveFactory();
-        
+        if (data.__isReactive && data._factory) {
+            throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
+        }
+
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
+
         // ⭐ OPTION 7 KEY CHANGE: Just call reactive() - it handles EVERYTHING
         // No more manual computed extraction, no more manual descriptor wrapping
         // Single source of truth: reactive()
         const reactiveData = factory.reactive(data, new WeakSet);
-        
+
         // Add factory reference
         Object.defineProperty(reactiveData, "_factory", {
             value: factory,
@@ -92,11 +97,17 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
+        // Per-model MessageBus for user-facing event API ($on/$emit/$off/$once/$use).
+        // Each model gets its own bus so events don't leak across unrelated observables.
+        // The shared factory's reactiveSystem.messageBus handles internal framework events
+        // (nested-change, array-mutation) which are already payload-scoped.
+        const modelBus = new MessageBus({ version: Version });
+
         // Add Message Bus API
         Object.defineProperty(reactiveData, "$on", {
             value: function (event, callback) {
-                return factory.reactiveSystem.messageBus.subscribe(event, callback);
+                return modelBus.subscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -130,7 +141,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$use", {
             value: function (middleware) {
-                return factory.reactiveSystem.messageBus.use(middleware);
+                return modelBus.use(middleware);
             },
             writable: false,
             enumerable: false,
@@ -138,7 +149,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$off", {
             value: function (event, callback) {
-                factory.reactiveSystem.messageBus.unsubscribe(event, callback);
+                modelBus.unsubscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -146,7 +157,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$emit", {
             value: function (event, payload) {
-                factory.reactiveSystem.messageBus.publish(event, payload);
+                modelBus.publish(event, payload);
             },
             writable: false,
             enumerable: false,
@@ -154,7 +165,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$once", {
             value: function (event, callback) {
-                const unsubscribe = factory.reactiveSystem.messageBus.subscribe(event, payload => {
+                const unsubscribe = modelBus.subscribe(event, payload => {
                     callback(payload);
                     unsubscribe();
                 });
@@ -164,13 +175,13 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
         if (options.debug) {
             reactiveData.on(change => {
                 console.log(`[Stitch.js ${Version} Debug] ${change.field}:`, change.oldValue, "->", change.newValue);
             });
         }
-        
+
         return reactiveData;
     }
 
@@ -178,17 +189,19 @@ class Observable {
      * Creates reactive array with all mutations tracked.
      * 
      * @param {Array} [items=[]] - Initial array items
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Proxy} Reactive Proxy
      * @example
      * const list = Stitch.Observable.createArray([1, 2, 3]);
      * list.push(4); // Triggers reactivity
      * list[0] = 10; // Triggers reactivity
      */
-    static createArray(items = []) {
+    static createArray(items = [], options = {}) {
         if (!Array.isArray(items)) {
             throw new Error("Observable.createArray() requires an array as input");
         }
-        const factory = createReactiveFactory();
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
         Object.defineProperty(reactiveArray, "_factory", {
             value: factory,
@@ -201,12 +214,17 @@ class Observable {
 
     /**
      * Makes existing object reactive. Eager conversion of entire tree.
-     * 
+     *
      * @param {Object} obj - Object to make reactive
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Object} Reactive object
      */
-    static reactive(obj) {
-        const factory = createReactiveFactory();
+    static reactive(obj, options = {}) {
+        if (obj && obj.__isReactive) {
+            return obj;
+        }
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveObj = factory.reactive(obj, new WeakSet);
         Object.defineProperty(reactiveObj, "_factory", {
             value: factory,
@@ -306,6 +324,15 @@ class Observable {
             return reactiveObj;
         }
         return reactiveObj.toJSON ? reactiveObj.toJSON() : reactiveObj;
+    }
+
+    /**
+     * Resets the shared ReactiveSystem, clearing all shared state.
+     * Primarily for testing. Creates a fresh system on next Observable.create().
+     * Existing observables retain their old factory; only new observables use the new one.
+     */
+    static reset() {
+        resetDefaultFactory();
     }
 }
 function computed(config) {
@@ -1170,8 +1197,23 @@ function createReactiveFactory(options = {}) {
         bubbleChangeUp: bubbleChangeUp
     };
 }
+let _defaultFactory = null;
+
+function getDefaultFactory() {
+    if (!_defaultFactory) {
+        _defaultFactory = createReactiveFactory();
+    }
+    return _defaultFactory;
+}
+
+function resetDefaultFactory() {
+    _defaultFactory = null;
+}
+
 module.exports = {
-    createReactiveFactory
+    createReactiveFactory,
+    getDefaultFactory,
+    resetDefaultFactory
 };
 
   };

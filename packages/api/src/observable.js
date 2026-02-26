@@ -1,6 +1,7 @@
 "use strict";
 
-const { createReactiveFactory } = require("./reactive-factory");
+const { createReactiveFactory, getDefaultFactory, resetDefaultFactory } = require("./reactive-factory");
+const { MessageBus } = require("../../core/src/message-bus");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 
 const Version = "v2.1.0";
@@ -14,6 +15,7 @@ class Observable {
      * 
      * @param {Object} data - Data object to make reactive
      * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @param {boolean} [options.debug] - Enable debug logging for this instance
      * @returns {Object} Reactive proxy
      * @example
@@ -55,14 +57,17 @@ class Observable {
         if (!data || typeof data !== "object") {
             throw new Error("Observable.create() requires an object as input");
         }
-        
-        const factory = createReactiveFactory();
-        
+        if (data.__isReactive && data._factory) {
+            throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
+        }
+
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
+
         // ⭐ OPTION 7 KEY CHANGE: Just call reactive() - it handles EVERYTHING
         // No more manual computed extraction, no more manual descriptor wrapping
         // Single source of truth: reactive()
         const reactiveData = factory.reactive(data, new WeakSet);
-        
+
         // Add factory reference
         Object.defineProperty(reactiveData, "_factory", {
             value: factory,
@@ -70,11 +75,17 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
+        // Per-model MessageBus for user-facing event API ($on/$emit/$off/$once/$use).
+        // Each model gets its own bus so events don't leak across unrelated observables.
+        // The shared factory's reactiveSystem.messageBus handles internal framework events
+        // (nested-change, array-mutation) which are already payload-scoped.
+        const modelBus = new MessageBus({ version: Version });
+
         // Add Message Bus API
         Object.defineProperty(reactiveData, "$on", {
             value: function (event, callback) {
-                return factory.reactiveSystem.messageBus.subscribe(event, callback);
+                return modelBus.subscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -108,7 +119,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$use", {
             value: function (middleware) {
-                return factory.reactiveSystem.messageBus.use(middleware);
+                return modelBus.use(middleware);
             },
             writable: false,
             enumerable: false,
@@ -116,7 +127,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$off", {
             value: function (event, callback) {
-                factory.reactiveSystem.messageBus.unsubscribe(event, callback);
+                modelBus.unsubscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -124,7 +135,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$emit", {
             value: function (event, payload) {
-                factory.reactiveSystem.messageBus.publish(event, payload);
+                modelBus.publish(event, payload);
             },
             writable: false,
             enumerable: false,
@@ -132,7 +143,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$once", {
             value: function (event, callback) {
-                const unsubscribe = factory.reactiveSystem.messageBus.subscribe(event, payload => {
+                const unsubscribe = modelBus.subscribe(event, payload => {
                     callback(payload);
                     unsubscribe();
                 });
@@ -142,13 +153,13 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
         if (options.debug) {
             reactiveData.on(change => {
                 console.log(`[Stitch.js ${Version} Debug] ${change.field}:`, change.oldValue, "->", change.newValue);
             });
         }
-        
+
         return reactiveData;
     }
 
@@ -156,17 +167,19 @@ class Observable {
      * Creates reactive array with all mutations tracked.
      * 
      * @param {Array} [items=[]] - Initial array items
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Proxy} Reactive Proxy
      * @example
      * const list = Stitch.Observable.createArray([1, 2, 3]);
      * list.push(4); // Triggers reactivity
      * list[0] = 10; // Triggers reactivity
      */
-    static createArray(items = []) {
+    static createArray(items = [], options = {}) {
         if (!Array.isArray(items)) {
             throw new Error("Observable.createArray() requires an array as input");
         }
-        const factory = createReactiveFactory();
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
         Object.defineProperty(reactiveArray, "_factory", {
             value: factory,
@@ -179,12 +192,17 @@ class Observable {
 
     /**
      * Makes existing object reactive. Eager conversion of entire tree.
-     * 
+     *
      * @param {Object} obj - Object to make reactive
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Object} Reactive object
      */
-    static reactive(obj) {
-        const factory = createReactiveFactory();
+    static reactive(obj, options = {}) {
+        if (obj && obj.__isReactive) {
+            return obj;
+        }
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveObj = factory.reactive(obj, new WeakSet);
         Object.defineProperty(reactiveObj, "_factory", {
             value: factory,
@@ -284,6 +302,15 @@ class Observable {
             return reactiveObj;
         }
         return reactiveObj.toJSON ? reactiveObj.toJSON() : reactiveObj;
+    }
+
+    /**
+     * Resets the shared ReactiveSystem, clearing all shared state.
+     * Primarily for testing. Creates a fresh system on next Observable.create().
+     * Existing observables retain their old factory; only new observables use the new one.
+     */
+    static reset() {
+        resetDefaultFactory();
     }
 }
 function computed(config) {
