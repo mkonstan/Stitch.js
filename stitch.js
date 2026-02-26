@@ -1,4 +1,4 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T03:58:39.185Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T05:17:19.953Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -22,7 +22,8 @@ module.exports = {
   __stitchModuleFactories["packages/api/src/observable.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
+const { createReactiveFactory, getDefaultFactory, resetDefaultFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
+const { MessageBus } = __stitchRequire("packages/core/src/message-bus.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
 
 const Version = "v2.1.0";
@@ -36,6 +37,7 @@ class Observable {
      * 
      * @param {Object} data - Data object to make reactive
      * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @param {boolean} [options.debug] - Enable debug logging for this instance
      * @returns {Object} Reactive proxy
      * @example
@@ -77,14 +79,17 @@ class Observable {
         if (!data || typeof data !== "object") {
             throw new Error("Observable.create() requires an object as input");
         }
-        
-        const factory = createReactiveFactory();
-        
+        if (data.__isReactive && data._factory) {
+            throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
+        }
+
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
+
         // ⭐ OPTION 7 KEY CHANGE: Just call reactive() - it handles EVERYTHING
         // No more manual computed extraction, no more manual descriptor wrapping
         // Single source of truth: reactive()
         const reactiveData = factory.reactive(data, new WeakSet);
-        
+
         // Add factory reference
         Object.defineProperty(reactiveData, "_factory", {
             value: factory,
@@ -92,11 +97,17 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
+        // Per-model MessageBus for user-facing event API ($on/$emit/$off/$once/$use).
+        // Each model gets its own bus so events don't leak across unrelated observables.
+        // The shared factory's reactiveSystem.messageBus handles internal framework events
+        // (nested-change, array-mutation) which are already payload-scoped.
+        const modelBus = new MessageBus({ version: Version });
+
         // Add Message Bus API
         Object.defineProperty(reactiveData, "$on", {
             value: function (event, callback) {
-                return factory.reactiveSystem.messageBus.subscribe(event, callback);
+                return modelBus.subscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -130,7 +141,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$use", {
             value: function (middleware) {
-                return factory.reactiveSystem.messageBus.use(middleware);
+                return modelBus.use(middleware);
             },
             writable: false,
             enumerable: false,
@@ -138,7 +149,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$off", {
             value: function (event, callback) {
-                factory.reactiveSystem.messageBus.unsubscribe(event, callback);
+                modelBus.unsubscribe(event, callback);
             },
             writable: false,
             enumerable: false,
@@ -146,7 +157,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$emit", {
             value: function (event, payload) {
-                factory.reactiveSystem.messageBus.publish(event, payload);
+                modelBus.publish(event, payload);
             },
             writable: false,
             enumerable: false,
@@ -154,7 +165,7 @@ class Observable {
         });
         Object.defineProperty(reactiveData, "$once", {
             value: function (event, callback) {
-                const unsubscribe = factory.reactiveSystem.messageBus.subscribe(event, payload => {
+                const unsubscribe = modelBus.subscribe(event, payload => {
                     callback(payload);
                     unsubscribe();
                 });
@@ -164,13 +175,13 @@ class Observable {
             enumerable: false,
             configurable: false
         });
-        
+
         if (options.debug) {
             reactiveData.on(change => {
                 console.log(`[Stitch.js ${Version} Debug] ${change.field}:`, change.oldValue, "->", change.newValue);
             });
         }
-        
+
         return reactiveData;
     }
 
@@ -178,17 +189,19 @@ class Observable {
      * Creates reactive array with all mutations tracked.
      * 
      * @param {Array} [items=[]] - Initial array items
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Proxy} Reactive Proxy
      * @example
      * const list = Stitch.Observable.createArray([1, 2, 3]);
      * list.push(4); // Triggers reactivity
      * list[0] = 10; // Triggers reactivity
      */
-    static createArray(items = []) {
+    static createArray(items = [], options = {}) {
         if (!Array.isArray(items)) {
             throw new Error("Observable.createArray() requires an array as input");
         }
-        const factory = createReactiveFactory();
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
         Object.defineProperty(reactiveArray, "_factory", {
             value: factory,
@@ -201,12 +214,17 @@ class Observable {
 
     /**
      * Makes existing object reactive. Eager conversion of entire tree.
-     * 
+     *
      * @param {Object} obj - Object to make reactive
+     * @param {Object} [options={}] - Options
+     * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
      * @returns {Object} Reactive object
      */
-    static reactive(obj) {
-        const factory = createReactiveFactory();
+    static reactive(obj, options = {}) {
+        if (obj && obj.__isReactive) {
+            return obj;
+        }
+        const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveObj = factory.reactive(obj, new WeakSet);
         Object.defineProperty(reactiveObj, "_factory", {
             value: factory,
@@ -306,6 +324,15 @@ class Observable {
             return reactiveObj;
         }
         return reactiveObj.toJSON ? reactiveObj.toJSON() : reactiveObj;
+    }
+
+    /**
+     * Resets the shared ReactiveSystem, clearing all shared state.
+     * Primarily for testing. Creates a fresh system on next Observable.create().
+     * Existing observables retain their old factory; only new observables use the new one.
+     */
+    static reset() {
+        resetDefaultFactory();
     }
 }
 function computed(config) {
@@ -754,23 +781,15 @@ function createReactiveFactory(options = {}) {
     }
 
     /**
-     * Shared factory for reactive Map and Set proxies.
-     * Handles common proxy infrastructure: cache lookup, metadata setup,
-     * and shared traps (__isReactive, _changeHandlers, _parent, on, off,
-     * size, clear, iteration methods).
-     *
-     * Type-specific methods (Map: get/has/set/delete, Set: has/add/delete)
-     * are injected via methodOverrides, which is a function receiving
-     * (target, reactiveSystem, reactive, bubbleChangeUp) and returning
-     * a map of prop -> handler function factories.
-     *
-     * @param {Map|Set} target - Collection to make reactive
-     * @param {Object|null} parent - Parent object
-     * @param {string|null} key - Property key in parent
-     * @param {Function} methodOverrides - Returns object of prop -> function(target) overrides
-     * @returns {Proxy} Reactive collection proxy
+     * Makes Map reactive using Proxy.
+     * Intercepts set, delete, clear, and accessors.
+     * 
+     * @param {Map} target - Map to make reactive
+     * @param {Object|null} [parent=null] - Parent object
+     * @param {string|null} [key=null] - Property key in parent
+     * @returns {Proxy} Reactive Map proxy
      */
-    function createReactiveCollection(target, parent, key, methodOverrides) {
+    function createReactiveMap(target, parent = null, key = null) {
         const cachedProxy = proxyMap.get(target);
         if (cachedProxy) {
             attachParent(target, parent, key);
@@ -787,8 +806,6 @@ function createReactiveFactory(options = {}) {
         }
         attachParent(target, parent, key);
 
-        const overrides = methodOverrides(target);
-
         const proxy = new Proxy(target, {
             get(target, prop, receiver) {
                 if (prop === "__isReactive") return true;
@@ -804,13 +821,53 @@ function createReactiveFactory(options = {}) {
                 }
 
                 const value = Reflect.get(target, prop, receiver);
-
+                
                 if (typeof value === 'function') {
-                    // Check type-specific method overrides first
-                    if (Object.prototype.hasOwnProperty.call(overrides, prop)) {
-                        return overrides[prop];
+                    // Bind methods to target
+                    if (prop === 'get') {
+                        return function(key) {
+                            reactiveSystem.track(target, key);
+                            return target.get(key);
+                        }
                     }
-                    // Common: clear
+                    if (prop === 'has') {
+                        return function(key) {
+                            reactiveSystem.track(target, key);
+                            return target.has(key);
+                        }
+                    }
+                    if (prop === 'set') {
+                        return function(key, val) {
+                            const oldHas = target.has(key);
+                            const oldValue = target.get(key);
+                            // Make value reactive if object
+                            if (val && typeof val === "object" && !val.__isReactive) {
+                                val = reactive(val, new WeakSet);
+                            }
+                            const result = target.set(key, val);
+                            if (!oldHas || oldValue !== val) {
+                                reactiveSystem.trigger(target, key, oldValue, val);
+                                reactiveSystem.trigger(target, "size", target.size, target.size);
+                                reactiveSystem.trigger(target, "iteration", null, null);
+                                bubbleChangeUp(target, key, oldValue, val);
+                            }
+                            return result;
+                        }
+                    }
+                    if (prop === 'delete') {
+                        return function(key) {
+                            const oldHas = target.has(key);
+                            const oldValue = target.get(key);
+                            const result = target.delete(key);
+                            if (oldHas) {
+                                reactiveSystem.trigger(target, key, oldValue, undefined);
+                                reactiveSystem.trigger(target, "size", target.size + 1, target.size);
+                                reactiveSystem.trigger(target, "iteration", null, null);
+                                bubbleChangeUp(target, key, oldValue, undefined);
+                            }
+                            return result;
+                        }
+                    }
                     if (prop === 'clear') {
                         return function() {
                             const oldSize = target.size;
@@ -822,7 +879,6 @@ function createReactiveFactory(options = {}) {
                             }
                         }
                     }
-                    // Common: iteration methods
                     if (['forEach', 'keys', 'values', 'entries', Symbol.iterator].includes(prop)) {
                          reactiveSystem.track(target, "iteration");
                          return value.bind(target);
@@ -837,108 +893,108 @@ function createReactiveFactory(options = {}) {
     }
 
     /**
-     * Makes Map reactive using Proxy.
-     * Thin wrapper over createReactiveCollection with Map-specific methods:
-     * get (tracked read), has (tracked membership), set (reactive mutation),
-     * delete (reactive removal).
-     *
-     * @param {Map} target - Map to make reactive
-     * @param {Object|null} [parent=null] - Parent object
-     * @param {string|null} [key=null] - Property key in parent
-     * @returns {Proxy} Reactive Map proxy
-     */
-    function createReactiveMap(target, parent = null, key = null) {
-        return createReactiveCollection(target, parent, key, function(target) {
-            return {
-                get: function(key) {
-                    reactiveSystem.track(target, key);
-                    return target.get(key);
-                },
-                has: function(key) {
-                    reactiveSystem.track(target, key);
-                    return target.has(key);
-                },
-                set: function(key, val) {
-                    const oldHas = target.has(key);
-                    const oldValue = target.get(key);
-                    // Make value reactive if object
-                    if (val && typeof val === "object" && !val.__isReactive) {
-                        val = reactive(val, new WeakSet);
-                    }
-                    const result = target.set(key, val);
-                    if (!oldHas || oldValue !== val) {
-                        reactiveSystem.trigger(target, key, oldValue, val);
-                        reactiveSystem.trigger(target, "size", target.size, target.size);
-                        reactiveSystem.trigger(target, "iteration", null, null);
-                        bubbleChangeUp(target, key, oldValue, val);
-                    }
-                    return result;
-                },
-                delete: function(key) {
-                    const oldHas = target.has(key);
-                    const oldValue = target.get(key);
-                    const result = target.delete(key);
-                    if (oldHas) {
-                        reactiveSystem.trigger(target, key, oldValue, undefined);
-                        reactiveSystem.trigger(target, "size", target.size + 1, target.size);
-                        reactiveSystem.trigger(target, "iteration", null, null);
-                        bubbleChangeUp(target, key, oldValue, undefined);
-                    }
-                    return result;
-                }
-            };
-        });
-    }
-
-    /**
      * Makes Set reactive using Proxy.
-     * Thin wrapper over createReactiveCollection with Set-specific methods:
-     * has (tracked membership with normalizeSetLookup), add (reactive insertion),
-     * delete (reactive removal with normalizeSetLookup).
-     *
+     * Intercepts add, delete, clear, and accessors.
+     * 
      * @param {Set} target - Set to make reactive
      * @param {Object|null} [parent=null] - Parent object
      * @param {string|null} [key=null] - Property key in parent
      * @returns {Proxy} Reactive Set proxy
      */
     function createReactiveSet(target, parent = null, key = null) {
-        return createReactiveCollection(target, parent, key, function(target) {
-            return {
-                has: function(key) {
-                    const normalizedKey = normalizeSetLookup(key);
-                    reactiveSystem.track(target, normalizedKey);
-                    return target.has(normalizedKey);
-                },
-                add: function(val) {
-                    const oldValue = val;
-                    if (val && typeof val === "object" && !val.__isReactive) {
-                        val = reactive(val, new WeakSet);
-                    }
-                    const normalizedVal = normalizeSetLookup(val);
-                    const oldHas = target.has(normalizedVal);
-                    const result = target.add(normalizedVal);
-                    if (!oldHas) {
-                        reactiveSystem.trigger(target, normalizedVal, undefined, normalizedVal); // Key is value for Set
-                        reactiveSystem.trigger(target, "size", target.size - 1, target.size);
-                        reactiveSystem.trigger(target, "iteration", null, null);
-                        bubbleChangeUp(target, "add", undefined, oldValue);
-                    }
-                    return result;
-                },
-                delete: function(val) {
-                    const normalizedVal = normalizeSetLookup(val);
-                    const oldHas = target.has(normalizedVal);
-                    const result = target.delete(normalizedVal);
-                    if (oldHas) {
-                        reactiveSystem.trigger(target, normalizedVal, normalizedVal, undefined);
-                        reactiveSystem.trigger(target, "size", target.size + 1, target.size);
-                        reactiveSystem.trigger(target, "iteration", null, null);
-                        bubbleChangeUp(target, "delete", val, undefined);
-                    }
-                    return result;
+        const cachedProxy = proxyMap.get(target);
+        if (cachedProxy) {
+            attachParent(target, parent, key);
+            return cachedProxy;
+        }
+
+        if (!target._changeHandlers) {
+            Object.defineProperty(target, "_changeHandlers", {
+                value: new Set,
+                writable: false,
+                enumerable: false,
+                configurable: false
+            });
+        }
+        attachParent(target, parent, key);
+
+        const proxy = new Proxy(target, {
+            get(target, prop, receiver) {
+                if (prop === "__isReactive") return true;
+                if (prop === "_changeHandlers") return target._changeHandlers;
+                if (prop === "_parent") return target._parent;
+                if (prop === "on") return addChangeHandler.bind(target);
+                if (prop === "off") return removeChangeHandler.bind(target);
+
+                if (prop === "size") {
+                    reactiveSystem.track(target, "size");
+                    return Reflect.get(target, prop, target);
                 }
-            };
+
+                const value = Reflect.get(target, prop, receiver);
+
+                if (typeof value === 'function') {
+                    if (prop === 'has') {
+                        return function(key) {
+                            const normalizedKey = normalizeSetLookup(key);
+                            reactiveSystem.track(target, normalizedKey);
+                            return target.has(normalizedKey);
+                        }
+                    }
+                    if (prop === 'add') {
+                        return function(val) {
+                            const oldValue = val;
+                            if (val && typeof val === "object" && !val.__isReactive) {
+                                val = reactive(val, new WeakSet);
+                            }
+                            const normalizedVal = normalizeSetLookup(val);
+                            const oldHas = target.has(normalizedVal);
+                            const result = target.add(normalizedVal);
+                            if (!oldHas) {
+                                reactiveSystem.trigger(target, normalizedVal, undefined, normalizedVal); // Key is value for Set
+                                reactiveSystem.trigger(target, "size", target.size - 1, target.size);
+                                reactiveSystem.trigger(target, "iteration", null, null);
+                                bubbleChangeUp(target, "add", undefined, oldValue);
+                            }
+                            return result;
+                        }
+                    }
+                    if (prop === 'delete') {
+                        return function(val) {
+                            const normalizedVal = normalizeSetLookup(val);
+                            const oldHas = target.has(normalizedVal);
+                            const result = target.delete(normalizedVal);
+                            if (oldHas) {
+                                reactiveSystem.trigger(target, normalizedVal, normalizedVal, undefined);
+                                reactiveSystem.trigger(target, "size", target.size + 1, target.size);
+                                reactiveSystem.trigger(target, "iteration", null, null);
+                                bubbleChangeUp(target, "delete", val, undefined);
+                            }
+                            return result;
+                        }
+                    }
+                    if (prop === 'clear') {
+                        return function() {
+                            const oldSize = target.size;
+                            if (oldSize > 0) {
+                                target.clear();
+                                reactiveSystem.trigger(target, "size", oldSize, 0);
+                                reactiveSystem.trigger(target, "iteration", null, null);
+                                bubbleChangeUp(target, "clear", oldSize, 0);
+                            }
+                        }
+                    }
+                    if (['forEach', 'keys', 'values', 'entries', Symbol.iterator].includes(prop)) {
+                         reactiveSystem.track(target, "iteration");
+                         return value.bind(target);
+                    }
+                    return value.bind(target);
+                }
+                return value;
+            }
         });
+        proxyMap.set(target, proxy);
+        return proxy;
     }
 
     /**
@@ -1141,8 +1197,23 @@ function createReactiveFactory(options = {}) {
         bubbleChangeUp: bubbleChangeUp
     };
 }
+let _defaultFactory = null;
+
+function getDefaultFactory() {
+    if (!_defaultFactory) {
+        _defaultFactory = createReactiveFactory();
+    }
+    return _defaultFactory;
+}
+
+function resetDefaultFactory() {
+    _defaultFactory = null;
+}
+
 module.exports = {
-    createReactiveFactory
+    createReactiveFactory,
+    getDefaultFactory,
+    resetDefaultFactory
 };
 
   };

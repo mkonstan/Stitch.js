@@ -766,7 +766,22 @@ function createReactiveFactory(options = {}) {
         bubbleChangeUp: bubbleChangeUp
     };
 }
+let _defaultFactory = null;
+
+function getDefaultFactory() {
+    if (!_defaultFactory) {
+        _defaultFactory = createReactiveFactory();
+    }
+    return _defaultFactory;
+}
+
+function resetDefaultFactory() {
+    _defaultFactory = null;
+}
+
 module.exports = {
     createReactiveFactory,
-    createComputedMarker
+    createComputedMarker,
+    getDefaultFactory,
+    resetDefaultFactory
 };

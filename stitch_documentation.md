@@ -242,10 +242,12 @@ Computed Ready for Access ← get() returns fresh value
    - Automatic microtask flushing via Promise.resolve()
    - Infinite loop protection (MAX_FLUSH_DEPTH: 100)
 
-4. **ReactiveSystem** - Core dependency tracking engine
+4. **ReactiveSystem** - Core dependency tracking engine (shared singleton by default)
    - Transparent tracking via JavaScript Proxies
    - Effect stack for nested computed properties
    - Synchronous trigger() for immediate invalidation
+   - All observables share one ReactiveSystem by default (cross-observable effects, coalesced batching)
+   - Opt-in isolation via `Observable.create(data, { isolated: true })`
 
 > 📖 **For Implementation Details:** See [ARCHITECTURE.md](ARCHITECTURE.md) for deep dive into BatchScheduler, ComputedRef, and ReactiveSystem internals.
 >
@@ -1930,6 +1932,14 @@ const model = Stitch.Observable.create({
 });
 ```
 
+By default, all observables share a single `ReactiveSystem` and `BatchScheduler`. This means effects can track dependencies across observable boundaries, and batched updates coalesce into a single microtask flush. Each observable gets its own `MessageBus` for `$on`/`$emit` events.
+
+**Isolated Observable (opt-in):**
+```javascript
+const isolated = Stitch.Observable.create({ count: 0 }, { isolated: true });
+// This observable has its own ReactiveSystem — no cross-observable tracking
+```
+
 **Observable Array:**
 ```javascript
 const items = Stitch.Observable.createArray([1, 2, 3]);
@@ -1940,6 +1950,13 @@ items.push(4);  // ✅ Reactive
 ```javascript
 const obj = { count: 0 };
 const reactive = Stitch.Observable.reactive(obj);
+// If obj is already reactive, returns the existing proxy
+```
+
+**Reset Shared State (for testing):**
+```javascript
+Stitch.Observable.reset();
+// Existing observables keep their old system; new ones get a fresh system
 ```
 
 ### ⚠️ Arrow Function Restriction
@@ -2724,6 +2741,8 @@ model.age = "abc";  // Console: "Failed to convert 'abc' to float. Returning nul
 
 Every Observable created with `Observable.create()` includes 6 built-in methods for event observation and coordination. All methods use the `$` prefix (Vue.js convention) to indicate framework-provided instance methods.
 
+Each observable gets its **own per-model MessageBus**. Events emitted on one model are only delivered to subscribers on that same model — they do not leak across unrelated observables.
+
 > ⚠️ **V2.0 Breaking Change - MessageBus Role Change:**
 >
 > In **v1.0**, MessageBus was the core reactivity mechanism for property changes (async).
@@ -2734,6 +2753,7 @@ Every Observable created with `Observable.create()` includes 6 built-in methods 
 > **Recommended Migration:**
 > - ✅ Use `$watch()` for property observation (still works, now uses ReactiveSystem internally)
 > - ⚠️ Avoid subscribing to 'property-changed' events directly (deprecated, may be removed in future)
+> - ❌ `$on('array-mutation')` and `$on('nested-change')` no longer receive internal framework events — these now run on a separate internal bus. Use `$watch()` instead.
 > - ✅ Continue using `$emit()` / `$on()` for custom user events
 >
 > See [MIGRATION.md](MIGRATION.md) for complete details.
@@ -2744,7 +2764,7 @@ Subscribe to Message Bus events. Returns an unsubscribe function.
 
 **Parameters:**
 - `event` (String) - Event name: custom events, or '*' (wildcard)
-  - ⚠️ **Deprecated (v2.0):** 'property-changed', 'nested-change', 'array-mutation' (use `$watch()` instead)
+  - ⚠️ **Removed:** 'property-changed', 'nested-change', 'array-mutation' are no longer delivered to model `$on()`. Use `$watch()` for property observation.
 - `callback` (Function) - Handler function receiving payload
 
 **Returns:** Function - Unsubscribe function
