@@ -13,7 +13,7 @@ function fail(message) {
 }
 
 function parseAssemblyMetadata(artifactText) {
-    const match = artifactText.match(/\/\*\s*STITCH_ASSEMBLY_METADATA\s+(\{[\s\S]*?\})\s*\*\//);
+    const match = artifactText.match(/\/\*!?\s*STITCH_ASSEMBLY_METADATA\s+(\{[\s\S]*?\})\s*\*\//);
     if (!match) return null;
     try {
         return JSON.parse(match[1]);
