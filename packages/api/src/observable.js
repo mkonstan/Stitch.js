@@ -2,6 +2,7 @@
 
 const { createReactiveFactory } = require("./reactive-factory");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
+const { defineHidden } = require("../../utils/src/reactive-object-helpers");
 
 const Version = "v2.1.0";
 const getProperty = runtimeHelpers.getProperty;
@@ -64,83 +65,56 @@ class Observable {
         const reactiveData = factory.reactive(data, new WeakSet);
         
         // Add factory reference
-        Object.defineProperty(reactiveData, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        
+        defineHidden(reactiveData, "_factory", factory);
+
         // Add Message Bus API
-        Object.defineProperty(reactiveData, "$on", {
-            value: function (event, callback) {
-                return factory.reactiveSystem.messageBus.subscribe(event, callback);
+        const bus = factory.reactiveSystem.messageBus;
+        const messageBusMethods = {
+            $on: function (event, callback) {
+                return bus.subscribe(event, callback);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$watch", {
-            value: function (property, callback, options = {}) {
-                let previousValue = getProperty(reactiveData, property);
-
-                // Create effect that tracks the property
-                return factory.reactiveSystem.effect(() => {
-                    const currentValue = getProperty(reactiveData, property);
-
-                    // Call callback if value changed
-                    if (currentValue !== previousValue) {
-                        callback(currentValue, previousValue, {
-                            key: property,
-                            newValue: currentValue,
-                            oldValue: previousValue,
-                            target: reactiveData
-                        });
-                        previousValue = currentValue;
-                    }
-                }, {
-                    batch: options.batch !== undefined ? options.batch : false  // Immediate by default
-                });
+            $use: function (middleware) {
+                return bus.use(middleware);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$use", {
-            value: function (middleware) {
-                return factory.reactiveSystem.messageBus.use(middleware);
+            $off: function (event, callback) {
+                bus.unsubscribe(event, callback);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$off", {
-            value: function (event, callback) {
-                factory.reactiveSystem.messageBus.unsubscribe(event, callback);
+            $emit: function (event, payload) {
+                bus.publish(event, payload);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$emit", {
-            value: function (event, payload) {
-                factory.reactiveSystem.messageBus.publish(event, payload);
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$once", {
-            value: function (event, callback) {
-                const unsubscribe = factory.reactiveSystem.messageBus.subscribe(event, payload => {
+            $once: function (event, callback) {
+                const unsubscribe = bus.subscribe(event, payload => {
                     callback(payload);
                     unsubscribe();
                 });
                 return unsubscribe;
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
+            }
+        };
+        for (const [name, fn] of Object.entries(messageBusMethods)) {
+            defineHidden(reactiveData, name, fn);
+        }
+
+        // $watch remains separate due to closure over previousValue
+        defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
+            let previousValue = getProperty(reactiveData, property);
+
+            // Create effect that tracks the property
+            return factory.reactiveSystem.effect(() => {
+                const currentValue = getProperty(reactiveData, property);
+
+                // Call callback if value changed
+                if (currentValue !== previousValue) {
+                    callback(currentValue, previousValue, {
+                        key: property,
+                        newValue: currentValue,
+                        oldValue: previousValue,
+                        target: reactiveData
+                    });
+                    previousValue = currentValue;
+                }
+            }, {
+                batch: options.batch !== undefined ? options.batch : false  // Immediate by default
+            });
         });
         
         if (options.debug) {
@@ -168,12 +142,7 @@ class Observable {
         }
         const factory = createReactiveFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
-        Object.defineProperty(reactiveArray, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(reactiveArray, "_factory", factory);
         return reactiveArray;
     }
 
@@ -186,12 +155,7 @@ class Observable {
     static reactive(obj) {
         const factory = createReactiveFactory();
         const reactiveObj = factory.reactive(obj, new WeakSet);
-        Object.defineProperty(reactiveObj, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(reactiveObj, "_factory", factory);
         return reactiveObj;
     }
 

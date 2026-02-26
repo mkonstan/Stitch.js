@@ -1,4 +1,4 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-21T19:44:21.958Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T02:35:58.978Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -24,6 +24,7 @@ module.exports = {
 
 const { createReactiveFactory } = __stitchRequire("packages/api/src/reactive-factory.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
+const { defineHidden } = __stitchRequire("packages/utils/src/reactive-object-helpers.js");
 
 const Version = "v2.1.0";
 const getProperty = runtimeHelpers.getProperty;
@@ -86,83 +87,56 @@ class Observable {
         const reactiveData = factory.reactive(data, new WeakSet);
         
         // Add factory reference
-        Object.defineProperty(reactiveData, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        
+        defineHidden(reactiveData, "_factory", factory);
+
         // Add Message Bus API
-        Object.defineProperty(reactiveData, "$on", {
-            value: function (event, callback) {
-                return factory.reactiveSystem.messageBus.subscribe(event, callback);
+        const bus = factory.reactiveSystem.messageBus;
+        const messageBusMethods = {
+            $on: function (event, callback) {
+                return bus.subscribe(event, callback);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$watch", {
-            value: function (property, callback, options = {}) {
-                let previousValue = getProperty(reactiveData, property);
-
-                // Create effect that tracks the property
-                return factory.reactiveSystem.effect(() => {
-                    const currentValue = getProperty(reactiveData, property);
-
-                    // Call callback if value changed
-                    if (currentValue !== previousValue) {
-                        callback(currentValue, previousValue, {
-                            key: property,
-                            newValue: currentValue,
-                            oldValue: previousValue,
-                            target: reactiveData
-                        });
-                        previousValue = currentValue;
-                    }
-                }, {
-                    batch: options.batch !== undefined ? options.batch : false  // Immediate by default
-                });
+            $use: function (middleware) {
+                return bus.use(middleware);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$use", {
-            value: function (middleware) {
-                return factory.reactiveSystem.messageBus.use(middleware);
+            $off: function (event, callback) {
+                bus.unsubscribe(event, callback);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$off", {
-            value: function (event, callback) {
-                factory.reactiveSystem.messageBus.unsubscribe(event, callback);
+            $emit: function (event, payload) {
+                bus.publish(event, payload);
             },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$emit", {
-            value: function (event, payload) {
-                factory.reactiveSystem.messageBus.publish(event, payload);
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
-        Object.defineProperty(reactiveData, "$once", {
-            value: function (event, callback) {
-                const unsubscribe = factory.reactiveSystem.messageBus.subscribe(event, payload => {
+            $once: function (event, callback) {
+                const unsubscribe = bus.subscribe(event, payload => {
                     callback(payload);
                     unsubscribe();
                 });
                 return unsubscribe;
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
+            }
+        };
+        for (const [name, fn] of Object.entries(messageBusMethods)) {
+            defineHidden(reactiveData, name, fn);
+        }
+
+        // $watch remains separate due to closure over previousValue
+        defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
+            let previousValue = getProperty(reactiveData, property);
+
+            // Create effect that tracks the property
+            return factory.reactiveSystem.effect(() => {
+                const currentValue = getProperty(reactiveData, property);
+
+                // Call callback if value changed
+                if (currentValue !== previousValue) {
+                    callback(currentValue, previousValue, {
+                        key: property,
+                        newValue: currentValue,
+                        oldValue: previousValue,
+                        target: reactiveData
+                    });
+                    previousValue = currentValue;
+                }
+            }, {
+                batch: options.batch !== undefined ? options.batch : false  // Immediate by default
+            });
         });
         
         if (options.debug) {
@@ -190,12 +164,7 @@ class Observable {
         }
         const factory = createReactiveFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
-        Object.defineProperty(reactiveArray, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(reactiveArray, "_factory", factory);
         return reactiveArray;
     }
 
@@ -208,12 +177,7 @@ class Observable {
     static reactive(obj) {
         const factory = createReactiveFactory();
         const reactiveObj = factory.reactive(obj, new WeakSet);
-        Object.defineProperty(reactiveObj, "_factory", {
-            value: factory,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(reactiveObj, "_factory", factory);
         return reactiveObj;
     }
 
@@ -325,6 +289,7 @@ const { ReactiveSystem } = __stitchRequire("packages/core/src/reactive-system.js
 const { ComputedRef } = __stitchRequire("packages/core/src/computed-ref.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
 const objectHelpers = __stitchRequire("packages/utils/src/reactive-object-helpers.js");
+const defineHidden = objectHelpers.defineHidden;
 
 const NOOP_DEBUG = {
     enabled: false,
@@ -359,12 +324,7 @@ function createReactiveFactory(options = {}) {
      */
     function attachParent(target, parent, key) {
         if (parent && key !== null && key !== undefined && !target._parent) {
-            Object.defineProperty(target, "_parent", {
-                value: { obj: parent, key: key },
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_parent", { obj: parent, key: key });
         }
     }
 
@@ -641,28 +601,13 @@ function createReactiveFactory(options = {}) {
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
         // Add metadata
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         if (StitchDebug.enabled && !target.__stitchId) {
-            Object.defineProperty(target, "__stitchId", {
-                value: `obj_${Math.random().toString(36).substr(2, 9)}`,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "__stitchId", `obj_${Math.random().toString(36).substr(2, 9)}`);
         }
         attachParent(target, parent, key);
-        Object.defineProperty(target, "__isReactive", {
-            value: true,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(target, "__isReactive", true);
         
         const internal = {};
         const propertyDescriptors = {};
@@ -703,53 +648,24 @@ function createReactiveFactory(options = {}) {
             propertyDescriptors[propKey] = createComputedDescriptor(target, propKey, computeFn, resolvedDeps);
         });
         
-        // Add helper methods
-        propertyDescriptors.on = {
-            value: addChangeHandler.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.off = {
-            value: removeChangeHandler.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.set = {
-            value: setProperty.bind(null, target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.get = {
-            value: getProperty.bind(null, target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.toJSON = {
-            value: toJSON.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.$set = {
-            value: function (key, value) {
-                if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
-                    this[key] = value;
-                } else {
-                    const descriptor = createReactiveDescriptor(this, key, internal);
-                    Object.defineProperty(this, key, descriptor);
-                    this[key] = value;
-                }
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        
         Object.defineProperties(target, propertyDescriptors);
+
+        // Add helper methods
+        defineHidden(target, "on", addChangeHandler.bind(target));
+        defineHidden(target, "off", removeChangeHandler.bind(target));
+        defineHidden(target, "set", setProperty.bind(null, target));
+        defineHidden(target, "get", getProperty.bind(null, target));
+        defineHidden(target, "toJSON", toJSON.bind(target));
+        defineHidden(target, "$set", function (key, value) {
+            if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
+                this[key] = value;
+            } else {
+                const descriptor = createReactiveDescriptor(this, key, internal);
+                Object.defineProperty(this, key, descriptor);
+                this[key] = value;
+            }
+        });
+
         return target;
     }
 
@@ -770,12 +686,7 @@ function createReactiveFactory(options = {}) {
         }
 
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
@@ -794,7 +705,7 @@ function createReactiveFactory(options = {}) {
                 }
 
                 const value = Reflect.get(target, prop, receiver);
-                
+
                 if (typeof value === 'function') {
                     // Bind methods to target
                     if (prop === 'get') {
@@ -882,12 +793,7 @@ function createReactiveFactory(options = {}) {
         }
 
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
@@ -989,12 +895,7 @@ function createReactiveFactory(options = {}) {
 
         const arrayMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill"];
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
@@ -3515,6 +3416,15 @@ module.exports = {
   __stitchModuleFactories["packages/utils/src/reactive-object-helpers.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
+function defineHidden(target, name, value) {
+    Object.defineProperty(target, name, {
+        value: value,
+        writable: false,
+        enumerable: false,
+        configurable: false
+    });
+}
+
 function addChangeHandler(handler) {
     this._changeHandlers.add(handler);
 }
@@ -3543,6 +3453,7 @@ function toJSON() {
 }
 
 module.exports = {
+    defineHidden,
     addChangeHandler,
     removeChangeHandler,
     toJSON

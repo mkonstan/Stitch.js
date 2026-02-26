@@ -4,6 +4,7 @@ const { ReactiveSystem } = require("../../core/src/reactive-system");
 const { ComputedRef } = require("../../core/src/computed-ref");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const objectHelpers = require("../../utils/src/reactive-object-helpers");
+const defineHidden = objectHelpers.defineHidden;
 
 const NOOP_DEBUG = {
     enabled: false,
@@ -38,12 +39,7 @@ function createReactiveFactory(options = {}) {
      */
     function attachParent(target, parent, key) {
         if (parent && key !== null && key !== undefined && !target._parent) {
-            Object.defineProperty(target, "_parent", {
-                value: { obj: parent, key: key },
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_parent", { obj: parent, key: key });
         }
     }
 
@@ -320,28 +316,13 @@ function createReactiveFactory(options = {}) {
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
         // Add metadata
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         if (StitchDebug.enabled && !target.__stitchId) {
-            Object.defineProperty(target, "__stitchId", {
-                value: `obj_${Math.random().toString(36).substr(2, 9)}`,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "__stitchId", `obj_${Math.random().toString(36).substr(2, 9)}`);
         }
         attachParent(target, parent, key);
-        Object.defineProperty(target, "__isReactive", {
-            value: true,
-            writable: false,
-            enumerable: false,
-            configurable: false
-        });
+        defineHidden(target, "__isReactive", true);
         
         const internal = {};
         const propertyDescriptors = {};
@@ -382,53 +363,24 @@ function createReactiveFactory(options = {}) {
             propertyDescriptors[propKey] = createComputedDescriptor(target, propKey, computeFn, resolvedDeps);
         });
         
-        // Add helper methods
-        propertyDescriptors.on = {
-            value: addChangeHandler.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.off = {
-            value: removeChangeHandler.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.set = {
-            value: setProperty.bind(null, target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.get = {
-            value: getProperty.bind(null, target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.toJSON = {
-            value: toJSON.bind(target),
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        propertyDescriptors.$set = {
-            value: function (key, value) {
-                if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
-                    this[key] = value;
-                } else {
-                    const descriptor = createReactiveDescriptor(this, key, internal);
-                    Object.defineProperty(this, key, descriptor);
-                    this[key] = value;
-                }
-            },
-            writable: false,
-            enumerable: false,
-            configurable: false
-        };
-        
         Object.defineProperties(target, propertyDescriptors);
+
+        // Add helper methods
+        defineHidden(target, "on", addChangeHandler.bind(target));
+        defineHidden(target, "off", removeChangeHandler.bind(target));
+        defineHidden(target, "set", setProperty.bind(null, target));
+        defineHidden(target, "get", getProperty.bind(null, target));
+        defineHidden(target, "toJSON", toJSON.bind(target));
+        defineHidden(target, "$set", function (key, value) {
+            if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
+                this[key] = value;
+            } else {
+                const descriptor = createReactiveDescriptor(this, key, internal);
+                Object.defineProperty(this, key, descriptor);
+                this[key] = value;
+            }
+        });
+
         return target;
     }
 
@@ -449,12 +401,7 @@ function createReactiveFactory(options = {}) {
         }
 
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
@@ -473,7 +420,7 @@ function createReactiveFactory(options = {}) {
                 }
 
                 const value = Reflect.get(target, prop, receiver);
-                
+
                 if (typeof value === 'function') {
                     // Bind methods to target
                     if (prop === 'get') {
@@ -561,12 +508,7 @@ function createReactiveFactory(options = {}) {
         }
 
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
@@ -668,12 +610,7 @@ function createReactiveFactory(options = {}) {
 
         const arrayMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill"];
         if (!target._changeHandlers) {
-            Object.defineProperty(target, "_changeHandlers", {
-                value: new Set,
-                writable: false,
-                enumerable: false,
-                configurable: false
-            });
+            defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
 
