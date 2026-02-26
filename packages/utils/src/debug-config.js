@@ -71,9 +71,23 @@ function formatUnknownCategoryWarning(category, categories = DEFAULT_DEBUG_CATEG
     return `[Stitch.js Debug] Unknown category: ${category}. Valid categories: ${listDebugCategories(categories).join(", ")}`;
 }
 
+/**
+ * No-op debug object used as a default when debugging is disabled.
+ * Provides the same interface as the real debug object so callers
+ * don't need to check for null.
+ */
+const NOOP_DEBUG = {
+    enabled: false,
+    categories: Object.create(null),
+    log() {},
+    group() {},
+    groupEnd() {}
+};
+
 module.exports = {
     DEFAULT_DEBUG_CATEGORIES,
     DEFAULT_DEBUG_COLORS,
+    NOOP_DEBUG,
     createDebugState,
     listDebugCategories,
     isKnownDebugCategory,

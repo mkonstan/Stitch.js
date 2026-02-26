@@ -1,12 +1,6 @@
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 
 function createBindingRuntime(deps = {}) {
     const Version = deps.version || "v2.1.0";

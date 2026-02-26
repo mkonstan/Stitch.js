@@ -4,14 +4,7 @@ const { ReactiveSystem } = require("../../core/src/reactive-system");
 const { ComputedRef } = require("../../core/src/computed-ref");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const objectHelpers = require("../../utils/src/reactive-object-helpers");
-
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 function createReactiveFactory(options = {}) {
     const Version = options.version || "v2.1.0";
     const StitchDebug = options.debug || NOOP_DEBUG;

@@ -1,12 +1,6 @@
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 
 class BatchScheduler {
     constructor(options = {}) {

@@ -1,4 +1,4 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-21T19:44:21.958Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T01:53:51.120Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -325,14 +325,7 @@ const { ReactiveSystem } = __stitchRequire("packages/core/src/reactive-system.js
 const { ComputedRef } = __stitchRequire("packages/core/src/computed-ref.js");
 const runtimeHelpers = __stitchRequire("packages/utils/src/runtime-helpers.js");
 const objectHelpers = __stitchRequire("packages/utils/src/reactive-object-helpers.js");
-
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = __stitchRequire("packages/utils/src/debug-config.js");
 function createReactiveFactory(options = {}) {
     const Version = options.version || "v2.1.0";
     const StitchDebug = options.debug || NOOP_DEBUG;
@@ -1281,13 +1274,7 @@ module.exports = {
   __stitchModuleFactories["packages/browser/src/binding-runtime.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = __stitchRequire("packages/utils/src/debug-config.js");
 
 function createBindingRuntime(deps = {}) {
     const Version = deps.version || "v2.1.0";
@@ -1856,13 +1843,7 @@ module.exports = {
   __stitchModuleFactories["packages/browser/src/data-binder.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = __stitchRequire("packages/utils/src/debug-config.js");
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || "v2.1.0";
@@ -2531,13 +2512,7 @@ module.exports = {
   __stitchModuleFactories["packages/core/src/batch-scheduler.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = __stitchRequire("packages/utils/src/debug-config.js");
 
 class BatchScheduler {
     constructor(options = {}) {
@@ -2727,13 +2702,7 @@ module.exports = {
   __stitchModuleFactories["packages/core/src/message-bus.js"] = function(module, exports, __stitchRequire){
 "use strict";
 
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
+const { NOOP_DEBUG } = __stitchRequire("packages/utils/src/debug-config.js");
 
 class MessageBus {
     constructor(options = {}) {
@@ -3293,9 +3262,23 @@ function formatUnknownCategoryWarning(category, categories = DEFAULT_DEBUG_CATEG
     return `[Stitch.js Debug] Unknown category: ${category}. Valid categories: ${listDebugCategories(categories).join(", ")}`;
 }
 
+/**
+ * No-op debug object used as a default when debugging is disabled.
+ * Provides the same interface as the real debug object so callers
+ * don't need to check for null.
+ */
+const NOOP_DEBUG = {
+    enabled: false,
+    categories: Object.create(null),
+    log() {},
+    group() {},
+    groupEnd() {}
+};
+
 module.exports = {
     DEFAULT_DEBUG_CATEGORIES,
     DEFAULT_DEBUG_COLORS,
+    NOOP_DEBUG,
     createDebugState,
     listDebugCategories,
     isKnownDebugCategory,
