@@ -72,18 +72,24 @@ It exposes:
 
 ### 3.2 Data and Effect Flow
 
-1. `Observable.create()` (API layer) creates reactive objects through `createReactiveFactory()`.
+1. `Observable.create()` (API layer) creates reactive objects via a **shared default factory** (`getDefaultFactory()`). All observables share a single `ReactiveSystem`, `BatchScheduler`, and `proxyMap` by default. Pass `{ isolated: true }` to `Observable.create()` for an independent system.
 2. `ReactiveSystem` (core layer) tracks dependencies in `WeakMap -> Map -> Set`.
 3. Property writes trigger synchronous dependency invalidation:
 - computed refs are marked dirty immediately,
 - non-batched effects run immediately,
 - batched effects queue in `BatchScheduler`.
-4. `DataBinder` (browser layer) installs binding handlers that create effects for DOM updates.
-5. DOM effects are usually `{ batch: true }`, so updates flush on microtask boundaries.
+4. Because observables share a `ReactiveSystem` by default, effects can track dependencies across observable boundaries, and batched updates coalesce into a single microtask flush.
+5. `DataBinder` (browser layer) installs binding handlers that create effects for DOM updates.
+6. DOM effects are usually `{ batch: true }`, so updates flush on microtask boundaries.
+7. `Observable.reset()` discards the shared factory for test isolation. Existing observables retain their old factory; new ones get a fresh system.
 
 ### 3.3 MessageBus Role
 
-`MessageBus` is retained for eventing and compatibility paths (user events + internal bus events), while core property dependency tracking is handled by `ReactiveSystem`.
+Each observable created via `Observable.create()` gets its own per-model `MessageBus` for the user-facing event API (`$on`, `$emit`, `$off`, `$once`, `$use`). Events do not leak across unrelated observables.
+
+The shared `ReactiveSystem` has a separate internal `MessageBus` for framework events (`nested-change`, `array-mutation`), which are payload-scoped to specific targets. Subscribing to these internal events via `$on()` is deprecated since v2.0; use `$watch()` instead.
+
+Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus.
 
 ## 4. Package and Module Inventory (23 Reachable Modules)
 
@@ -92,8 +98,8 @@ It exposes:
 | Module | Role | Used by |
 |---|---|---|
 | `packages/api/index.js` | API package entry exports Observable/computed/factory/version | `stitch.entry.js` |
-| `packages/api/src/observable.js` | Public Observable API (`create`, `createArray`, `reactive`, `computed`, watch/event helpers) | app code, `stitch.entry.js` |
-| `packages/api/src/reactive-factory.js` | Reactive object/array/map/set creation, computed descriptor wiring, bubbling, proxy identity cache | `Observable` |
+| `packages/api/src/observable.js` | Public Observable API (`create`, `createArray`, `reactive`, `computed`, `reset`, watch/event helpers). Each `create()` call gets a per-model MessageBus. | app code, `stitch.entry.js` |
+| `packages/api/src/reactive-factory.js` | Reactive object/array/map/set creation via `createReactiveFactory()`. Shared collection infrastructure via `createReactiveCollection()`. Default singleton via `getDefaultFactory()`/`resetDefaultFactory()`. Computed descriptor wiring, bubbling, proxy identity cache. | `Observable` |
 
 ### 4.2 Core Package (`packages/core`)
 
@@ -122,13 +128,13 @@ It exposes:
 |---|---|---|
 | `packages/utils/index.js` | Utils package entry + debug facade + utility exports | `stitch.entry.js`, other packages |
 | `packages/utils/src/runtime-helpers.js` | `getProperty`, `setProperty`, arrow-function detection, path diagnostics | API + browser |
-| `packages/utils/src/debug-config.js` | canonical debug category/color config and helpers | browser/utils debug wiring |
+| `packages/utils/src/debug-config.js` | Canonical debug category/color config, helpers, and `NOOP_DEBUG` singleton (shared across all packages) | browser/utils debug wiring, all packages |
 | `packages/utils/src/attr-value-handlers.js` | `data-attr` value-type strategy handlers | browser binding runtime |
 | `packages/utils/src/value-binding-helpers.js` | value validators and value handlers (input/select/radio/number/range/default) | browser binding runtime |
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
 | `packages/utils/src/foreach-template-helpers.js` | foreach template parsing/container handling | foreach render/reconcile |
 | `packages/utils/src/foreach-reconcile-helpers.js` | keyed row reconciliation and item context creation | foreach rendering |
-| `packages/utils/src/reactive-object-helpers.js` | change-handler add/remove and `toJSON` serialization helpers | reactive factory |
+| `packages/utils/src/reactive-object-helpers.js` | `defineHidden()` helper, change-handler add/remove, and `toJSON` serialization helpers | reactive factory, observable |
 
 ## 5. Repository Resource Map
 
@@ -217,13 +223,15 @@ npm run package:contributor
 1. Reads `stitch.entry.js`.
 2. Enumerates package module files (`index.js` + `src/*.js`).
 3. Resolves internal module graph via `require()` pattern rewrite to `__stitchRequire()`.
-4. Selects modules by mode:
+4. Assigns **numeric module IDs** (0, 1, 2, ...) to replace path strings in the registry and require calls. A `moduleMap` in the metadata preserves path-to-ID mapping for debugging.
+5. Selects modules by mode:
 - `reachable`: only transitively reachable from entrypoint
 - `all`: all discovered modules
-5. Emits inline module prelude + patched entry.
-6. Stamps metadata comment:
-- `generatedAt`, `mode`, `moduleCount`, `availableModuleCount`, `modules[]`.
-7. Writes output to both:
+6. Emits inline module prelude + patched entry.
+7. Stamps `/*!` metadata comment (preserved through Terser minification):
+- `generatedAt`, `mode`, `moduleCount`, `availableModuleCount`, `modules[]`, `moduleMap`.
+8. Prepends `/*!` license banner from `package.json` version.
+9. Writes output to both:
 - `dist/stitch.assembled.js`
 - `stitch.js`
 
@@ -333,5 +341,5 @@ npm run pipeline:build-compare
 
 ---
 
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-26
 **Maintainers:** Stitch.js modularization contributors

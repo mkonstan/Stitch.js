@@ -29,6 +29,12 @@ window.Stitch = {
 
 Creates a reactive object and adds event helpers (`$watch`, `$on`, `$emit`, etc.).
 
+**Options:**
+- `debug` (boolean) — Enable debug logging for this instance.
+- `isolated` (boolean) — If `true`, creates an isolated ReactiveSystem instead of using the shared default. Use this when you need observables that cannot cross-track dependencies.
+
+By default, all observables share a single `ReactiveSystem` and `BatchScheduler`, enabling cross-observable dependency tracking and coalesced batch scheduling. Each observable still gets its own `MessageBus` for `$on`/`$emit` events.
+
 Important behavior:
 - Function properties remain normal methods.
 - Computed properties must be wrapped with `Stitch.computed(...)`.
@@ -54,9 +60,11 @@ console.log(model.fullName);      // "Jane Doe" (property access, not function c
 console.log(model.greet('Hello')); // "Hello Jane Doe"
 ```
 
-### Observable.createArray(items)
+### Observable.createArray(items, options?)
 
 Creates a reactive array with mutation tracking.
+
+**Options:** Same as `Observable.create()` (`isolated`).
 
 ```javascript
 const todos = Stitch.Observable.createArray(['Learn Stitch.js', 'Build app']);
@@ -65,13 +73,23 @@ todos.splice(1, 1);          // Reactive
 todos[0] = 'Master Stitch';  // Reactive
 ```
 
-### Observable.reactive(obj)
+### Observable.reactive(obj, options?)
 
-Makes an existing object reactive.
+Makes an existing object reactive. Returns the existing proxy if the object is already reactive.
+
+**Options:** Same as `Observable.create()` (`isolated`).
 
 ```javascript
 const plain = { count: 0 };
 const reactive = Stitch.Observable.reactive(plain);
+```
+
+### Observable.reset()
+
+Resets the shared ReactiveSystem, clearing all shared state. Primarily for testing. Existing observables retain their old factory; only new observables created after `reset()` use the new system.
+
+```javascript
+Stitch.Observable.reset();
 ```
 
 ### Observable.computed(config)
@@ -257,7 +275,7 @@ Stitch.DataBinder.registerBinding('tooltip', {
 
 `Stitch.MessageBus` is exported as a standalone pub/sub class.
 
-Observable instances from `Observable.create()` expose convenience wrappers:
+Each observable created with `Observable.create()` gets its own per-model `MessageBus`. Events emitted on one model are only visible to subscribers on that same model:
 - `$emit`, `$on`, `$off`, `$once`, `$use`
 
 ```javascript
@@ -267,7 +285,7 @@ model.$on('stateSelected', (data) => {
 });
 ```
 
-Internally, Stitch also uses message bus channels like `nested-change` and `array-mutation` for framework behavior.
+Internally, the shared `ReactiveSystem` uses a separate `MessageBus` for framework events (`nested-change`, `array-mutation`). These internal events are not accessible via `$on()` — use `$watch()` for property observation instead.
 
 ---
 
