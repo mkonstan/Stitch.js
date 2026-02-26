@@ -25,7 +25,7 @@ class MessageBus {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
+        this.debug.enabled && this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
             subscriberCount: this.subscribers.get(event).size
         });
         return () => this.unsubscribe(event, callback);
@@ -44,7 +44,7 @@ class MessageBus {
             payload,
             timestamp: Date.now()
         });
-        this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
+        this.debug.enabled && this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
             payload,
             queueLength: this.queue.length
         });
@@ -78,15 +78,15 @@ class MessageBus {
         const eventsToProcess = [...this.queue];
         this.queue = [];
 
-        this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
+        this.debug.enabled && this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
         eventsToProcess.forEach((eventData) => {
             this._executeEvent(eventData);
         });
-        this.debug.groupEnd("messageBus");
+        this.debug.enabled && this.debug.groupEnd("messageBus");
 
         this.isFlushing = false;
         if (this.queue.length > 0) {
-            this.debug.log(
+            this.debug.enabled && this.debug.log(
                 "messageBus",
                 `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
             );
@@ -109,7 +109,7 @@ class MessageBus {
         const payload = processedData.payload;
         const subscribers = this.subscribers.get(event);
 
-        this.debug.log("messageBus", `Executing event: "${event}"`, {
+        this.debug.enabled && this.debug.log("messageBus", `Executing event: "${event}"`, {
             payload,
             subscriberCount: subscribers ? subscribers.size : 0
         });

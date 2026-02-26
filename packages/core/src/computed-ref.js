@@ -13,7 +13,7 @@ class ComputedRef {
         this.id = Math.random().toString(36).substr(2, 9);
         this.isComputedRef = true;
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
             hasExplicitDeps: !!explicitDeps,
             explicitDeps
         });
@@ -24,7 +24,7 @@ class ComputedRef {
             return;
         }
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
         this.dependents.forEach((dependent) => {
@@ -39,7 +39,7 @@ class ComputedRef {
     }
 
     evaluate() {
-        this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
         this.cleanup();
         this.reactiveSystem.effectStack.push(this);
 
@@ -53,7 +53,7 @@ class ComputedRef {
             this.value = this.getter.call(this.context);
             this.dirty = false;
 
-            this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
+            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
                 value: this.value,
                 deps: this.deps.size
             });
@@ -68,7 +68,7 @@ class ComputedRef {
         const currentEffect = this.reactiveSystem.currentEffect;
         if (currentEffect) {
             this.dependents.add(currentEffect);
-            this.reactiveSystem.debug.log(
+            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log(
                 "computed",
                 `COMPUTED TRACKED (id: ${this.id}) by effect ${currentEffect.id || "unknown"}`
             );
@@ -78,7 +78,7 @@ class ComputedRef {
             return this.evaluate();
         }
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
             value: this.value
         });
         return this.value;

@@ -1,4 +1,4 @@
-/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-21T19:44:21.958Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
+/* STITCH_ASSEMBLY_METADATA {"generatedAt":"2026-02-26T02:43:02.381Z","source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"]} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
@@ -444,7 +444,7 @@ function createReactiveFactory(options = {}) {
             configurable: true,
             get() {
                 reactiveSystem.track(target, key);
-                StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.enabled && StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     value: internal[key],
                     hasEffect: !!reactiveSystem.currentEffect,
                     effectId: reactiveSystem.currentEffect?.id
@@ -454,10 +454,10 @@ function createReactiveFactory(options = {}) {
             set(newValue) {
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
-                    StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
+                    StitchDebug.enabled && StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
                     return;
                 }
-                StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
+                StitchDebug.enabled && StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
                     oldValue: oldValue,
                     newValue: newValue
                 });
@@ -494,11 +494,11 @@ function createReactiveFactory(options = {}) {
         );
 
         if (explicitDeps) {
-            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
+            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
                 deps: explicitDeps
             });
         } else {
-            StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
+            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
         }
 
         return {
@@ -591,7 +591,7 @@ function createReactiveFactory(options = {}) {
         for (const [childKey, value] of Object.entries(obj)) {
             // Detect computed properties (standardized marker)
             if (value && typeof value === "object" && value.__isStitchComputed) {
-                StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
+                StitchDebug.enabled && StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
                     hasExplicitDeps: !!value.__explicitDeps
                 });
                 computedProps.set(childKey, value);
@@ -681,7 +681,7 @@ function createReactiveFactory(options = {}) {
         
         // ⭐ OPTION 7 KEY CHANGE: Process computed properties
         computedProps.forEach((computedMarker, propKey) => {
-            StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
+            StitchDebug.enabled && StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
                 hasExplicitDeps: !!computedMarker.__explicitDeps
             });
             
@@ -693,7 +693,7 @@ function createReactiveFactory(options = {}) {
             let resolvedDeps = null;
             if (explicitDeps) {
                 resolvedDeps = resolveDependencies(explicitDeps, target);
-                StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
+                StitchDebug.enabled && StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
                     declared: explicitDeps,
                     resolved: resolvedDeps
                 });
@@ -1372,20 +1372,20 @@ const BINDING_HANDLERS = {
     value: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "value", element);
-            StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
                 element: element.tagName,
                 type: element.type
             });
             const handler = getValueHandler(element);
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
+                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
                 handler.modelToView(element, value, viewModel, path);
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
             const updateModel = () => {
                 const value = handler.viewToModel(element);
-                StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
+                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
@@ -1467,7 +1467,7 @@ const BINDING_HANDLERS = {
     event: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "event", element);
-            StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
                 element: element.tagName
             });
             // Track active listeners so each effect run can replace prior registrations.
@@ -1490,7 +1490,7 @@ const BINDING_HANDLERS = {
                 for (const [eventName, handlerPath] of Object.entries(eventConfig)) {
                     const handler = typeof handlerPath === "string" ? getProperty(viewModel, handlerPath) : handlerPath;
                     if (typeof handler === "function") {
-                        StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
+                        StitchDebug.enabled && StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
                             event: eventName
                         });
                         const wrappedHandler = e => handler.call(viewModel, e);
@@ -1555,27 +1555,27 @@ const BINDING_HANDLERS = {
     class: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "class", element);
-            StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
                 element: element.tagName,
                 initialClasses: Array.from(element.classList)
             });
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
+                StitchDebug.enabled && StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
                     element: element.tagName,
                     valueType: typeof value,
                     value: value
                 });
                 if (typeof value === "string") {
                     element.className = value;
-                    StitchDebug.log("bindings", `  → Set className to: "${value}"`);
+                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Set className to: "${value}"`);
                 } else if (value && typeof value === "object") {
                     Object.keys(value).forEach(className => {
                         const shouldHaveClass = !!value[className];
                         element.classList.toggle(className, shouldHaveClass);
-                        StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
+                        StitchDebug.enabled && StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
                     });
-                    StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
+                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
                 }
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
@@ -1979,7 +1979,7 @@ class DataBinder {
     _isBindingBoundary(element) {
         // foreach boundaries: manage their own child rendering
         if (element.hasAttribute("data-foreach")) {
-            StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
+            StitchDebug.enabled && StitchDebug.log("bindings", "Stopped at binding boundary: " + element.tagName);
             return true;
         }
 
@@ -2026,7 +2026,7 @@ class DataBinder {
         // Construct full path from context
         const fullPath = contextPath.length > 0 ? `${contextPath.join('.')}.${path}` : path;
 
-        StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
+        StitchDebug.enabled && StitchDebug.log("bindings", `_applyTypedBinding called: type="${type}", path="${path}", fullPath="${fullPath}"`, {
             element: element.tagName
         });
 
@@ -2040,7 +2040,7 @@ class DataBinder {
 
         // If onBind hook exists, call it instead of default binding
         if (propertyHooks && propertyHooks.onBind) {
-            StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `  → Using property hook onBind for "${fullPath}"`, {
                 propertyName: propertyName,
                 hasOnChange: !!propertyHooks.onChange
             });
@@ -2066,7 +2066,7 @@ class DataBinder {
 
         // Set up onChange hook if it exists (always, even if onBind exists)
         if (propertyHooks && propertyHooks.onChange) {
-            StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
+            StitchDebug.enabled && StitchDebug.log("bindings", `  → Setting up onChange reactive effect for "${fullPath}"`);
 
             // Create binding object for hook
             const binding = { type, path, attributeName: `data-${type}` };
@@ -2176,7 +2176,7 @@ class DataBinder {
         this.boundElements.clear();
         this.reactiveSystem = null;
 
-        StitchDebug.log("bindings", "DataBinder disposed");
+        StitchDebug.enabled && StitchDebug.log("bindings", "DataBinder disposed");
     }
 }
 
@@ -2585,7 +2585,7 @@ class BatchScheduler {
         this.flushScheduled = false;
         this.flushDepth++;
 
-        this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
+        this.debug.enabled && this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
 
         const effectsToRun = Array.from(this._pendingEffects);
         this._pendingEffects.clear();
@@ -2598,11 +2598,11 @@ class BatchScheduler {
             }
         });
 
-        this.debug.groupEnd("effects");
+        this.debug.enabled && this.debug.groupEnd("effects");
 
         this.flushing = false;
         if (this._pendingEffects.size > 0) {
-            this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
+            this.debug.enabled && this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
             this.scheduleFlush();
         } else {
             this.flushDepth = 0;
@@ -2640,7 +2640,7 @@ class ComputedRef {
         this.id = Math.random().toString(36).substr(2, 9);
         this.isComputedRef = true;
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
             hasExplicitDeps: !!explicitDeps,
             explicitDeps
         });
@@ -2651,7 +2651,7 @@ class ComputedRef {
             return;
         }
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
         this.dependents.forEach((dependent) => {
@@ -2666,7 +2666,7 @@ class ComputedRef {
     }
 
     evaluate() {
-        this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
         this.cleanup();
         this.reactiveSystem.effectStack.push(this);
 
@@ -2680,7 +2680,7 @@ class ComputedRef {
             this.value = this.getter.call(this.context);
             this.dirty = false;
 
-            this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
+            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
                 value: this.value,
                 deps: this.deps.size
             });
@@ -2695,7 +2695,7 @@ class ComputedRef {
         const currentEffect = this.reactiveSystem.currentEffect;
         if (currentEffect) {
             this.dependents.add(currentEffect);
-            this.reactiveSystem.debug.log(
+            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log(
                 "computed",
                 `COMPUTED TRACKED (id: ${this.id}) by effect ${currentEffect.id || "unknown"}`
             );
@@ -2705,7 +2705,7 @@ class ComputedRef {
             return this.evaluate();
         }
 
-        this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
+        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
             value: this.value
         });
         return this.value;
@@ -2752,7 +2752,7 @@ class MessageBus {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
+        this.debug.enabled && this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
             subscriberCount: this.subscribers.get(event).size
         });
         return () => this.unsubscribe(event, callback);
@@ -2771,7 +2771,7 @@ class MessageBus {
             payload,
             timestamp: Date.now()
         });
-        this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
+        this.debug.enabled && this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
             payload,
             queueLength: this.queue.length
         });
@@ -2805,15 +2805,15 @@ class MessageBus {
         const eventsToProcess = [...this.queue];
         this.queue = [];
 
-        this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
+        this.debug.enabled && this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
         eventsToProcess.forEach((eventData) => {
             this._executeEvent(eventData);
         });
-        this.debug.groupEnd("messageBus");
+        this.debug.enabled && this.debug.groupEnd("messageBus");
 
         this.isFlushing = false;
         if (this.queue.length > 0) {
-            this.debug.log(
+            this.debug.enabled && this.debug.log(
                 "messageBus",
                 `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
             );
@@ -2836,7 +2836,7 @@ class MessageBus {
         const payload = processedData.payload;
         const subscribers = this.subscribers.get(event);
 
-        this.debug.log("messageBus", `Executing event: "${event}"`, {
+        this.debug.enabled && this.debug.log("messageBus", `Executing event: "${event}"`, {
             payload,
             subscriberCount: subscribers ? subscribers.size : 0
         });
@@ -2960,7 +2960,7 @@ class ReactiveSystem {
         const currentEffect = this.currentEffect;
 
         if (!currentEffect) {
-            this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
@@ -2981,7 +2981,7 @@ class ReactiveSystem {
             currentEffect.deps.add(dep);
         }
 
-        this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
+        this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
             effectId: currentEffect.id,
             isComputed: !!currentEffect.isComputedRef,
             dependencyCount: dep.size
@@ -2993,11 +2993,11 @@ class ReactiveSystem {
         const dep = deps?.get(key);
 
         if (!dep || dep.size === 0) {
-            this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
+            this.debug.enabled && this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
-        this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+        this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
             oldValue,
             newValue
         });
@@ -3032,7 +3032,7 @@ class ReactiveSystem {
             this.cleanup(effect);
             this.effectStack.push(effect);
 
-            this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
+            this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
                 stackDepth: this.effectStack.length,
                 batch: !!options.batch
             });
@@ -3048,7 +3048,7 @@ class ReactiveSystem {
         effect.options = options;
         effect.id = effectId;
 
-        this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
+        this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
             lazy: !!options.lazy,
             batch: !!options.batch
         });

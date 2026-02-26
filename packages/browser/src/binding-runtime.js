@@ -91,20 +91,20 @@ const BINDING_HANDLERS = {
     value: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "value", element);
-            StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
                 element: element.tagName,
                 type: element.type
             });
             const handler = getValueHandler(element);
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
+                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
                 handler.modelToView(element, value, viewModel, path);
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
             const updateModel = () => {
                 const value = handler.viewToModel(element);
-                StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
+                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
@@ -186,7 +186,7 @@ const BINDING_HANDLERS = {
     event: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "event", element);
-            StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
                 element: element.tagName
             });
             // Track active listeners so each effect run can replace prior registrations.
@@ -209,7 +209,7 @@ const BINDING_HANDLERS = {
                 for (const [eventName, handlerPath] of Object.entries(eventConfig)) {
                     const handler = typeof handlerPath === "string" ? getProperty(viewModel, handlerPath) : handlerPath;
                     if (typeof handler === "function") {
-                        StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
+                        StitchDebug.enabled && StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
                             event: eventName
                         });
                         const wrappedHandler = e => handler.call(viewModel, e);
@@ -274,27 +274,27 @@ const BINDING_HANDLERS = {
     class: {
         bind(element, viewModel, path, context) {
             validateBinding(viewModel, path, "class", element);
-            StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
+            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
                 element: element.tagName,
                 initialClasses: Array.from(element.classList)
             });
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
-                StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
+                StitchDebug.enabled && StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
                     element: element.tagName,
                     valueType: typeof value,
                     value: value
                 });
                 if (typeof value === "string") {
                     element.className = value;
-                    StitchDebug.log("bindings", `  → Set className to: "${value}"`);
+                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Set className to: "${value}"`);
                 } else if (value && typeof value === "object") {
                     Object.keys(value).forEach(className => {
                         const shouldHaveClass = !!value[className];
                         element.classList.toggle(className, shouldHaveClass);
-                        StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
+                        StitchDebug.enabled && StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
                     });
-                    StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
+                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
                 }
             }, { batch: true });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
