@@ -204,8 +204,12 @@ function main() {
         modules: modules.map(m => m.id)
     };
 
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    const licenseBanner = `/*! Stitch.js v${pkg.version} | MIT License | https://github.com/user/Stitch.js */`;
+
     const output = [
-        `/* STITCH_ASSEMBLY_METADATA ${JSON.stringify(metadata)} */`,
+        licenseBanner,
+        `/*! STITCH_ASSEMBLY_METADATA ${JSON.stringify(metadata)} */`,
         prelude,
         patchedEntrySource
     ].join("\n\n");
