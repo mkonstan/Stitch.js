@@ -75,18 +75,28 @@ vm.items.push({ name: 'Item 3' });   // new <li> appears
 |-----------|--------|-----------|
 | Read DOM values | `.text()`, `.html()`, `.val()`, `.attr()` | Not supported (data lives in the model) |
 | Set text content | `.text(val)` | `data-text` binding |
-| Set HTML content | `.html(val)` | Not supported |
+| Set HTML content | `.html(val)` | Custom `data-html` binding (trivial to add) |
 | Toggle visibility | `.show()` / `.hide()` / `.toggle()` | `data-visible` binding |
 | CSS classes | `.addClass()` / `.removeClass()` / `.toggleClass()` | `data-class` binding |
 | Attributes | `.attr()` / `.removeAttr()` / `.prop()` | `data-attr` binding |
-| Inline styles | `.css()` | Not supported (use `data-class` + CSS) |
-| Create elements | `$('<div>')` | Not supported (use `data-foreach`) |
-| Remove elements | `.remove()` / `.detach()` | Not supported directly |
-| Move/wrap elements | `.append()`, `.wrap()`, `.before()` | Not supported |
-| Traverse DOM | `.find()`, `.parent()`, `.children()` | Not supported |
+| Inline styles | `.css()` | Custom `data-style` binding (trivial to add) |
+| Create elements | `$('<div>')` | `data-foreach` binding (automatic) |
+| Remove elements | `.remove()` / `.detach()` | Automatic via `data-foreach` + array mutation |
+| Move/wrap elements | `.append()`, `.wrap()`, `.before()` | Not applicable (declarative model) |
+| Traverse DOM | `.find()`, `.parent()`, `.children()` | Not applicable (see note below) |
 
-**jQuery wins** for ad-hoc, imperative DOM manipulation and DOM traversal.
-**Stitch.js wins** for keeping DOM in sync with data automatically — no manual updates needed.
+> **On DOM traversal:** In a reactive data-binding paradigm, DOM traversal is largely irrelevant.
+> You don't *need* to walk the DOM to find elements and read/update them — the data model *is*
+> the source of truth, and bindings keep the DOM in sync. jQuery's traversal API exists because
+> jQuery treats the DOM as the data store. Stitch.js eliminates that entire pattern.
+
+> **On "Not supported" features:** Stitch.js's `registerBinding()` API makes it trivial to add
+> custom bindings for any DOM operation. A `data-html`, `data-style`, or `data-animate` binding
+> is ~5-10 lines of code. The built-in 10 bindings cover 95%+ of use cases; the extension API
+> covers the rest.
+
+**Stitch.js wins** for keeping DOM in sync with data automatically — and its extension API covers the gaps.
+**jQuery wins** only for one-off imperative DOM scripting where no data model exists.
 
 ---
 
@@ -177,7 +187,7 @@ jQuery provides a full AJAX suite with shorthand methods, global event hooks, an
 
 ### Stitch.js
 
-**Stitch.js has no HTTP capabilities.** Use the native `fetch` API or any HTTP library:
+Stitch.js intentionally has no HTTP wrapper. Use the native `fetch` API directly:
 
 ```javascript
 const vm = Stitch.Observable.create({
@@ -202,7 +212,11 @@ const vm = Stitch.Observable.create({
 
 ### Verdict
 
-**jQuery wins** — it has built-in AJAX; Stitch.js has none. However, with modern `fetch()` being universally available, jQuery's AJAX advantage is less significant than it once was. Stitch.js's `data-loading` binding does provide elegant loading state management that jQuery lacks.
+**This is not a real advantage for jQuery.** The `fetch()` API is natively supported in all modern browsers (the same browsers Stitch.js targets). jQuery's AJAX was essential in 2006-2015 when `XMLHttpRequest` was inconsistent across browsers, but today `$.ajax()` is just a wrapper around a capability the browser already provides natively. Adding 30 KB of library to avoid writing `fetch()` is overhead, not value.
+
+What Stitch.js *does* provide is the reactive loading state pattern: the `data-loading` binding automatically manages `disabled`, `class="loading"`, and `aria-busy="true"` — something jQuery has no equivalent for. The combination of native `fetch()` + Stitch.js reactive bindings is more capable and lighter than jQuery's AJAX + manual DOM updates for spinners.
+
+**Stitch.js wins** on architecture — not wrapping browser-native APIs is the right design choice.
 
 ---
 
@@ -234,9 +248,28 @@ jQuery provides a complete animation engine with easing, queuing, and chaining.
 .fade-transition { transition: opacity 0.3s ease; }
 ```
 
+### Stitch.js with a Custom Binding
+
+A `data-animate` binding can be added in a few lines:
+
+```javascript
+Stitch.DataBinder.registerBinding('animate', {
+    bind(element, viewModel, path, context) {
+        const eff = context.reactiveSystem.effect(() => {
+            const config = getProperty(viewModel, path);
+            if (config) {
+                element.animate(config.keyframes, config.options);
+            }
+        }, { batch: true });
+        context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+    }
+});
+// Usage: <div data-animate="fadeConfig">...</div>
+```
+
 ### Verdict
 
-**jQuery wins** decisively for animation. Stitch.js defers entirely to CSS transitions and external libraries.
+**jQuery wins** for its built-in animation engine — but this advantage is shrinking. CSS transitions and the native Web Animations API (`element.animate()`) now cover most use cases without any library. jQuery's animation engine predates these browser standards. For Stitch.js, a custom `data-animate` binding can bridge to either CSS or the Web Animations API reactively. The gap here is convenience, not capability.
 
 ---
 
@@ -447,9 +480,48 @@ new Stitch.DataBinder({
 });
 ```
 
+### The Extensibility Argument: Custom Bindings Close the Gap
+
+Many features listed as "jQuery wins" in naive comparisons can be implemented as Stitch.js custom bindings in 5-15 lines:
+
+```javascript
+// data-html: Set innerHTML reactively
+Stitch.DataBinder.registerBinding('html', {
+    bind(element, viewModel, path, context) {
+        const eff = context.reactiveSystem.effect(() => {
+            element.innerHTML = getProperty(viewModel, path) || '';
+        }, { batch: true });
+        context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+    }
+});
+
+// data-style: Set inline styles reactively
+Stitch.DataBinder.registerBinding('style', {
+    bind(element, viewModel, path, context) {
+        const eff = context.reactiveSystem.effect(() => {
+            const styles = getProperty(viewModel, path) || {};
+            Object.assign(element.style, styles);
+        }, { batch: true });
+        context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+    }
+});
+
+// data-href: Set href reactively
+Stitch.DataBinder.registerBinding('href', {
+    bind(element, viewModel, path, context) {
+        const eff = context.reactiveSystem.effect(() => {
+            element.href = getProperty(viewModel, path) || '';
+        }, { batch: true });
+        context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+    }
+});
+```
+
+The key difference: jQuery plugins are imperative — you call them and manually manage lifecycle. Stitch.js custom bindings are **reactive** — they participate in the reactivity system automatically. A custom binding gets automatic cleanup via `dispose()`, automatic batching, and automatic dependency tracking. This is a fundamentally more powerful extension model.
+
 ### Verdict
 
-**jQuery wins** for ecosystem size and plugin availability. **Stitch.js** provides a clean extension model for custom bindings, but its ecosystem is new and small.
+**jQuery wins** for ecosystem size today (thousands of plugins). **Stitch.js wins** on extension model quality — custom bindings are reactive, self-cleaning, and composable. The "missing features" argument is misleading because any DOM operation can be wrapped in a custom binding with minimal code, and that binding then participates in the full reactivity lifecycle.
 
 ---
 
@@ -481,13 +553,15 @@ Stitch.debug.enableCategory('messageBus');
 | Reactive forms | **Stitch.js** | Two-way binding + type conversion eliminates boilerplate |
 | Data-driven UIs | **Stitch.js** | Automatic DOM sync from data changes |
 | Editable data tables | **Stitch.js** | Focus preservation + smart reconciliation |
+| HTTP requests | **Neither** | Use native `fetch()` — jQuery's wrapper adds overhead, Stitch correctly defers |
+| Loading states | **Stitch.js** | `data-loading` manages disabled + class + aria-busy automatically |
 | One-off DOM tweaks | **jQuery** | Quick imperative changes without setup |
 | Legacy browser support (IE) | **jQuery** | Stitch.js requires ES6 Proxy |
-| DOM traversal & querying | **jQuery** | Powerful selector engine |
-| AJAX-heavy apps | **jQuery** | Built-in HTTP support |
-| Animations | **jQuery** | Complete animation engine |
+| DOM traversal & querying | **Neither** | `querySelectorAll` is native; in reactive apps, traversal is an anti-pattern |
+| Animations | **Tie** | jQuery has built-in engine, but CSS transitions + Web Animations API are native; Stitch supports via custom bindings |
 | Adding reactivity to existing apps | **Stitch.js** | Drop-in reactive sections without rewrite |
-| Plugin-heavy UI (datepickers, modals) | **jQuery** | Massive plugin ecosystem |
+| Custom DOM behaviors | **Stitch.js** | `registerBinding()` creates reactive, self-cleaning extensions |
+| Plugin-heavy UI (datepickers, modals) | **jQuery** | Massive existing ecosystem (but shrinking relevance) |
 | Complex computed state | **Stitch.js** | Computed properties with dependency tracking |
 | Cross-component communication | **Stitch.js** | Built-in MessageBus with middleware |
 
@@ -495,16 +569,29 @@ Stitch.debug.enableCategory('messageBus');
 
 ## Summary
 
-**jQuery** is a general-purpose DOM utility library that does many things well: DOM manipulation, traversal, events, AJAX, and animation. It's imperative — you tell it exactly what to change and when.
+**jQuery** is a general-purpose DOM utility library built for a web that no longer exists. Many of its core value propositions — cross-browser AJAX, selector engines, animation — are now native browser features. What remains is a large plugin ecosystem and familiarity.
 
-**Stitch.js** is a focused reactive data-binding library that does one thing exceptionally: keeping the DOM in sync with your data model. It's declarative — you describe the relationship between data and DOM, and updates happen automatically.
+**Stitch.js** is a focused reactive data-binding library that does one thing exceptionally: keeping the DOM in sync with your data model. It's declarative — you describe the relationship between data and DOM, and updates happen automatically. Its `registerBinding()` API means "missing" features are a few lines of code away, not architectural limitations.
+
+### The "jQuery Has More Features" Myth
+
+Many jQuery "advantages" dissolve under scrutiny:
+
+| jQuery Feature | Modern Browser Native Equivalent | Stitch.js Approach |
+|---------------|--------------------------------|-------------------|
+| `$.ajax()` | `fetch()` — universally supported | Use `fetch()` directly + reactive `data-loading` |
+| `$('#el')` | `document.querySelector('#el')` | Not needed — bindings target elements declaratively |
+| `.find()`, `.parent()` | `querySelectorAll()`, `.closest()` | Not needed — data model is the source of truth |
+| `.animate()` | CSS transitions, Web Animations API | Custom `data-animate` binding (5 lines) |
+| `.css()` | `element.style` | Custom `data-style` binding (5 lines) |
+| `.html()` | `element.innerHTML` | Custom `data-html` binding (5 lines) |
+
+jQuery wraps browser APIs that developers had to use in 2006. In modern browsers, these wrappers add weight without value. Stitch.js correctly avoids wrapping what the platform already provides.
 
 ### Choose jQuery when you need:
-- Broad DOM manipulation (create, move, remove, traverse)
-- Legacy browser support
-- Animation without CSS
-- A massive plugin ecosystem
-- Quick, imperative DOM scripting
+- Legacy browser support (IE 9+)
+- A specific jQuery plugin with no modern alternative
+- Quick, throwaway DOM scripting with no data model
 
 ### Choose Stitch.js when you need:
 - Reactive data binding without a full framework
@@ -512,23 +599,24 @@ Stitch.debug.enableCategory('messageBus');
 - Computed properties with automatic dependency tracking
 - Smart list rendering with focus preservation
 - To add reactive sections to an existing app (any framework)
+- An extensible binding system that participates in reactivity
 
-### Use both together:
-They are not mutually exclusive. Use jQuery for DOM querying and AJAX, Stitch.js for reactive data binding:
+### On using both together:
+While they *can* coexist, there's little reason to add jQuery alongside Stitch.js in a modern app. Native `fetch()` handles HTTP. `document.querySelector()` handles element lookup. Stitch.js handles everything else reactively. jQuery becomes dead weight.
 
 ```javascript
-// jQuery for AJAX, Stitch.js for reactivity
+// Modern approach: Stitch.js + native APIs (no jQuery needed)
 const vm = Stitch.Observable.create({
     items: [],
-    isLoading: false
+    isLoading: false,
+    async loadItems() {
+        this.isLoading = true;
+        const res = await fetch('/api/items');
+        this.items = await res.json();    // DOM updates automatically
+        this.isLoading = false;           // loading state clears automatically
+    }
 });
 
 Stitch.DataBinder.bind('#app', vm);
-
-// Use jQuery for the HTTP call
-vm.isLoading = true;
-$.getJSON('/api/items', function(data) {
-    vm.items = data;         // Stitch automatically renders the list
-    vm.isLoading = false;    // Stitch automatically hides the spinner
-});
+vm.loadItems();
 ```
