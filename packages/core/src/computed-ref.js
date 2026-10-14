@@ -34,11 +34,32 @@ class ComputedRef {
 
         // Notify readers (effects and computeds) through the system's dependency map.
         this.reactiveSystem.trigger(this, COMPUTED_VALUE_KEY);
+
+        // Read only imperatively (no reader subscribed): stop listening until the next read.
+        if (!this.hasReaders()) {
+            this.release();
+        }
+    }
+
+    /** True while an effect or another computed is subscribed to this computed. */
+    hasReaders() {
+        const deps = this.reactiveSystem.depsMap.get(this);
+        const readers = deps && deps.get(COMPUTED_VALUE_KEY);
+        return !!readers && readers.size > 0;
+    }
+
+    /**
+     * Stops listening to every source; the next read recomputes and subscribes again.
+     * Releases, in turn, computeds that only this one was reading.
+     */
+    release() {
+        this.dirty = true;
+        this.reactiveSystem._releaseUnread(this.reactiveSystem._untrack(this));
     }
 
     evaluate() {
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
-        this.cleanup();
+        const unread = this.reactiveSystem._untrack(this);
         this.reactiveSystem.effectStack.push(this);
 
         try {
@@ -59,6 +80,7 @@ class ComputedRef {
             return this.value;
         } finally {
             this.reactiveSystem.effectStack.pop();
+            this.reactiveSystem._releaseUnread(unread);
         }
     }
 
@@ -77,7 +99,7 @@ class ComputedRef {
     }
 
     cleanup() {
-        this.reactiveSystem._untrack(this);
+        this.release();
     }
 }
 

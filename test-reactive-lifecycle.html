@@ -25,6 +25,7 @@
             'cleanup-releases-every-subscription',
             'rerun-drops-computed-it-no-longer-reads',
             'cleanup-drops-a-queued-run',
+            'unread-computed-stops-listening',
             'first-run-throw-releases-the-effect',
             'system-dispose-releases-everything',
             'binder-dispose-returns-counts-to-baseline'
@@ -73,9 +74,9 @@
                 rs.cleanup(effect);
                 const after = stats();
                 t.equal(after.effects, base.effects, 'no live effect after cleanup');
-                // The computeds keep their own subscriptions to a and b (they belong to the
-                // model); everything the effect made is gone.
-                t.equal(after.subscriptions - base.subscriptions, 3, 'only the computeds\' own subscriptions remain (sum: a, b; double: sum)');
+                // Nobody reads the computeds any more, so they release their own subscriptions
+                // too (double: sum; sum: a, b) and recompute on the next read.
+                t.equal(after.subscriptions, base.subscriptions, 'no subscription left: the unread computeds released theirs too');
                 const runsBefore = runs;
                 for (let i = 0; i < 5; i++) { model.a = 10 + i; model.b = 20 + i; }
                 await tick();
@@ -116,6 +117,20 @@
                 rs.cleanup(effect);
                 await tick();
                 t.equal(runs, 1, 'the queued run was dropped');
+            });
+
+            // A computed read only from code (no effect reads it) stops listening once its
+            // source changes, and recomputes correctly on the next read.
+            await StitchTest.test('unread-computed-stops-listening', async (t) => {
+                const model = isolated({ a: 1, twice: Stitch.computed(function () { return this.a * 2; }) });
+                const base = stats();
+                t.equal(model.twice, 2, 'precondition: the computed computes');
+                t.equal(stats().subscriptions - base.subscriptions, 1, 'while cached it listens to its one source');
+                model.a = 5;
+                t.deepEqual(stats(), base, 'after the source changed, with no reader, it listens to nothing');
+                t.equal(model.twice, 10, 'the next read recomputes');
+                model.a = 6;
+                t.equal(model.twice, 12, 'and stays correct');
             });
 
             // If an effect throws on its first run, effect() rethrows and the effect is released:

@@ -2550,11 +2550,32 @@ class ComputedRef {
 
         // Notify readers (effects and computeds) through the system's dependency map.
         this.reactiveSystem.trigger(this, COMPUTED_VALUE_KEY);
+
+        // Read only imperatively (no reader subscribed): stop listening until the next read.
+        if (!this.hasReaders()) {
+            this.release();
+        }
+    }
+
+    /** True while an effect or another computed is subscribed to this computed. */
+    hasReaders() {
+        const deps = this.reactiveSystem.depsMap.get(this);
+        const readers = deps && deps.get(COMPUTED_VALUE_KEY);
+        return !!readers && readers.size > 0;
+    }
+
+    /**
+     * Stops listening to every source; the next read recomputes and subscribes again.
+     * Releases, in turn, computeds that only this one was reading.
+     */
+    release() {
+        this.dirty = true;
+        this.reactiveSystem._releaseUnread(this.reactiveSystem._untrack(this));
     }
 
     evaluate() {
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
-        this.cleanup();
+        const unread = this.reactiveSystem._untrack(this);
         this.reactiveSystem.effectStack.push(this);
 
         try {
@@ -2575,6 +2596,7 @@ class ComputedRef {
             return this.value;
         } finally {
             this.reactiveSystem.effectStack.pop();
+            this.reactiveSystem._releaseUnread(unread);
         }
     }
 
@@ -2593,7 +2615,7 @@ class ComputedRef {
     }
 
     cleanup() {
-        this.reactiveSystem._untrack(this);
+        this.release();
     }
 }
 
@@ -2854,6 +2876,10 @@ class ReactiveSystem {
         let dep = deps.get(key);
         if (!dep) {
             dep = new Set();
+            if (target && target.isComputedRef) {
+                // The readers of a computed: when the last one leaves, the computed is released.
+                dep.computed = target;
+            }
             deps.set(key, dep);
         }
 
@@ -2925,7 +2951,7 @@ class ReactiveSystem {
             if (effect.disposed || this.disposed) {
                 return undefined;
             }
-            this._untrack(effect);
+            const unread = this._untrack(effect);
             this.effectStack.push(effect);
 
             this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
@@ -2937,6 +2963,8 @@ class ReactiveSystem {
                 return fn();
             } finally {
                 this.effectStack.pop();
+                // Only computeds the re-run did not read again are released.
+                this._releaseUnread(unread);
             }
         };
 
@@ -2983,7 +3011,7 @@ class ReactiveSystem {
      * Safe to call more than once.
      */
     cleanup(effect) {
-        this._untrack(effect);
+        this._releaseUnread(this._untrack(effect));
         if (effect.disposed) {
             return;
         }
@@ -2999,19 +3027,44 @@ class ReactiveSystem {
     /**
      * Removes a subscriber (effect or computed) from every dependency set it joined.
      * Used before each re-run (dependencies are collected afresh) and on release.
+     * Returns the reader sets of computeds this subscriber was the last reader of
+     * (or null); pass them to _releaseUnread once the subscriber has re-read what it needs.
      * @private
      */
     _untrack(subscriber) {
         const live = subscriber._generation === this._generation;
         let removed = 0;
+        let unread = null;
         subscriber.deps.forEach((dep) => {
             if (dep.delete(subscriber)) {
                 removed++;
+                if (dep.computed && dep.size === 0) {
+                    (unread || (unread = [])).push(dep);
+                }
             }
         });
         subscriber.deps.clear();
         if (live && removed > 0) {
             this._countSubscriptions(-removed);
+        }
+        return unread;
+    }
+
+    /**
+     * A computed that nobody reads any more stops listening to its sources (and so
+     * stops being reachable from them); it recomputes on its next read. Without this a
+     * computed on a removed list row, reading a long-lived property, stayed subscribed
+     * to it, and kept the row alive, for the life of the page.
+     * @private
+     */
+    _releaseUnread(readerSets) {
+        if (!readerSets) {
+            return;
+        }
+        for (const readers of readerSets) {
+            if (readers.size === 0) {
+                readers.computed.release();
+            }
         }
     }
 

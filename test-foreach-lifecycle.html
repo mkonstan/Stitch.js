@@ -32,7 +32,8 @@
             'same-key-same-object-row-untouched',
             'same-key-new-object-row-rebound',
             'index-follows-moves',
-            'row-change-does-not-rerender-list'
+            'row-change-does-not-rerender-list',
+            'replacements-release-row-computeds'
         ]);
 
         const CYCLES = 100;
@@ -294,6 +295,42 @@
                 await tick();
                 t.deepEqual(texts(host, 'span'), ['item2', 'item3'], 'precondition: first row removed');
                 t.deepEqual(texts(host, 'b'), ['0', '1'], 'the remaining rows show their new indexes');
+            });
+
+            // Rows whose objects carry computeds: one reads only its own row, one also reads a
+            // long-lived model property. After 100 replacements with new objects the counts are
+            // what they were after the first render: a removed row's computeds no longer listen
+            // to anything (the long-lived property would otherwise keep every old row alive).
+            await StitchTest.test('replacements-release-row-computeds', async (t) => {
+                const host = mount('<ul data-foreach="items"><li><span data-text="total"></span><b data-text="label"></b></li></ul>');
+                let model;
+                let generation = 0;
+                const makeRows = () => {
+                    generation++;
+                    return [1, 2, 3].map(i => ({
+                        id: i, price: i * generation,
+                        total: Stitch.computed(function () { return this.price * model.rate; }),
+                        label: Stitch.computed(function () { return 'p' + this.price; })
+                    }));
+                };
+                const base = stats();
+                model = Stitch.Observable.create({ rate: 2, items: makeRows() });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                await tick();
+                const afterFirstRender = stats();
+                for (let round = 0; round < CYCLES; round++) {
+                    model.items = makeRows();
+                    await flush();
+                }
+                await tick();
+                t.deepEqual(texts(host, 'span'), [1, 2, 3].map(i => String(i * generation * 2)), 'precondition: the last rows are shown');
+                t.deepEqual(stats(), afterFirstRender, 'after 100 replacements effects and subscriptions equal the first render');
+                model.rate = 3;
+                await tick();
+                t.deepEqual(texts(host, 'span'), [1, 2, 3].map(i => String(i * generation * 3)), 'the live rows still follow the long-lived property');
+                binder.unbind(host);
+                t.deepEqual(stats(), base, 'after unbind nothing is left, computeds included');
             });
 
             // A change inside one row updates that row's binding only; the list itself does
