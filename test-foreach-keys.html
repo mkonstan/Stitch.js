@@ -47,7 +47,8 @@
             'keys-compare-as-values',
             'data-key-misuse-throws',
             'one-root-rule-data-template',
-            'one-root-rule-inline-ignores-whitespace-and-comments'
+            'one-root-rule-inline-ignores-whitespace-and-comments',
+            'failed-bind-leaves-the-list-bindable'
         ]);
 
         const tick = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -103,7 +104,7 @@
                     t.match(message, /\brow 2\b/, `${path}: missing-key error names the row index`);
                     t.match(message, /"id"/, `${path}: missing-key error names the key field`);
                     t.match(message, /data-key/, `${path}: missing-key error names the fix`);
-                    t.equal(rowsOf(r.host).length, 0, `${path}: nothing rendered for the rejected list`);
+                    t.deepEqual(rowsOf(r.host).filter(text => text !== ""), [], `${path}: no row rendered for the rejected list (only the untouched template is left)`);
 
                     // No fallback to row.key: such a row throws, and the error suggests data-key="key".
                     r = tryBind(build('name', ''), { rows: [{ key: 'a', name: 'Ann' }] });
@@ -231,6 +232,27 @@
                 t.match(r.error ? r.error.message : '', /inline row template is empty/, 'an empty inline template throws');
                 r = tryBind('<div data-foreach="rows"><b data-text="name"></b> stray <i></i></div>', { rows: [] });
                 t.match(r.error ? r.error.message : '', /3 root nodes \(<b>, text "stray", <i>\).*Wrap/, 'stray text counts as a root');
+            });
+
+            // A bind() that throws on the key rule leaves the list element as it was, so the
+            // same element can be bound again once the data is fixed.
+            await StitchTest.test('failed-bind-leaves-the-list-bindable', async (t) => {
+                for (const [label, html] of [
+                    ['inline', '<ul data-foreach="rows"><li data-text="name"></li></ul>'],
+                    ['select with placeholder', '<select data-foreach="rows" data-default-text="Pick"><option data-text="name"></option></select>'],
+                    ['data-template', '<ul data-foreach="rows" data-template="tpl-name"></ul>']
+                ]) {
+                    const host = mount(html);
+                    const before = host.innerHTML;
+                    let error = null;
+                    try { new Stitch.DataBinder().bind(host, Stitch.Observable.create({ rows: [{ name: 'no id' }] })); } catch (e) { error = e; }
+                    t.match(error ? error.message : '', /row 0 has no "id"/, `${label}: precondition: bind() threw the key error`);
+                    t.equal(host.innerHTML, before, `${label}: the list element is as it was before bind()`);
+                    error = null;
+                    try { new Stitch.DataBinder().bind(host, Stitch.Observable.create({ rows: [{ id: 1, name: 'fixed' }] })); } catch (e) { error = e; }
+                    t.equal(error, null, `${label}: binding the same element again with fixed data works`);
+                    t.deepEqual(texts(host, 'li, option').filter(text => text !== 'Pick'), ['fixed'], `${label}: and renders the row`);
+                }
             });
         })();
     </script>

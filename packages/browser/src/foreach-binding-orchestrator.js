@@ -46,9 +46,9 @@ function readKeyField(element, path, version) {
 }
 
 /**
- * Takes the row template out of the list element (inline) or out of the <template>
- * named by data-template, enforcing the one-root rule. Returns a detached element
- * that is cloned for every row; it is never bound itself.
+ * Reads the row template from the list element (inline) or from the <template> named
+ * by data-template, enforcing the one-root rule. Returns a detached copy that is
+ * cloned for every row; it is never bound itself. Changes nothing in the DOM.
  */
 function readRowTemplate(element, path, version, doc) {
     const templateId = element.getAttribute("data-template");
@@ -95,12 +95,9 @@ function readRowTemplate(element, path, version, doc) {
         );
     }
 
-    // Inline template nodes were never bound (foreach is a binding boundary), so they can
-    // simply be taken out of the list element.
-    while (element.firstChild) {
-        element.removeChild(element.firstChild);
-    }
-    return templateId ? doc.importNode(roots[0], true) : roots[0];
+    // A detached copy: the list element's own children are left in place here (bindForeach
+    // takes them out, and puts them back if the first render throws).
+    return templateId ? doc.importNode(roots[0], true) : roots[0].cloneNode(true);
 }
 
 /**
@@ -156,6 +153,12 @@ function bindForeach(element, viewModel, path, context, deps) {
         tagName: element.tagName
     };
     const rowTemplate = readRowTemplate(element, path, version, doc);
+
+    // The list element's original children (inline template, whitespace). They were never
+    // bound (foreach is a binding boundary), so they are simply taken out; if the first
+    // render throws they are put back, so the element can be bound again once fixed.
+    const originalChildren = Array.from(element.childNodes);
+    originalChildren.forEach(node => element.removeChild(node));
 
     const isSelect = element.tagName === "SELECT";
     const valuePath = isSelect ? element.getAttribute("data-value") : null;
@@ -280,12 +283,23 @@ function bindForeach(element, viewModel, path, context, deps) {
         }
     }
 
-    const effect = reactiveSystem.effect(() => {
-        reconcile(readItems());
-        if (isSelect) {
-            restoreSelectValue();
+    let effect;
+    try {
+        effect = reactiveSystem.effect(() => {
+            reconcile(readItems());
+            if (isSelect) {
+                restoreSelectValue();
+            }
+        }, { batch: true });
+    } catch (error) {
+        // The first render threw (effect() has released the effect, and reconcile has
+        // released any rows it built): restore the element as it was before bind().
+        while (element.firstChild) {
+            element.removeChild(element.firstChild);
         }
-    }, { batch: true });
+        originalChildren.forEach(node => element.appendChild(node));
+        throw error;
+    }
 
     binder._trackCleanup(element, () => {
         reactiveSystem.cleanup(effect);
