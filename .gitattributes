@@ -1,0 +1,2 @@
+# LF everywhere, so a rebuild matches the committed generated files on every platform.
+* text=auto eol=lf
