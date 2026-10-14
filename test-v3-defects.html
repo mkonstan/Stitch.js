@@ -27,7 +27,8 @@
             'd3-hidden-rows-release-bindings',
             'd4-root-handler-in-nested-foreach',
             'd5-strict-bindings-and-one-debug-switch',
-            'd6-computed-reader-stops-after-cleanup'
+            'd6-computed-reader-stops-after-cleanup',
+            'd7-multi-root-row-template-throws'
         ]);
 
         const tick = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -264,6 +265,26 @@
                 t.equal(runCounts.get(plainReader) - plainBefore, 0, 'control: the plain-property reader ran 0 times after cleanup');
                 t.equal(runCounts.get(computedReader) - computedBefore, 0, 'the computed reader ran 0 times after cleanup');
                 t.equal(computedReader.textContent, '2', 'the cleaned-up computed reader kept its last text');
+            });
+
+            // Defect 7 (T1, D22): a foreach row template must have exactly one root element.
+            // Today extra roots are dropped silently (an inner list never renders); v3 throws
+            // from bind(), naming the list, the number of roots and the fix (wrap them).
+            await StitchTest.test('d7-multi-root-row-template-throws', async (t) => {
+                // Control: one root element with several children renders every child.
+                const good = mount('<ul data-foreach="items"><li><b data-text="name"></b><i data-text="name"></i></li></ul>');
+                const goodError = tryBind(good, Stitch.Observable.create({ items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }] }));
+                t.equal(goodError, null, 'control: a single-root row template binds without error');
+                await tick();
+                t.deepEqual(texts(good, 'li > *'), ['a', 'a', 'b', 'b'], 'control: every child of the single root renders');
+
+                const host = mount('<div data-foreach="items"><h4 data-text="name"></h4><span data-text="name"></span></div>');
+                const error = tryBind(host, Stitch.Observable.create({ items: [{ id: 1, name: 'a' }] }));
+                t.ok(error instanceof Error, 'bind() throws when the row template of "items" has 2 root elements');
+                const message = error ? String(error.message) : '';
+                t.match(message, /\bitems\b/, 'the multi-root error names the list');
+                t.match(message, /\b2\b/, 'the multi-root error gives the number of root elements');
+                t.match(message, /\bwrap\b/i, 'the multi-root error names the fix (wrap them in one element)');
             });
         })();
     </script>

@@ -63,6 +63,17 @@
         "the cleaned-up computed reader kept its last text"
       ]
     },
+    "test-v3-defects.html#d7-multi-root-row-template-throws": {
+      "defect": 7,
+      "sprint": "T1",
+      "summary": "A foreach row template with several root elements silently drops all but the first",
+      "expect": [
+        "bind() throws when the row template of \"items\" has 2 root elements",
+        "the multi-root error names the list",
+        "the multi-root error gives the number of root elements",
+        "the multi-root error names the fix (wrap them in one element)"
+      ]
+    },
     "test-warnings.html#warns-missing-property": {
       "defect": 5,
       "sprint": "T2",

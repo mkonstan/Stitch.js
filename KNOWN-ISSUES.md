@@ -20,6 +20,7 @@ some tests.
 | 4 | In a nested list, a click handler cannot reach the root model: there is no `$root.` path, and `data-click="$root.remove"` does nothing, silently. | `test-v3-defects.html#d4-root-handler-in-nested-foreach` | T2 |
 | 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch`, `test-warnings.html#warns-missing-property`, `test-warnings.html#warns-missing-keys`, `test-warnings.html#warns-select-performance` | T2 |
 | 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
+| 7 | A list row template with more than one root element (for example `<h4>` followed by `<ul>` inside a `data-foreach` container) silently renders only the first root; the rest, including any nested list, never appears. No error is raised. v3 requires exactly one root element and throws otherwise. | `test-v3-defects.html#d7-multi-root-row-template-throws` | T1 |
 
 "Target" is the planned hardening sprint for the next major release (v3): T1 covers list correctness and
 binding lifecycle, T2 covers strictness and debug mode.
