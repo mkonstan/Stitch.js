@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: fail-precondition</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Fails its "deliberately wrong" assertion AND a precondition: a wrong-reason failure. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['broken']);
+StitchTest.test('broken', (t) => {
+    t.equal(1 + 1, 5, 'precondition: setup works');
+    t.equal(1 + 1, 3, 'deliberately wrong');
+});
+</script>
+</body>
+</html>

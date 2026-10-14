@@ -108,6 +108,10 @@ function validateKnownFailing(tests, label) {
         if (!/^[^#]+\.html#.+$/.test(id)) throw new Error(`${label}: "${id}" is not "<page>.html#<test id>"`);
         if (!entry || !Number.isInteger(entry.defect)) throw new Error(`${label}: "${id}" needs an integer "defect"`);
         if (typeof entry.sprint !== "string" || !/^T\d+$/.test(entry.sprint)) throw new Error(`${label}: "${id}" needs "sprint" like "T1"`);
+        if (!Array.isArray(entry.expect) || entry.expect.length === 0 ||
+            !entry.expect.every((prefix) => typeof prefix === "string" && prefix.trim() !== "")) {
+            throw new Error(`${label}: "${id}" needs "expect": the failed-assertion messages (prefixes) it must fail with`);
+        }
     }
     return tests;
 }
@@ -304,7 +308,13 @@ function classify(config, runs) {
                 } else if (test.status === "pass") {
                     counts.passed++;
                 } else if (entry) {
-                    counts.knownFailing++;
+                    const reason = wrongReason(entry, test.detail);
+                    if (reason) {
+                        counts.failed++;
+                        fatal.push(`WRONG   ${fullId} [${build}]: listed in ${config.knownFailingLabel} (defect ${entry.defect}) but failed for a different reason: ${reason}`);
+                    } else {
+                        counts.knownFailing++;
+                    }
                 } else {
                     counts.failed++;
                     fatal.push(`FAILED  ${fullId} [${build}]: ${firstLine(test.detail) || "failed"}`);
@@ -317,6 +327,23 @@ function classify(config, runs) {
         if (!seenIds.has(id)) fatal.push(`STALE   ${id}: listed in ${config.knownFailingLabel} but matches no test that ran (fix or remove the entry)`);
     }
     return { summary, fatal };
+}
+
+/**
+ * A parked test must fail for its own reason. Each line of its failure detail
+ * (one per failed assertion; "threw: ..." when it threw) must start with one of
+ * the entry's expect prefixes, and each prefix must match at least one line.
+ * Returns null when the failure is the expected one, else a description.
+ */
+function wrongReason(entry, detail) {
+    const lines = String(detail || "").split("\n").map((line) => line.trim()).filter(Boolean);
+    const unexpected = lines.filter((line) => !entry.expect.some((prefix) => line.startsWith(prefix)));
+    const absent = entry.expect.filter((prefix) => !lines.some((line) => line.startsWith(prefix)));
+    if (unexpected.length === 0 && absent.length === 0) return null;
+    const parts = [];
+    if (unexpected.length) parts.push(`unexpected failure(s): ${unexpected.map((l) => JSON.stringify(l.slice(0, 160))).join("; ")}`);
+    if (absent.length) parts.push(`expected failure(s) absent: ${absent.map((l) => JSON.stringify(l)).join("; ")}`);
+    return parts.join(" | ");
 }
 
 function firstLine(text) {

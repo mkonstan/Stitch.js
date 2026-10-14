@@ -27,7 +27,7 @@ const browser = {
     "control-pass": { suites: [`${F}pass.html`], expect: PASS },
     "control-known-failing": {
         suites: [`${F}fail.html`],
-        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9" } },
+        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
         expect: PASS
     },
 
@@ -49,14 +49,35 @@ const browser = {
     "unlisted-failure": { suites: [`${F}fail.html`], expect: FAIL(`FAILED  ${F}fail.html#broken`) },
     "known-failing-passes": {
         suites: [`${F}pass.html`],
-        knownFailing: { [`${F}pass.html#ok`]: { defect: 99, sprint: "T9" } },
+        knownFailing: { [`${F}pass.html#ok`]: { defect: 99, sprint: "T9", expect: ["an observable holds a written value"] } },
         expect: FAIL("Remove it from known-failing")
     },
     "known-failing-stale": {
         suites: [`${F}pass.html`],
-        knownFailing: { [`${F}pass.html#no-such-test`]: { defect: 99, sprint: "T9" } },
+        knownFailing: { [`${F}pass.html#no-such-test`]: { defect: 99, sprint: "T9", expect: ["anything"] } },
         expect: FAIL("matches no test that ran")
     },
+    "known-failing-extra-failure": {
+        suites: [`${F}fail-precondition.html`],
+        knownFailing: { [`${F}fail-precondition.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
+        expect: FAIL('failed for a different reason: unexpected failure(s): "precondition: setup works')
+    },
+    "known-failing-threw": {
+        suites: [`${F}fail-throws.html`],
+        knownFailing: { [`${F}fail-throws.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
+        expect: FAIL('failed for a different reason: unexpected failure(s): "threw: Error: fixture: setup exploded')
+    },
+    "known-failing-expected-failure-absent": {
+        suites: [`${F}fail.html`],
+        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong", "another expected failure"] } },
+        expect: FAIL('expected failure(s) absent: "another expected failure"')
+    },
+    "known-failing-without-expect": {
+        suites: [`${F}fail.html`],
+        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9" } },
+        expect: FAIL('needs "expect"')
+    },
+    "late-assertion": { suites: [`${F}late-assertion.html`], expect: FAIL("harness: assertion after test 'a' settled (failed): fixture: late assertion") },
     "page-missing-from-list": {
         suites: [`${F}pass.html`],
         discoverDir: `${F}orphan/`,

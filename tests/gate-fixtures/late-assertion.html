@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: late-assertion</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). A test that settles, then asserts from a timer it did not await. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['a']);
+StitchTest.test('a', (t) => {
+    t.ok(true, 'passes in time');
+    setTimeout(() => { t.ok(false, 'fixture: late assertion'); }, 50);
+});
+</script>
+</body>
+</html>

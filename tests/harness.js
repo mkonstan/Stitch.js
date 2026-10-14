@@ -87,9 +87,16 @@
 
     // Assertion collector used by StitchTest.test(). A test with zero
     // assertions fails: it would otherwise pass without checking anything.
-    function makeAsserter() {
-        var t = { count: 0, failures: [] };
+    // An assertion made after the test has settled (e.g. from a timer the test
+    // did not await) cannot change its recorded result, so it is a harness
+    // problem, which fails the page, instead of vanishing.
+    function makeAsserter(id) {
+        var t = { count: 0, failures: [], settled: false };
         function check(pass, message) {
+            if (t.settled) {
+                problem("assertion after test '" + id + "' settled (" + (pass ? "passed" : "failed") + "): " + message);
+                return;
+            }
             t.count++;
             if (!pass) t.failures.push(String(message));
         }
@@ -174,13 +181,15 @@
          * thrown error, or zero assertions.
          */
         test: function (id, fn) {
-            var t = makeAsserter();
+            var t = makeAsserter(id);
             var settle = function (error) {
+                if (t.settled) return;
                 if (error) {
                     t.failures.push("threw: " + (error && error.stack ? error.stack : String(error)));
                 } else if (t.count === 0) {
                     t.failures.push("the test made no assertions");
                 }
+                t.settled = true;
                 if (t.failures.length === 0) {
                     record(id, "pass", t.count + " assertion(s)");
                 } else {

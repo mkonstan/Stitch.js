@@ -1,50 +1,91 @@
 {
-  "_about": "Tests that fail today because of a known defect. Listed + failed = reported as known-failing. Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
+  "_about": "Tests that fail today because of a known defect. Listed + failed with exactly its \"expect\" failures = reported as known-failing. Listed + failed for any other reason = the runner FAILS (\"expect\" lists the failed-assertion messages, as prefixes, the test must fail with: every failure line must match one, and every one must match a failure line). Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
   "tests": {
     "test-v3-defects.html#d1-keyless-row-throws": {
       "defect": 1,
       "sprint": "T1",
-      "summary": "A list row without its key renders by position instead of throwing"
+      "summary": "A list row without its key renders by position instead of throwing",
+      "expect": [
+        "bind() throws when row 1 of \"people\" has no id",
+        "the error names the list",
+        "the error names the row index",
+        "the error names the key field",
+        "the error names the fix (data-key)",
+        "bind() throws when row 1 of \"holdings\" has no ticker",
+        "the data-key error names the list",
+        "the data-key error names the key field from data-key"
+      ]
     },
     "test-v3-defects.html#d2-same-id-new-object-rebinds": {
       "defect": 2,
       "sprint": "T1",
-      "summary": "Rows reloaded as new objects with the same ids keep showing the old values"
+      "summary": "Rows reloaded as new objects with the same ids keep showing the old values",
+      "expect": [
+        "rows show the new objects after a same-id reload",
+        "rows follow later changes to the new objects"
+      ]
     },
     "test-v3-defects.html#d3-hidden-rows-release-bindings": {
       "defect": 3,
       "sprint": "T1",
-      "summary": "Removed rows keep their bindings alive; one change runs once per leaked binding"
+      "summary": "Removed rows keep their bindings alive; one change runs once per leaked binding",
+      "expect": [
+        "one change ran exactly one binding update"
+      ]
     },
     "test-v3-defects.html#d4-root-handler-in-nested-foreach": {
       "defect": 4,
       "sprint": "T2",
-      "summary": "$root. handler paths do not exist; a nested click does nothing, silently"
+      "summary": "$root. handler paths do not exist; a nested click does nothing, silently",
+      "expect": [
+        "the root handler ran once",
+        "it received the clicked row item itself"
+      ]
     },
     "test-v3-defects.html#d5-strict-bindings-and-one-debug-switch": {
       "defect": 5,
       "sprint": "T2",
-      "summary": "Unknown binding names are ignored silently, and Stitch.debug does not switch the binder's debug output"
+      "summary": "Unknown binding names are ignored silently, and Stitch.debug does not switch the binder's debug output",
+      "expect": [
+        "bind() throws for the unknown binding data-txet",
+        "the error names the binding",
+        "the error names the element",
+        "the error lists the valid bindings",
+        "with Stitch.debug enabled, binding a missing property reports it"
+      ]
     },
     "test-v3-defects.html#d6-computed-reader-stops-after-cleanup": {
       "defect": 6,
       "sprint": "T1",
-      "summary": "An effect that read a computed keeps running after cleanup"
+      "summary": "An effect that read a computed keeps running after cleanup",
+      "expect": [
+        "the computed reader ran 0 times after cleanup",
+        "the cleaned-up computed reader kept its last text"
+      ]
     },
     "test-warnings.html#warns-missing-property": {
       "defect": 5,
       "sprint": "T2",
-      "summary": "Debug mode does not warn about a missing property"
+      "summary": "Debug mode does not warn about a missing property",
+      "expect": [
+        "no warning containing \"Property \"nonExistentProperty\" not found\""
+      ]
     },
     "test-warnings.html#warns-missing-keys": {
       "defect": 5,
       "sprint": "T2",
-      "summary": "Debug mode does not warn about list items without keys"
+      "summary": "Debug mode does not warn about list items without keys",
+      "expect": [
+        "no warning containing \"objects but missing 'id' or 'key'\""
+      ]
     },
     "test-warnings.html#warns-select-performance": {
       "defect": 5,
       "sprint": "T2",
-      "summary": "Debug mode does not warn about large select lists"
+      "summary": "Debug mode does not warn about large select lists",
+      "expect": [
+        "no warning containing \"triggers full re-render\""
+      ]
     }
   }
 }

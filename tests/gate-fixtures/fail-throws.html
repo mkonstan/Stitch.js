@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: fail-throws</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Throws during setup instead of failing its assertion: a wrong-reason failure. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['broken']);
+StitchTest.test('broken', () => {
+    throw new Error('fixture: setup exploded');
+});
+</script>
+</body>
+</html>
