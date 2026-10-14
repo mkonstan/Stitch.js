@@ -1,6 +1,36 @@
 {
   "_about": "Tests that fail today because of a known defect. Listed + failed = reported as known-failing. Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
   "tests": {
+    "test-v3-defects.html#d1-keyless-row-throws": {
+      "defect": 1,
+      "sprint": "T1",
+      "summary": "A list row without its key renders by position instead of throwing"
+    },
+    "test-v3-defects.html#d2-same-id-new-object-rebinds": {
+      "defect": 2,
+      "sprint": "T1",
+      "summary": "Rows reloaded as new objects with the same ids keep showing the old values"
+    },
+    "test-v3-defects.html#d3-hidden-rows-release-bindings": {
+      "defect": 3,
+      "sprint": "T1",
+      "summary": "Removed rows keep their bindings alive; one change runs once per leaked binding"
+    },
+    "test-v3-defects.html#d4-root-handler-in-nested-foreach": {
+      "defect": 4,
+      "sprint": "T2",
+      "summary": "$root. handler paths do not exist; a nested click does nothing, silently"
+    },
+    "test-v3-defects.html#d5-strict-bindings-and-one-debug-switch": {
+      "defect": 5,
+      "sprint": "T2",
+      "summary": "Unknown binding names are ignored silently, and Stitch.debug does not switch the binder's debug output"
+    },
+    "test-v3-defects.html#d6-computed-reader-stops-after-cleanup": {
+      "defect": 6,
+      "sprint": "T1",
+      "summary": "An effect that read a computed keeps running after cleanup"
+    },
     "test-warnings.html#warns-missing-property": {
       "defect": 5,
       "sprint": "T2",

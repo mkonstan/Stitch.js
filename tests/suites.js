@@ -30,5 +30,6 @@
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },
         { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
         { page: "test-warnings.html", title: "Debug warnings", about: "Debug mode warns about missing properties, missing keys, large selects" },
+        { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" }
     ];
 });

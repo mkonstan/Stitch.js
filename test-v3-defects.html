@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js v3 defect tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>v3 defect tests</h1>
+    <p>
+        Each test asserts the v3 <em>target</em> behaviour for one known v2 defect, so each one
+        fails on v2 code. They are listed in <code>tests/known-failing.json</code> with the sprint
+        that fixes them; the runner fails if a listed test starts passing, so each fix must remove
+        its own entry. See <code>KNOWN-ISSUES.md</code>.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'd1-keyless-row-throws',
+            'd2-same-id-new-object-rebinds',
+            'd3-hidden-rows-release-bindings',
+            'd4-root-handler-in-nested-foreach',
+            'd5-strict-bindings-and-one-debug-switch',
+            'd6-computed-reader-stops-after-cleanup'
+        ]);
+
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        const texts = (host, selector) => Array.from(host.querySelectorAll(selector)).map(el => el.textContent);
+
+        function tryBind(host, model) {
+            try {
+                new Stitch.DataBinder().bind(host, model);
+                return null;
+            } catch (error) {
+                return error;
+            }
+        }
+
+        // Collects console output (warn/log/info/debug/error) while fn runs.
+        async function captureConsole(fn) {
+            const methods = ['warn', 'log', 'info', 'debug', 'error'];
+            const original = {};
+            const lines = [];
+            methods.forEach(name => {
+                original[name] = console[name];
+                console[name] = (...args) => { lines.push(args.map(a => typeof a === 'string' ? a : String(a)).join(' ')); };
+            });
+            try {
+                await fn();
+            } finally {
+                methods.forEach(name => { console[name] = original[name]; });
+            }
+            return lines;
+        }
+
+        // Custom bindings written exactly as documented (STITCH_API.md, registerBinding):
+        // an effect, and its cleanup registered with the binder. Each counts its runs.
+        const runCounts = new Map();
+        function registerCountingBinding(name) {
+            Stitch.DataBinder.registerBinding(name, {
+                bind(element, viewModel, path, context) {
+                    runCounts.set(element, 0);
+                    const effect = context.reactiveSystem.effect(() => {
+                        runCounts.set(element, runCounts.get(element) + 1);
+                        element.textContent = viewModel[path];
+                    });
+                    context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
+                }
+            });
+        }
+        registerCountingBinding('v3probe');
+
+        (async () => {
+            // Defect 1 (T1, D2/D10/D16): a list row without its key throws, naming the
+            // list, the row index, the key field and the fix (data-key). The initial render
+            // runs inside bind(), so the error must reach the bind() caller.
+            await StitchTest.test('d1-keyless-row-throws', (t) => {
+                const host = mount('<ul data-foreach="people"><li data-text="name"></li></ul>');
+                const error = tryBind(host, Stitch.Observable.create({
+                    people: [{ id: 1, name: 'Ann' }, { name: 'Bob' }]
+                }));
+                t.ok(error instanceof Error, 'bind() throws when row 1 of "people" has no id');
+                const message = error ? String(error.message) : '';
+                t.match(message, /\bpeople\b/, 'the error names the list');
+                t.match(message, /\brow\s*#?\s*1\b|\bindex\s*1\b|\[1\]/i, 'the error names the row index');
+                t.match(message, /\bid\b/, 'the error names the key field');
+                t.match(message, /data-key/, 'the error names the fix (data-key)');
+
+                // The key field comes from data-key when the list sets it.
+                const keyed = mount('<ul data-foreach="holdings" data-key="ticker"><li data-text="ticker"></li></ul>');
+                const keyedError = tryBind(keyed, Stitch.Observable.create({
+                    holdings: [{ ticker: 'AAA' }, { name: 'no ticker' }]
+                }));
+                t.ok(keyedError instanceof Error, 'bind() throws when row 1 of "holdings" has no ticker');
+                const keyedMessage = keyedError ? String(keyedError.message) : '';
+                t.match(keyedMessage, /\bholdings\b/, 'the data-key error names the list');
+                t.match(keyedMessage, /\bticker\b/, 'the data-key error names the key field from data-key');
+            });
+
+            // Defect 2 (T1): rows reloaded as NEW objects with the SAME ids show the new
+            // values, and stay bound to the new objects.
+            await StitchTest.test('d2-same-id-new-object-rebinds', async (t) => {
+                const host = mount('<ul data-foreach="list"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({ list: [{ id: 1, name: 'old1' }, { id: 2, name: 'old2' }] });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['old1', 'old2'], 'precondition: initial rows');
+
+                model.list = [{ id: 1, name: 'NEW1' }, { id: 2, name: 'NEW2' }];
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['NEW1', 'NEW2'], 'rows show the new objects after a same-id reload');
+
+                model.list[0].name = 'NEWER1';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['NEWER1', 'NEW2'], 'rows follow later changes to the new objects');
+            });
+
+            // Defect 3 (T1): rows removed by hide/show cycles release their bindings. After
+            // 10 cycles, one change runs one update per live binding that reads it.
+            await StitchTest.test('d3-hidden-rows-release-bindings', async (t) => {
+                const host = mount('<ul data-foreach="shown"><li><span data-v3probe="name"></span></li></ul>');
+                const model = Stitch.Observable.create({
+                    items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }],
+                    hide: false,
+                    shown: Stitch.computed(function () { return this.hide ? [] : this.items.slice(); })
+                });
+                // Count every run of every probe, including probes on detached rows.
+                const countAll = () => { let sum = 0; runCounts.forEach(v => { sum += v; }); return sum; };
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                for (let cycle = 0; cycle < 10; cycle++) {
+                    model.hide = true; await tick();
+                    model.hide = false; await tick();
+                }
+                t.equal(host.querySelectorAll('li').length, 3, 'precondition: 3 rows visible after the cycles');
+
+                const before = countAll();
+                model.items[0].name = 'a2';
+                await tick();
+                t.deepEqual(texts(host, 'li span'), ['a2', 'b', 'c'], 'the live row shows the change');
+                t.equal(countAll() - before, 1, 'one change ran exactly one binding update (the one live row that reads it)');
+            });
+
+            // Defect 4 (T2, D12): in a nested foreach, data-click="$root.remove" calls the
+            // root handler with the clicked row item.
+            await StitchTest.test('d4-root-handler-in-nested-foreach', async (t) => {
+                const calls = [];
+                const host = mount(
+                    '<div data-foreach="groups"><ul data-foreach="items">' +
+                    '<li><button data-click="$root.remove">x</button></li></ul></div>');
+                const model = Stitch.Observable.create({
+                    groups: [{ id: 'g1', items: [{ id: 'i1', name: 'first' }, { id: 'i2', name: 'second' }] }],
+                    remove(item) { calls.push(item); }
+                });
+                const error = tryBind(host, model);
+                t.equal(error, null, 'bind() accepts a $root. handler path');
+                await tick();
+                const buttons = host.querySelectorAll('button');
+                t.equal(buttons.length, 2, 'precondition: two nested rows rendered');
+                const lines = await captureConsole(async () => {
+                    if (buttons[1]) buttons[1].click();
+                    await tick();
+                });
+                t.equal(calls.length, 1, 'the root handler ran once');
+                t.ok(calls[0] === model.groups[0].items[1], 'it received the clicked row item itself');
+                t.deepEqual(lines, [], 'the click logged nothing');
+            });
+
+            // Defect 5 (T2, D3): a misspelled binding throws, naming the element, the
+            // binding and the valid bindings; and Stitch.debug is the one debug switch
+            // (enabling it makes a missing property warn, disabling it silences that).
+            await StitchTest.test('d5-strict-bindings-and-one-debug-switch', async (t) => {
+                const host = mount('<span id="v3-misspelled" data-txet="name"></span>');
+                const error = tryBind(host, Stitch.Observable.create({ name: 'x' }));
+                t.ok(error instanceof Error, 'bind() throws for the unknown binding data-txet');
+                const message = error ? String(error.message) : '';
+                t.match(message, /txet/, 'the error names the binding');
+                t.match(message, /span|v3-misspelled/i, 'the error names the element');
+                const listed = ['text', 'value', 'visible', 'foreach', 'click'].filter(name => new RegExp('\\b' + name + '\\b').test(message));
+                t.deepEqual(listed, ['text', 'value', 'visible', 'foreach', 'click'], 'the error lists the valid bindings');
+
+                const enabledLines = await captureConsole(async () => {
+                    Stitch.debug.enable();
+                    tryBind(mount('<span data-text="v3MissingProp"></span>'), Stitch.Observable.create({ exists: 1 }));
+                    await tick();
+                });
+                const disabledLines = await captureConsole(async () => {
+                    Stitch.debug.disable();
+                    tryBind(mount('<span data-text="v3MissingProp"></span>'), Stitch.Observable.create({ exists: 1 }));
+                    await tick();
+                });
+                const mentions = lines => lines.filter(line => line.includes('v3MissingProp')).length;
+                t.ok(mentions(enabledLines) > 0, 'with Stitch.debug enabled, binding a missing property reports it');
+                t.equal(mentions(disabledLines), 0, 'with Stitch.debug disabled, it is silent');
+            });
+
+            // Defect 6 (T1, triage #19): an effect that read a computed stops running after
+            // its cleanup. Control: one that read a plain property stops too.
+            await StitchTest.test('d6-computed-reader-stops-after-cleanup', async (t) => {
+                const host = mount('<span id="v3-computed-reader" data-v3probe="doubled"></span><span id="v3-plain-reader" data-v3probe="plain"></span>');
+                const model = Stitch.Observable.create({
+                    n: 1,
+                    plain: 'p0',
+                    doubled: Stitch.computed(function () { return this.n * 2; })
+                });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                await tick();
+                const computedReader = document.getElementById('v3-computed-reader');
+                const plainReader = document.getElementById('v3-plain-reader');
+                t.equal(computedReader.textContent, '2', 'precondition: the computed reader shows 2');
+                t.equal(plainReader.textContent, 'p0', 'precondition: the plain reader shows p0');
+
+                binder.unbind(computedReader);
+                binder.unbind(plainReader);
+                const computedBefore = runCounts.get(computedReader);
+                const plainBefore = runCounts.get(plainReader);
+                for (let i = 0; i < 10; i++) {
+                    model.n = i + 2;
+                    model.plain = 'p' + (i + 1);
+                    await tick();
+                }
+                t.equal(runCounts.get(plainReader) - plainBefore, 0, 'control: the plain-property reader ran 0 times after cleanup');
+                t.equal(runCounts.get(computedReader) - computedBefore, 0, 'the computed reader ran 0 times after cleanup');
+                t.equal(computedReader.textContent, '2', 'the cleaned-up computed reader kept its last text');
+            });
+        })();
+    </script>
+</body>
+</html>
