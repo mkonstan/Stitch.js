@@ -228,7 +228,10 @@ failed request; never finishes; plans zero tests; reports a test twice, late, un
 planned test unreported; or makes an assertion after its test has settled. `window.Stitch` must expose exactly the public surface and the `package.json` version.
 
 Per test, against `tests/known-failing.json`:
-- failed and listed, with exactly the failures named in its `expect` list (assertion-message prefixes): counted as known-failing (not fatal);
+- failed and listed, with exactly the failures named in its `expect` list: counted as known-failing (not fatal).
+  `expect` holds one assertion-message prefix per failed assertion, matched on a word boundary; each prefix must be
+  at least 3 words and 15 characters, must match exactly one failure line, and may not start with `threw`,
+  `precondition`, `control`, `harness` or another harness message (such prefixes are refused at load);
 - failed and listed, but for any other reason (another assertion failed, it threw, or an expected failure is absent): FATAL;
 - passed and listed: FATAL, remove the entry (each fix removes its own marker);
 - failed and not listed: FATAL;

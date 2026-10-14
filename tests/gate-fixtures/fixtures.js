@@ -27,7 +27,7 @@ const browser = {
     "control-pass": { suites: [`${F}pass.html`], expect: PASS },
     "control-known-failing": {
         suites: [`${F}fail.html`],
-        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
+        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong arithmetic"] } },
         expect: PASS
     },
 
@@ -54,28 +54,58 @@ const browser = {
     },
     "known-failing-stale": {
         suites: [`${F}pass.html`],
-        knownFailing: { [`${F}pass.html#no-such-test`]: { defect: 99, sprint: "T9", expect: ["anything"] } },
+        knownFailing: { [`${F}pass.html#no-such-test`]: { defect: 99, sprint: "T9", expect: ["an assertion that never ran"] } },
         expect: FAIL("matches no test that ran")
     },
     "known-failing-extra-failure": {
         suites: [`${F}fail-precondition.html`],
-        knownFailing: { [`${F}fail-precondition.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
+        knownFailing: { [`${F}fail-precondition.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong arithmetic"] } },
         expect: FAIL('failed for a different reason: unexpected failure(s): "precondition: setup works')
     },
     "known-failing-threw": {
         suites: [`${F}fail-throws.html`],
-        knownFailing: { [`${F}fail-throws.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong"] } },
+        knownFailing: { [`${F}fail-throws.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong arithmetic"] } },
         expect: FAIL('failed for a different reason: unexpected failure(s): "threw: Error: fixture: setup exploded')
     },
     "known-failing-expected-failure-absent": {
         suites: [`${F}fail.html`],
-        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong", "another expected failure"] } },
-        expect: FAIL('expected failure(s) absent: "another expected failure"')
+        knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9", expect: ["deliberately wrong arithmetic", "another expected failure here"] } },
+        expect: FAIL('expected failure(s) absent: "another expected failure here"')
     },
     "known-failing-without-expect": {
         suites: [`${F}fail.html`],
         knownFailing: { [`${F}fail.html#broken`]: { defect: 99, sprint: "T9" } },
         expect: FAIL('needs "expect"')
+    },
+    "control-known-failing-precise": {
+        suites: [`${F}fail-two.html`],
+        knownFailing: { [`${F}fail-two.html#broken`]: { defect: 99, sprint: "T9", expect: ["the value is wrong in step one", "the value is wrong in step two"] } },
+        expect: PASS
+    },
+    "expect-too-short": {
+        suites: [`${F}fail-throws.html`],
+        knownFailing: { [`${F}fail-throws.html#broken`]: { defect: 99, sprint: "T9", expect: ["t", "a"] } },
+        expect: FAIL('expect prefix "t" is too broad')
+    },
+    "expect-generic-throw": {
+        suites: [`${F}fail-throws.html`],
+        knownFailing: { [`${F}fail-throws.html#broken`]: { defect: 99, sprint: "T9", expect: ["threw: Error: fixture"] } },
+        expect: FAIL('is too broad: it starts with "threw"')
+    },
+    "expect-generic-precondition": {
+        suites: [`${F}fail-precondition.html`],
+        knownFailing: { [`${F}fail-precondition.html#broken`]: { defect: 99, sprint: "T9", expect: ["precondition: setup works", "deliberately wrong arithmetic"] } },
+        expect: FAIL('is too broad: it starts with "precondition"')
+    },
+    "expect-shared-prefix": {
+        suites: [`${F}fail-two.html`],
+        knownFailing: { [`${F}fail-two.html#broken`]: { defect: 99, sprint: "T9", expect: ["the value is wrong in step"] } },
+        expect: FAIL('expect prefix matches several failure lines')
+    },
+    "expect-partial-word": {
+        suites: [`${F}fail-two.html`],
+        knownFailing: { [`${F}fail-two.html#broken`]: { defect: 99, sprint: "T9", expect: ["the value is wrong in step o", "the value is wrong in step two"] } },
+        expect: FAIL('expected failure(s) absent: "the value is wrong in step o"')
     },
     "late-assertion": { suites: [`${F}late-assertion.html`], expect: FAIL("harness: assertion after test 'a' settled (failed): fixture: late assertion") },
     "page-missing-from-list": {

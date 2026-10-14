@@ -112,8 +112,38 @@ function validateKnownFailing(tests, label) {
             !entry.expect.every((prefix) => typeof prefix === "string" && prefix.trim() !== "")) {
             throw new Error(`${label}: "${id}" needs "expect": the failed-assertion messages (prefixes) it must fail with`);
         }
+        for (const prefix of entry.expect) {
+            const why = tooBroad(prefix);
+            if (why) throw new Error(`${label}: "${id}" expect prefix ${JSON.stringify(prefix)} is too broad: ${why}`);
+        }
     }
     return tests;
+}
+
+// An expect prefix must name ONE specific assertion. These rules stop a prefix
+// from legitimising unrelated failures (any throw, any precondition, ...).
+const EXPECT_MIN_CHARS = 15;
+const EXPECT_MIN_WORDS = 3;
+// Failure lines that are never a defect's own assertion: a throw, the harness's
+// own messages, and the precondition/control assertions every defect test uses.
+const EXPECT_FORBIDDEN_STARTS = ["threw", "the test made no assertions", "assertion after", "harness", "precondition", "control"];
+
+function tooBroad(prefix) {
+    const text = prefix.trim();
+    if (text !== prefix) return "leading or trailing whitespace";
+    if (text.length < EXPECT_MIN_CHARS) return `shorter than ${EXPECT_MIN_CHARS} characters`;
+    if (text.split(/\s+/).length < EXPECT_MIN_WORDS) return `fewer than ${EXPECT_MIN_WORDS} words`;
+    const lower = text.toLowerCase();
+    const forbidden = EXPECT_FORBIDDEN_STARTS.find((start) => lower.startsWith(start));
+    if (forbidden) return `it starts with "${forbidden}", which names no defect assertion`;
+    return null;
+}
+
+/** prefix matches line at a word boundary: the next character is not a letter or digit. */
+function prefixMatches(prefix, line) {
+    if (!line.startsWith(prefix)) return false;
+    const next = line.charAt(prefix.length);
+    return next === "" || !/[A-Za-z0-9_]/.test(next);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,10 +367,15 @@ function classify(config, runs) {
  */
 function wrongReason(entry, detail) {
     const lines = String(detail || "").split("\n").map((line) => line.trim()).filter(Boolean);
-    const unexpected = lines.filter((line) => !entry.expect.some((prefix) => line.startsWith(prefix)));
-    const absent = entry.expect.filter((prefix) => !lines.some((line) => line.startsWith(prefix)));
-    if (unexpected.length === 0 && absent.length === 0) return null;
+    const unexpected = lines.filter((line) => !entry.expect.some((prefix) => prefixMatches(prefix, line)));
+    const absent = entry.expect.filter((prefix) => !lines.some((line) => prefixMatches(prefix, line)));
+    // One prefix per failed assertion: a prefix matching several lines is a catch-all.
+    const shared = entry.expect
+        .map((prefix) => ({ prefix, count: lines.filter((line) => prefixMatches(prefix, line)).length }))
+        .filter((m) => m.count > 1);
+    if (unexpected.length === 0 && absent.length === 0 && shared.length === 0) return null;
     const parts = [];
+    if (shared.length) parts.push(`expect prefix matches several failure lines (one prefix per assertion): ${shared.map((m) => `${JSON.stringify(m.prefix)} x${m.count}`).join("; ")}`);
     if (unexpected.length) parts.push(`unexpected failure(s): ${unexpected.map((l) => JSON.stringify(l.slice(0, 160))).join("; ")}`);
     if (absent.length) parts.push(`expected failure(s) absent: ${absent.map((l) => JSON.stringify(l)).join("; ")}`);
     return parts.join(" | ");

@@ -1,5 +1,5 @@
 {
-  "_about": "Tests that fail today because of a known defect. Listed + failed with exactly its \"expect\" failures = reported as known-failing. Listed + failed for any other reason = the runner FAILS (\"expect\" lists the failed-assertion messages, as prefixes, the test must fail with: every failure line must match one, and every one must match a failure line). Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
+  "_about": "Tests that fail today because of a known defect. Listed + failed with exactly its \"expect\" failures = reported as known-failing. Listed + failed for any other reason = the runner FAILS (\"expect\" lists one entry per failed assertion: the failed-assertion messages, as prefixes matched on a word boundary, each at least 3 words and 15 characters and not a generic throw/precondition/control/harness line; every failure line must match one, and every one must match a failure line). Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
   "tests": {
     "test-v3-defects.html#d1-keyless-row-throws": {
       "defect": 1,
