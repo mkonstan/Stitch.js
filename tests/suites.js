@@ -1,22 +1,26 @@
 /*
  * THE suite list. One list, read by:
- *   - _tools/run-tests.js (`npm test`), which runs every page below against
- *     stitch.js and stitch.min.js, and fails if a test page exists that is
- *     not listed here;
- *   - run-tests.html, which links each page for running by hand.
- * Each page reports through tests/harness.js. Paths are relative to the
+ *   - _tools/run-tests.js (`npm test`), which runs every page in `suites`
+ *     against stitch.js and stitch.min.js, and fails if a test page exists
+ *     that is not listed here, or an example page exists that is not in
+ *     `examples`;
+ *   - run-tests.html, which links each page for running by hand;
+ *   - test-examples.html, which loads every page in `examples` and fails on
+ *     any error.
+ * Each suite page reports through tests/harness.js. Paths are relative to the
  * repository root.
  */
 (function (root, factory) {
-    var suites = factory();
+    var lists = factory();
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = suites;
+        module.exports = lists;
     } else {
-        root.STITCH_SUITES = suites;
+        root.STITCH_SUITES = lists.suites;
+        root.STITCH_EXAMPLES = lists.examples;
     }
 })(this, function () {
     "use strict";
-    return [
+    var suites = [
         { page: "test-core-reactivity.html", title: "Core reactivity", about: "Property updates, nested objects, text binding" },
         { page: "test-computed-properties.html", title: "Computed properties", about: "Top-level, nested, array-dependent and chained computeds" },
         { page: "test-array-reactivity.html", title: "Array reactivity", about: "Mutators, index writes, nested arrays, foreach rendering" },
@@ -35,6 +39,24 @@
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },
         { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
         { page: "test-warnings.html", title: "Debug warnings", about: "Debug mode warns about missing properties, missing keys, large selects" },
-        { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" }
+        { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
+        { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" }
     ];
+    // Every public example page (example*.html at the root). The runner fails if one is missing.
+    var examples = [
+        "example-17-cascading-dropdowns.html",
+        "example-18-dynamic-validation.html",
+        "example-19-shopping-cart.html",
+        "example-20-editable-table.html",
+        "example-21-conditional-forms.html",
+        "example-22-search-filter.html",
+        "example-23-wizard.html",
+        "example-24-nested-computed.html",
+        "example-25-event-binding.html",
+        "example-26-dropdown-without-value.html",
+        "example-27-attr-class-bindings.html",
+        "example-basic-demo.html",
+        "example-nested-computed.html"
+    ];
+    return { suites: suites, examples: examples };
 });

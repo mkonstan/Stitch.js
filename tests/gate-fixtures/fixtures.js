@@ -113,7 +113,13 @@ const browser = {
         discoverDir: `${F}orphan/`,
         expect: FAIL(`test page not in tests/suites.js: ${F}orphan/test-orphan.html`)
     },
-    "listed-page-missing": { suites: [`${F}does-not-exist.html`], expect: FAIL("listed page does not exist") }
+    "listed-page-missing": { suites: [`${F}does-not-exist.html`], expect: FAIL("listed page does not exist") },
+    "example-missing-from-list": {
+        suites: [`${F}pass.html`],
+        discoverDir: `${F}orphan-example/`,
+        expect: FAIL(`example page not in tests/suites.js examples: ${F}orphan-example/example-orphan.html`)
+    },
+    "listed-example-missing": { suites: [`${F}pass.html`], examples: [`${F}example-does-not-exist.html`], expect: FAIL("listed example does not exist") }
 };
 
 function write(dir, files) {

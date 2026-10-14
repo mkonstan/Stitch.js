@@ -52,9 +52,11 @@ const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"))
 // Configuration
 
 function mainConfig() {
+    const lists = require(path.join(ROOT, SUITES_FILE));
     return {
         name: "main",
-        suites: loadSuites(require(path.join(ROOT, SUITES_FILE))),
+        suites: loadSuites(lists.suites),
+        examples: loadExamples(lists.examples),
         knownFailing: loadKnownFailing(path.join(ROOT, KNOWN_FAILING_FILE)),
         knownFailingLabel: KNOWN_FAILING_FILE,
         discoverDir: "",
@@ -73,6 +75,7 @@ function fixtureConfig(name) {
     return {
         name: `fixture:${name}`,
         suites: loadSuites(fixture.suites.map((page) => ({ page }))),
+        examples: loadExamples(fixture.examples || []),
         knownFailing: validateKnownFailing(fixture.knownFailing || {}, `${FIXTURES_FILE}#${name}`),
         knownFailingLabel: `${FIXTURES_FILE}#${name}`,
         discoverDir: fixture.discoverDir || null,
@@ -95,6 +98,14 @@ function loadSuites(list) {
         seen.add(entry.page);
         return { page: entry.page.replace(/\\/g, "/") };
     });
+}
+
+function loadExamples(list) {
+    if (!Array.isArray(list) || list.some((page) => typeof page !== "string")) {
+        throw new Error(`${SUITES_FILE} must export an "examples" array of page paths`);
+    }
+    if (new Set(list).size !== list.length) throw new Error(`${SUITES_FILE}: an example is listed twice`);
+    return list.map((page) => page.replace(/\\/g, "/"));
 }
 
 function loadKnownFailing(file) {
@@ -156,10 +167,17 @@ function isTestPage(rel) {
     return /tests\/harness\.js|["']harness\.js["']/.test(fs.readFileSync(path.join(ROOT, rel), "utf8"));
 }
 
+function isExamplePage(rel) {
+    return /^example[^/]*\.html$/.test(path.posix.basename(rel));
+}
+
 function checkSuiteList(config) {
     const problems = [];
     for (const { page } of config.suites) {
         if (!fs.existsSync(path.join(ROOT, page))) problems.push(`listed page does not exist: ${page}`);
+    }
+    for (const page of config.examples) {
+        if (!fs.existsSync(path.join(ROOT, page))) problems.push(`listed example does not exist: ${page}`);
     }
     if (config.discoverDir !== null) {
         const listed = new Set(config.suites.map((s) => s.page));
@@ -167,6 +185,10 @@ function checkSuiteList(config) {
             rel.startsWith(config.discoverDir) && !config.excludeDirs.some((dir) => rel.startsWith(dir)));
         for (const rel of files.filter(isTestPage)) {
             if (!listed.has(rel)) problems.push(`test page not in ${SUITES_FILE}: ${rel} (add it to the list)`);
+        }
+        const examples = new Set(config.examples);
+        for (const rel of files.filter(isExamplePage)) {
+            if (!examples.has(rel)) problems.push(`example page not in ${SUITES_FILE} examples: ${rel} (add it, so the examples smoke suite loads it)`);
         }
     }
     return problems;

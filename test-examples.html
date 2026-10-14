@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js examples smoke test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        iframe { width: 320px; height: 200px; border: 1px solid #ccc; margin: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Examples smoke test</h1>
+    <p>
+        Loads every public example page (the <code>examples</code> list in
+        <code>tests/suites.js</code>) with the build under test. Each page must load Stitch and
+        run its start-up code with no uncaught error, no unhandled rejection, no
+        <code>console.error</code> and no failed resource. It does not click through the pages.
+    </p>
+    <div id="frames"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/suites.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        const EXAMPLES = window.STITCH_EXAMPLES || [];
+        StitchTest.plan(EXAMPLES.length ? EXAMPLES : ['examples-list-is-empty']);
+
+        // Runs first inside each example: records every error the page produces.
+        const CAPTURE = `<script>(function () {
+            var errors = [];
+            window.__smokeErrors = errors;
+            var original = console.error;
+            console.error = function () {
+                errors.push('console.error: ' + Array.prototype.map.call(arguments, function (a) {
+                    return a && a.message ? a.message : String(a);
+                }).join(' '));
+                return original.apply(console, arguments);
+            };
+            window.addEventListener('error', function (e) {
+                var el = e.target;
+                if (el && el !== window && (el.src || el.href)) errors.push('failed to load: ' + (el.src || el.href));
+                else errors.push('uncaught error: ' + (e.error && e.error.message || e.message));
+            }, true);
+            window.addEventListener('unhandledrejection', function (e) {
+                errors.push('unhandled rejection: ' + (e.reason && e.reason.message || e.reason));
+            });
+        })();<\/script>`;
+
+        function loadExample(page) {
+            return fetch(page, { cache: 'no-store' }).then(response => {
+                if (!response.ok) throw new Error(`${page}: HTTP ${response.status}`);
+                return response.text();
+            }).then(html => new Promise(resolve => {
+                const frame = document.createElement('iframe');
+                frame.title = page;
+                // The capture script must run before any of the page's own scripts.
+                const withCapture = /<head[^>]*>/i.test(html)
+                    ? html.replace(/<head[^>]*>/i, match => match + CAPTURE)
+                    : CAPTURE + html;
+                frame.addEventListener('load', () => setTimeout(() => resolve(frame), 400), { once: true });
+                frame.srcdoc = withCapture;
+                document.getElementById('frames').appendChild(frame);
+            }));
+        }
+
+        (async () => {
+            if (!EXAMPLES.length) {
+                StitchTest.fail('examples-list-is-empty', 'tests/suites.js lists no examples');
+                return;
+            }
+            const frames = await Promise.all(EXAMPLES.map(page => loadExample(page).catch(error => error)));
+            for (let i = 0; i < EXAMPLES.length; i++) {
+                const page = EXAMPLES[i];
+                const frame = frames[i];
+                await StitchTest.test(page, async (t) => {
+                    t.ok(!(frame instanceof Error), `${page} was fetched` + (frame instanceof Error ? `: ${frame.message}` : ''));
+                    if (frame instanceof Error) return;
+                    const win = frame.contentWindow;
+                    t.ok(!!(win.Stitch && win.Stitch.version === Stitch.version), `${page} loaded the build under test`);
+                    t.deepEqual(win.__smokeErrors, [], `${page} produced no errors`);
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
