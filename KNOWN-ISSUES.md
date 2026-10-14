@@ -4,7 +4,8 @@ This file lists the defects known in the current code. None of them is fixed yet
 
 Each defect has a test that asserts the intended (v3) behaviour and fails today. The tests are
 listed in `tests/known-failing.json`, so `npm test` reports them as known-failing instead of
-failing the build. When a fix makes its test pass, `npm test` fails until the entry is removed
+failing the build, but only while each fails with exactly the assertions recorded for it; a
+failure for any other reason fails the build. When a fix makes its test pass, `npm test` fails until the entry is removed
 from that file, so this list and the code cannot silently drift apart.
 
 An earlier version of this file said there were no known issues and that all suites passed. That
@@ -20,7 +21,7 @@ some tests.
 | 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch`, `test-warnings.html#warns-missing-property`, `test-warnings.html#warns-missing-keys`, `test-warnings.html#warns-select-performance` | T2 |
 | 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
 
-"Target" is the planned hardening sprint for the v3.0.0 release: T1 covers list correctness and
+"Target" is the planned hardening sprint for the next major release (v3): T1 covers list correctness and
 binding lifecycle, T2 covers strictness and debug mode.
 
 ## How to check

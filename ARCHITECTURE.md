@@ -214,6 +214,7 @@ npm run build:assembly:all
 
 1. **Static checks** (`_tools/check-repo.js`, also `npm run test:static`):
    - version-literal: the `package.json` version string appears nowhere else (the generated bundles and npm's lock-file root fields are excepted, and checked);
+   - stale-version: no other version is named as a Stitch version (`v` or `Version ` before x.y.z); history docs listed in `ARCHIVE_PATHS` are exempt;
    - local-path: no absolute local path (drive letters, home directories, file URLs) in any file;
    - missing-reference: every file a doc or page points to exists, and every `npm run` script mentioned exists;
    - build-match: see 6.4.
@@ -224,10 +225,11 @@ npm run build:assembly:all
 
 A page fails the gate when it: never loads the build under test; logs an uncaught error or a console error; has a
 failed request; never finishes; plans zero tests; reports a test twice, late, unplanned or skipped; or leaves a
-planned test unreported. `window.Stitch` must expose exactly the public surface and the `package.json` version.
+planned test unreported; or makes an assertion after its test has settled. `window.Stitch` must expose exactly the public surface and the `package.json` version.
 
 Per test, against `tests/known-failing.json`:
-- failed and listed: counted as known-failing (not fatal);
+- failed and listed, with exactly the failures named in its `expect` list (assertion-message prefixes): counted as known-failing (not fatal);
+- failed and listed, but for any other reason (another assertion failed, it threw, or an expected failure is absent): FATAL;
 - passed and listed: FATAL, remove the entry (each fix removes its own marker);
 - failed and not listed: FATAL;
 - a listed entry that matches no test: FATAL.
