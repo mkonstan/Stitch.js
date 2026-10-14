@@ -2,10 +2,11 @@
 
 const { MessageBus, NOOP_DEBUG } = require("./message-bus");
 const { BatchScheduler } = require("./batch-scheduler");
+const { VERSION } = require("../../utils/src/version");
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
-        this.version = options.version || "v2.1.0";
+        this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
         this.effects = new Set();
         this.effectStack = [];

@@ -5,7 +5,9 @@ const { MessageBus } = require("../../core/src/message-bus");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const { defineHidden } = require("../../utils/src/reactive-object-helpers");
 
-const Version = "v2.1.0";
+const { VERSION } = require("../../utils/src/version");
+
+const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
 class Observable {
     /**

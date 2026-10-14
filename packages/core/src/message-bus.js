@@ -1,10 +1,11 @@
 "use strict";
 
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
+const { VERSION } = require("../../utils/src/version");
 
 class MessageBus {
     constructor(options = {}) {
-        this.version = options.version || "v2.1.0";
+        this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
         this.subscribers = new Map();
         this.queue = [];

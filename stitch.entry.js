@@ -1,6 +1,5 @@
 /**
- * Stitch.js v2.1.0
- * Generated distribution entry. Source of truth is package modules under packages/*.
+ * Stitch.js distribution entry. The version comes from package.json (stamped by the build). Source of truth is package modules under packages/*.
  */
 (function () {
     "use strict";
@@ -18,7 +17,10 @@
     const computed = api.computed || (Observable && Observable.computed);
     const DataBinder = browser.DataBinder;
     const MessageBus = core.MessageBus;
-    const version = api.version || core.version || browser.version || utils.version || "2.1.0";
+    const version = api.version;
+    if (typeof version !== "string" || !version) {
+        throw new Error("Stitch.js bootstrap failed: package version is missing.");
+    }
     const debug = utils.debug || {
         enable() {},
         disable() {},

@@ -5,6 +5,7 @@ const { ComputedRef } = require("../../core/src/computed-ref");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const objectHelpers = require("../../utils/src/reactive-object-helpers");
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
+const { VERSION } = require("../../utils/src/version");
 const defineHidden = objectHelpers.defineHidden;
 
 /**
@@ -38,7 +39,7 @@ function createComputedMarker(config, version) {
     };
 }
 function createReactiveFactory(options = {}) {
-    const Version = options.version || "v2.1.0";
+    const Version = options.version || `v${VERSION}`;
     const StitchDebug = options.debug || NOOP_DEBUG;
     const ReactiveSystemClass = options.ReactiveSystem || ReactiveSystem;
     const ComputedRefClass = options.ComputedRef || ComputedRef;
@@ -85,7 +86,7 @@ function createReactiveFactory(options = {}) {
      * Recursively bubbles changes to parent objects.
      * Publishes 'nested-change' events for parent notification.
      * 
-     * OPTIMIZED (v2.1.0): Iterative traversal + Conditional publishing.
+     * OPTIMIZED: Iterative traversal + Conditional publishing.
      * Prevents event spam in deep trees when no one is listening.
      *
      * @param {Object} target - Child object that changed
@@ -638,7 +639,7 @@ function createReactiveFactory(options = {}) {
                         const oldLength = target.length;
                         const result = Array.prototype[key].apply(target, args);
 
-                        // V2.1.0 FIX: Trigger synchronously for immediate computed invalidation
+                        // FIX: Trigger synchronously for immediate computed invalidation
                         reactiveSystem.trigger(target, "length", oldLength, target.length);
 
                         // Trigger only tracked index keys whose values actually changed.

@@ -1,4 +1,4 @@
-# Stitch.js v2.1.0 - API Reference
+# Stitch.js - API Reference
 
 **Type:** Micro MVVM reactive data-binding framework  
 **Size:** ~52KB minified (`stitch.min.js` in this repo is 52,830 bytes)  
@@ -16,7 +16,7 @@ window.Stitch = {
     DataBinder,  // DOM binding engine
     MessageBus,  // Pub/sub class export
     computed,    // Alias of Observable.computed
-    version,     // "2.1.0"
+    version,     // the package.json version string
     debug        // Debug helpers
 };
 ```

@@ -1,6 +1,6 @@
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = require("./src/version");
 const helpers = require("./src/runtime-helpers");
 const debugConfig = require("./src/debug-config");
 const attrValueHandlers = require("./src/attr-value-handlers");

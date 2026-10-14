@@ -1,6 +1,6 @@
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = require("../utils/src/version");
 const { MessageBus } = require("./src/message-bus");
 const { BatchScheduler } = require("./src/batch-scheduler");
 const { ComputedRef } = require("./src/computed-ref");

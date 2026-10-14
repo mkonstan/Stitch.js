@@ -1,6 +1,6 @@
-# Stitch.js v2.1.0 - Complete Documentation
+# Stitch.js - Complete Documentation
 
-**Version 2.1.0** | **Enterprise MVVM Framework**
+**Version:** see `Stitch.version` (the root `package.json` is the single version source) | **Enterprise MVVM Framework**
 
 > *"Stitching data to the DOM with precision"*
 
@@ -145,7 +145,7 @@ npx playwright install chromium
 npm run build:assembly
 ```
 
-`npm run build:assembly` (alias: `npm run build:stitch`) runs `_tools/build-stitch-assembly.js` and writes:
+`npm run build:assembly` runs `_tools/build-stitch-assembly.js` and writes:
 - `dist/stitch.assembled.js`
 - `stitch.js`
 
@@ -1975,7 +1975,7 @@ const model = Stitch.Observable.create({
 });
 
 // Error message:
-// "Stitch.js v2.1.0: Arrow function detected in property 'increment'
+// "Stitch.js v<version>: Arrow function detected in property 'increment'
 //
 //  Arrow functions cannot access reactive properties via 'this'.
 //
@@ -4220,11 +4220,11 @@ If flush depth reaches 100, the framework:
 ```javascript
 // Console output (when depth = 100):
 // BatchScheduler:
-// "[Stitch.js v2.1.0 BatchScheduler] Maximum flush depth (100) exceeded.
+// "[Stitch.js v<version> BatchScheduler] Maximum flush depth (100) exceeded.
 //  Possible infinite loop detected. Queue cleared."
 //
 // MessageBus (for user events):
-// "[Stitch.js v2.1.0 MessageBus] Maximum flush depth (100) exceeded.
+// "[Stitch.js v<version> MessageBus] Maximum flush depth (100) exceeded.
 //  Possible infinite loop detected.
 //  Event queue has been cleared to prevent browser freeze."
 ```
@@ -4411,5 +4411,5 @@ model.items[0].name = 'Updated';         // Only 1 row updated
 
 ---
 
-**Last Updated:** 2026-02-13 (v2.1.0 - Modularization + Build Workflow Update)
+**Last Updated:** 2026-02-13 (Modularization + Build Workflow Update)
 **Maintained By:** Stitch.js modularization contributors

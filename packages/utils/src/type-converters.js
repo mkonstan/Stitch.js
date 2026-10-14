@@ -1,6 +1,6 @@
 "use strict";
 
-const DEFAULT_VERSION = "2.1.0";
+const { VERSION: DEFAULT_VERSION } = require("./version");
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.

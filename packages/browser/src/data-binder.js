@@ -1,9 +1,10 @@
 "use strict";
 
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
+const { VERSION } = require("../../utils/src/version");
 
 function createDataBinderClass(deps = {}) {
-    const Version = deps.version || "v2.1.0";
+    const Version = deps.version || `v${VERSION}`;
     const StitchDebug = deps.debug || NOOP_DEBUG;
     const getProperty = deps.getProperty;
     const getBindingHandler = deps.getBindingHandler;

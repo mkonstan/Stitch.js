@@ -7,6 +7,8 @@ const path = require("path");
 // caller's working directory, so the build is the same wherever it is started.
 const DEFAULT_ROOT = path.resolve(__dirname, "..");
 
+const VERSION_MODULE_ID = "packages/utils/src/version.js";
+
 const PACKAGE_DIRS = [
     "packages/core",
     "packages/api",
@@ -182,11 +184,25 @@ function assemble(options = {}) {
     const moduleFiles = listModuleFiles(ROOT);
     const moduleIds = moduleFiles.map(file => normalizeModuleId(toPosix(path.relative(ROOT, file))));
     const knownIds = new Set(moduleIds);
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+    if (typeof pkg.version !== "string" || !/^\d+\.\d+\.\d+/.test(pkg.version)) {
+        throw new Error(`package.json has no usable "version" field: ${JSON.stringify(pkg.version)}`);
+    }
     const moduleSourceById = new Map();
     for (const file of moduleFiles) {
         const id = normalizeModuleId(toPosix(path.relative(ROOT, file)));
         moduleSourceById.set(id, fs.readFileSync(file, "utf8"));
     }
+    if (!moduleSourceById.has(VERSION_MODULE_ID)) {
+        throw new Error(`Cannot build assembly: ${VERSION_MODULE_ID} not found.`);
+    }
+    // Stamp the single version source. Unbuilt, the module reads package.json;
+    // in the bundle it is a constant, so the bundle never touches the file system.
+    moduleSourceById.set(VERSION_MODULE_ID,
+        `"use strict";
+// Stamped by the build from package.json.
+module.exports = { VERSION: ${JSON.stringify(pkg.version)} };
+`);
 
     let selectedModuleIds;
     if (mode === "all") {
@@ -225,7 +241,6 @@ function assemble(options = {}) {
         moduleMap
     };
 
-    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
     const licenseBanner = `/*! Stitch.js v${pkg.version} | MIT License | https://github.com/user/Stitch.js */`;
 
     const output = [

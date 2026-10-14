@@ -1,6 +1,6 @@
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = require("../utils/src/version");
 const foreachRenderingDelegates = require("./src/foreach-rendering-delegates");
 const foreachBindingOrchestrator = require("./src/foreach-binding-orchestrator");
 const bindingScanHelpers = require("./src/binding-scan-helpers");

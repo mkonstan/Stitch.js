@@ -1,6 +1,6 @@
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = require("../utils/src/version");
 const { createReactiveFactory } = require("./src/reactive-factory");
 const { Observable, computed } = require("./src/observable");
 

@@ -1,5 +1,7 @@
 "use strict";
 
+const { VERSION } = require("./version");
+
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
  *
@@ -49,12 +51,12 @@ function setProperty(target, path, value) {
  * @param {Object} target
  * @param {string} path
  * @param {Object} [options]
- * @param {string} [options.version='2.1.0']
+ * @param {string} [options.version] defaults to the package version
  * @param {boolean} [options.debugEnabled=false]
  * @returns {*}
  */
 function getProperty(target, path, options = {}) {
-    const version = options.version || "2.1.0";
+    const version = options.version || VERSION;
     const debugEnabled = !!options.debugEnabled;
 
     if (path.trim().startsWith("{")) {

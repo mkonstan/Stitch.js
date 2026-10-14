@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":23,"moduleCount":23,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":24,"moduleCount":24,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js","23":"packages/utils/src/version.js"}} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = __stitchRequire(23);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -29,7 +29,9 @@ const { MessageBus } = __stitchRequire(12);
 const runtimeHelpers = __stitchRequire(20);
 const { defineHidden } = __stitchRequire(19);
 
-const Version = "v2.1.0";
+const { VERSION } = __stitchRequire(23);
+
+const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
 class Observable {
     /**
@@ -298,6 +300,7 @@ const { ComputedRef } = __stitchRequire(11);
 const runtimeHelpers = __stitchRequire(20);
 const objectHelpers = __stitchRequire(19);
 const { NOOP_DEBUG } = __stitchRequire(16);
+const { VERSION } = __stitchRequire(23);
 const defineHidden = objectHelpers.defineHidden;
 
 /**
@@ -331,7 +334,7 @@ function createComputedMarker(config, version) {
     };
 }
 function createReactiveFactory(options = {}) {
-    const Version = options.version || "v2.1.0";
+    const Version = options.version || `v${VERSION}`;
     const StitchDebug = options.debug || NOOP_DEBUG;
     const ReactiveSystemClass = options.ReactiveSystem || ReactiveSystem;
     const ComputedRefClass = options.ComputedRef || ComputedRef;
@@ -378,7 +381,7 @@ function createReactiveFactory(options = {}) {
      * Recursively bubbles changes to parent objects.
      * Publishes 'nested-change' events for parent notification.
      * 
-     * OPTIMIZED (v2.1.0): Iterative traversal + Conditional publishing.
+     * OPTIMIZED: Iterative traversal + Conditional publishing.
      * Prevents event spam in deep trees when no one is listening.
      *
      * @param {Object} target - Child object that changed
@@ -931,7 +934,7 @@ function createReactiveFactory(options = {}) {
                         const oldLength = target.length;
                         const result = Array.prototype[key].apply(target, args);
 
-                        // V2.1.0 FIX: Trigger synchronously for immediate computed invalidation
+                        // FIX: Trigger synchronously for immediate computed invalidation
                         reactiveSystem.trigger(target, "length", oldLength, target.length);
 
                         // Trigger only tracked index keys whose values actually changed.
@@ -1083,7 +1086,7 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = __stitchRequire(23);
 const foreachRenderingDelegates = __stitchRequire(8);
 const foreachBindingOrchestrator = __stitchRequire(7);
 const bindingScanHelpers = __stitchRequire(5);
@@ -1187,9 +1190,10 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
+const { VERSION } = __stitchRequire(23);
 
 function createBindingRuntime(deps = {}) {
-    const Version = deps.version || "v2.1.0";
+    const Version = deps.version || `v${VERSION}`;
     const StitchDebug = deps.debug || NOOP_DEBUG;
     const getProperty = deps.getProperty;
     const setProperty = deps.setProperty;
@@ -1756,9 +1760,10 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
+const { VERSION } = __stitchRequire(23);
 
 function createDataBinderClass(deps = {}) {
-    const Version = deps.version || "v2.1.0";
+    const Version = deps.version || `v${VERSION}`;
     const StitchDebug = deps.debug || NOOP_DEBUG;
     const getProperty = deps.getProperty;
     const getBindingHandler = deps.getBindingHandler;
@@ -2405,7 +2410,7 @@ module.exports = {
   __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = __stitchRequire(23);
 const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
 const { ComputedRef } = __stitchRequire(11);
@@ -2425,10 +2430,11 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
+const { VERSION } = __stitchRequire(23);
 
 class BatchScheduler {
     constructor(options = {}) {
-        this.version = options.version || "v2.1.0";
+        this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
         this._pendingEffects = new Set();
         this.flushing = false;
@@ -2615,10 +2621,11 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
+const { VERSION } = __stitchRequire(23);
 
 class MessageBus {
     constructor(options = {}) {
-        this.version = options.version || "v2.1.0";
+        this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
         this.subscribers = new Map();
         this.queue = [];
@@ -2764,10 +2771,11 @@ module.exports = {
 
 const { MessageBus, NOOP_DEBUG } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
+const { VERSION } = __stitchRequire(23);
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
-        this.version = options.version || "v2.1.0";
+        this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
         this.effects = new Set();
         this.effectStack = [];
@@ -2957,7 +2965,7 @@ module.exports = {
   __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
-const VERSION = "2.1.0";
+const { VERSION } = __stitchRequire(23);
 const helpers = __stitchRequire(20);
 const debugConfig = __stitchRequire(16);
 const attrValueHandlers = __stitchRequire(15);
@@ -3457,6 +3465,8 @@ module.exports = {
   __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
+const { VERSION } = __stitchRequire(23);
+
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
  *
@@ -3506,12 +3516,12 @@ function setProperty(target, path, value) {
  * @param {Object} target
  * @param {string} path
  * @param {Object} [options]
- * @param {string} [options.version='2.1.0']
+ * @param {string} [options.version] defaults to the package version
  * @param {boolean} [options.debugEnabled=false]
  * @returns {*}
  */
 function getProperty(target, path, options = {}) {
-    const version = options.version || "2.1.0";
+    const version = options.version || VERSION;
     const debugEnabled = !!options.debugEnabled;
 
     if (path.trim().startsWith("{")) {
@@ -3598,7 +3608,7 @@ module.exports = {
   __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
-const DEFAULT_VERSION = "2.1.0";
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(23);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -4038,6 +4048,12 @@ module.exports = {
 };
 
   };
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+"use strict";
+// Stamped by the build from package.json.
+module.exports = { VERSION: "2.1.0" };
+
+  };
   var __stitchModuleCache = Object.create(null);
   function __stitchRequire(id){
     var factory = __stitchModuleFactories[id];
@@ -4060,8 +4076,7 @@ module.exports = {
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
 
 /**
- * Stitch.js v2.1.0
- * Generated distribution entry. Source of truth is package modules under packages/*.
+ * Stitch.js distribution entry. The version comes from package.json (stamped by the build). Source of truth is package modules under packages/*.
  */
 (function () {
     "use strict";
@@ -4079,7 +4094,10 @@ module.exports = {
     const computed = api.computed || (Observable && Observable.computed);
     const DataBinder = browser.DataBinder;
     const MessageBus = core.MessageBus;
-    const version = api.version || core.version || browser.version || utils.version || "2.1.0";
+    const version = api.version;
+    if (typeof version !== "string" || !version) {
+        throw new Error("Stitch.js bootstrap failed: package version is missing.");
+    }
     const debug = utils.debug || {
         enable() {},
         disable() {},

@@ -1,4 +1,4 @@
-# Stitch.js v2.1.0 - Architecture, Build, and Bootstrap Guide
+# Stitch.js - Architecture, Build, and Bootstrap Guide
 
 This document is the source-of-truth technical map for both humans and cold AI instances.
 
