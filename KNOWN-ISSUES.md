@@ -1,8 +1,8 @@
 # Known Issues - Stitch.js
 
-This file lists the defects known in the current code. None of them is fixed yet.
+This file lists the defects known in the current code, and the ones already fixed on the way to v3.
 
-Each defect has a test that asserts the intended (v3) behaviour and fails today. The tests are
+Each open defect has a test that asserts the intended (v3) behaviour and fails today. The tests are
 listed in `tests/known-failing.json`, so `npm test` reports them as known-failing instead of
 failing the build, but only while each fails with exactly the assertions recorded for it; a
 failure for any other reason fails the build. When a fix makes its test pass, `npm test` fails until the entry is removed
@@ -19,11 +19,19 @@ some tests.
 | 3 | Rows removed from a list (for example by hiding and showing it) keep their bindings alive. Each later change runs once per leaked binding, and the leak grows with every cycle. | `test-v3-defects.html#d3-hidden-rows-release-bindings` | T1 |
 | 4 | In a nested list, a click handler cannot reach the root model: there is no `$root.` path, and `data-click="$root.remove"` does nothing, silently. | `test-v3-defects.html#d4-root-handler-in-nested-foreach` | T2 |
 | 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch`, `test-warnings.html#warns-missing-property`, `test-warnings.html#warns-missing-keys`, `test-warnings.html#warns-select-performance` | T2 |
-| 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
 | 7 | A list row template with more than one root element (for example `<h4>` followed by `<ul>` inside a `data-foreach` container) silently renders only the first root; the rest, including any nested list, never appears. No error is raised. v3 requires exactly one root element and throws otherwise. | `test-v3-defects.html#d7-multi-root-row-template-throws` | T1 |
 
 "Target" is the planned hardening sprint for the next major release (v3): T1 covers list correctness and
 binding lifecycle, T2 covers strictness and debug mode.
+
+### Fixed
+
+These were fixed in T1. Their tests stay in place and now pass on every run, so a regression
+fails the build.
+
+| # | Defect | Test (`<page>#<test id>`) | Fixed in |
+|---|---|---|---|
+| 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
 
 ## How to check
 

@@ -3,14 +3,20 @@
 const { MessageBus, NOOP_DEBUG } = require("./message-bus");
 const { BatchScheduler } = require("./batch-scheduler");
 const { VERSION } = require("../../utils/src/version");
+const { REACTIVE_TOTALS } = require("../../utils/src/reactive-stats");
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
         this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
-        this.effects = new Set();
         this.effectStack = [];
         this.depsMap = new WeakMap();
+        // Live counts for this system (Stitch.debug.stats() sums every system).
+        this._stats = { effects: 0, subscriptions: 0 };
+        // Bumped by dispose(): subscribers of an older generation sit in dependency
+        // sets that no longer exist, so releasing them changes no live count.
+        this._generation = 0;
+        this.disposed = false;
 
         const BatchSchedulerCtor = options.BatchScheduler || BatchScheduler;
         const MessageBusCtor = options.MessageBus || MessageBus;
@@ -79,7 +85,7 @@ class ReactiveSystem {
     track(target, key) {
         const currentEffect = this.currentEffect;
 
-        if (!currentEffect) {
+        if (!currentEffect || this.disposed) {
             this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
@@ -96,9 +102,10 @@ class ReactiveSystem {
             deps.set(key, dep);
         }
 
-        dep.add(currentEffect);
-        if (currentEffect.deps) {
+        if (!dep.has(currentEffect)) {
+            dep.add(currentEffect);
             currentEffect.deps.add(dep);
+            this._countSubscriptions(1);
         }
 
         this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
@@ -124,6 +131,9 @@ class ReactiveSystem {
 
         const effectsToRun = new Set(dep);
         effectsToRun.forEach((dependent) => {
+            if (dependent.disposed) {
+                return;
+            }
             if (dependent.isComputedRef) {
                 dependent.markDirty();
             } else if (dependent.options && dependent.options.batch) {
@@ -145,11 +155,22 @@ class ReactiveSystem {
         }
     }
 
+    /**
+     * Creates an effect: runs fn now (unless options.lazy) and again whenever a
+     * reactive value it read changes. Release it with cleanup(effect).
+     * If the first run throws, the effect is released and the error is rethrown.
+     */
     effect(fn, options = {}) {
+        if (this.disposed) {
+            throw new Error(`[Stitch.js ${this.version}] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
+        }
         const effectId = Math.random().toString(36).substr(2, 9);
 
         const effect = () => {
-            this.cleanup(effect);
+            if (effect.disposed || this.disposed) {
+                return undefined;
+            }
+            this._untrack(effect);
             this.effectStack.push(effect);
 
             this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
@@ -167,6 +188,9 @@ class ReactiveSystem {
         effect.deps = new Set();
         effect.options = options;
         effect.id = effectId;
+        effect.disposed = false;
+        effect._generation = this._generation;
+        this._countEffects(1);
 
         this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
             lazy: !!options.lazy,
@@ -174,17 +198,89 @@ class ReactiveSystem {
         });
 
         if (!options.lazy) {
-            effect();
+            try {
+                effect();
+            } catch (error) {
+                this.cleanup(effect);
+                throw error;
+            }
         }
 
         return effect;
     }
 
+    /**
+     * Releases an effect for good: it leaves every dependency set it joined
+     * (reactive properties and computeds), leaves the batch queue, and never runs again.
+     * Safe to call more than once.
+     */
     cleanup(effect) {
-        effect.deps.forEach((dep) => {
-            dep.delete(effect);
+        this._untrack(effect);
+        if (effect.disposed) {
+            return;
+        }
+        effect.disposed = true;
+        if (this.batchScheduler && typeof this.batchScheduler.dequeue === "function") {
+            this.batchScheduler.dequeue(effect);
+        }
+        if (effect._generation === this._generation) {
+            this._countEffects(-1);
+        }
+    }
+
+    /**
+     * Removes a subscriber (effect or computed) from every dependency set it joined.
+     * Used before each re-run (dependencies are collected afresh) and on release.
+     * @private
+     */
+    _untrack(subscriber) {
+        const live = subscriber._generation === this._generation;
+        let removed = 0;
+        subscriber.deps.forEach((dep) => {
+            if (dep.delete(subscriber)) {
+                removed++;
+            }
         });
-        effect.deps.clear();
+        subscriber.deps.clear();
+        if (live && removed > 0) {
+            this._countSubscriptions(-removed);
+        }
+    }
+
+    /**
+     * Releases the whole reactive graph of this system: every effect stops for good,
+     * every subscription is dropped, the batch queue is cleared. Models keep their
+     * plain values (computeds recompute on each read) but nothing reacts any more.
+     */
+    dispose() {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
+        REACTIVE_TOTALS.effects -= this._stats.effects;
+        REACTIVE_TOTALS.subscriptions -= this._stats.subscriptions;
+        this._stats.effects = 0;
+        this._stats.subscriptions = 0;
+        this._generation++;
+        this.depsMap = new WeakMap();
+        this.batchScheduler.clear();
+    }
+
+    /** Live counts for this system: { effects, subscriptions }. */
+    stats() {
+        return { effects: this._stats.effects, subscriptions: this._stats.subscriptions };
+    }
+
+    /** @private */
+    _countEffects(delta) {
+        this._stats.effects += delta;
+        REACTIVE_TOTALS.effects += delta;
+    }
+
+    /** @private */
+    _countSubscriptions(delta) {
+        this._stats.subscriptions += delta;
+        REACTIVE_TOTALS.subscriptions += delta;
     }
 }
 

@@ -27,6 +27,7 @@
         { page: "test-dispose.html", title: "Dispose", about: "DataBinder.dispose and listener cleanup" },
         { page: "test-custom-bindings.html", title: "Custom bindings", about: "DataBinder.registerBinding: arguments, effects, cleanup on unbind/dispose, rows" },
         { page: "test-foreach-rendering.html", title: "Foreach rendering", about: "Nested lists, computed-filtered lists, replaced lists, hide/show, debug toggle" },
+        { page: "test-reactive-lifecycle.html", title: "Reactive lifecycle", about: "Released effects stop and drop every subscription (computeds included); ReactiveSystem.dispose(); Stitch.debug.stats()" },
         { page: "test-unbind-memory.html", title: "Unbind", about: "An unbound element stops updating" },
         { page: "test-foreach-context.html", title: "Foreach context", about: "Row context ($index, $parent) does not leak between lists" },
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },

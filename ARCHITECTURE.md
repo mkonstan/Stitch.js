@@ -97,7 +97,7 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/core/src/message-bus.js` | Async queued pub/sub + middleware + wildcard + depth guard | `ReactiveSystem`, app event usage |
 | `packages/core/src/batch-scheduler.js` | Batched effect queue + dedupe + microtask flush + loop guard | `ReactiveSystem` |
 | `packages/core/src/computed-ref.js` | ComputedRef dirty/evaluate/cache/dependent propagation | `ReactiveFactory` |
-| `packages/core/src/reactive-system.js` | Track/trigger/effect/cleanup engine + nested change/array-mutation subscriptions | API + browser runtime |
+| `packages/core/src/reactive-system.js` | Track/trigger/effect engine; `cleanup(effect)` releases an effect for good, `dispose()` releases the whole system; live counts; nested change/array-mutation subscriptions | API + browser runtime |
 
 ### 4.3 Browser Package (`packages/browser`)
 
@@ -122,6 +122,7 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
 | `packages/utils/src/foreach-template-helpers.js` | foreach template parsing/container handling | foreach render/reconcile |
 | `packages/utils/src/foreach-reconcile-helpers.js` | keyed row reconciliation and item context creation | foreach rendering |
+| `packages/utils/src/reactive-stats.js` | Live effect and subscription counts behind `Stitch.debug.stats()` | reactive system, utils debug facade |
 | `packages/utils/src/version.js` | The release version: reads the root `package.json` when unbuilt; the build stamps it as a constant in the bundle | every package entry and versioned class |
 | `packages/utils/src/reactive-object-helpers.js` | `defineHidden()` helper, change-handler add/remove, and `toJSON` serialization helpers | reactive factory, observable |
 

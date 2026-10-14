@@ -9,6 +9,7 @@ const typeConverters = require("./src/type-converters");
 const foreachTemplateHelpers = require("./src/foreach-template-helpers");
 const foreachReconcileHelpers = require("./src/foreach-reconcile-helpers");
 const reactiveObjectHelpers = require("./src/reactive-object-helpers");
+const { readReactiveStats } = require("./src/reactive-stats");
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -39,6 +40,13 @@ const debug = {
     categories() {
         console.log("[Stitch.js Debug] Available categories:");
         console.table(debugState.categories);
+    },
+    /**
+     * Live reactive-graph counts across the page, read-only: { effects, subscriptions }.
+     * Works whether or not debug output is enabled.
+     */
+    stats() {
+        return readReactiveStats();
     }
 };
 

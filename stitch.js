@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":24,"moduleCount":24,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js","23":"packages/utils/src/version.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":25,"moduleCount":25,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/reactive-stats.js","21":"packages/utils/src/runtime-helpers.js","22":"packages/utils/src/type-converters.js","23":"packages/utils/src/value-binding-helpers.js","24":"packages/utils/src/version.js"}} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -26,10 +26,10 @@ module.exports = {
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
 const { MessageBus } = __stitchRequire(12);
-const runtimeHelpers = __stitchRequire(20);
+const runtimeHelpers = __stitchRequire(21);
 const { defineHidden } = __stitchRequire(19);
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
@@ -297,10 +297,10 @@ module.exports = {
 
 const { ReactiveSystem } = __stitchRequire(13);
 const { ComputedRef } = __stitchRequire(11);
-const runtimeHelpers = __stitchRequire(20);
+const runtimeHelpers = __stitchRequire(21);
 const objectHelpers = __stitchRequire(19);
 const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const defineHidden = objectHelpers.defineHidden;
 
 /**
@@ -1086,17 +1086,17 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const foreachRenderingDelegates = __stitchRequire(8);
 const foreachBindingOrchestrator = __stitchRequire(7);
 const bindingScanHelpers = __stitchRequire(5);
 const bindingRuntime = __stitchRequire(4);
 const dataBinderFactory = __stitchRequire(6);
-const runtimeHelpers = __stitchRequire(20);
+const runtimeHelpers = __stitchRequire(21);
 const debugConfig = __stitchRequire(16);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(22);
-const typeConverters = __stitchRequire(21);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
 const foreachTemplateHelpers = __stitchRequire(18);
 const foreachReconcileHelpers = __stitchRequire(17);
 
@@ -1190,7 +1190,7 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 function createBindingRuntime(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1760,7 +1760,7 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -2410,7 +2410,7 @@ module.exports = {
   __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
 const { ComputedRef } = __stitchRequire(11);
@@ -2430,7 +2430,7 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 class BatchScheduler {
     constructor(options = {}) {
@@ -2502,6 +2502,11 @@ class BatchScheduler {
         }
     }
 
+    /** Drops a queued effect (used when the effect is released before the flush). */
+    dequeue(effect) {
+        this._pendingEffects.delete(effect);
+    }
+
     hasQueued() {
         return this._pendingEffects.size > 0;
     }
@@ -2520,6 +2525,11 @@ module.exports = {
   __stitchModuleFactories[11] = function(module, exports, __stitchRequire){
 "use strict";
 
+// The dependency key under which readers of a computed subscribe to it. Readers live in
+// the system's dependency map like any other subscription, so releasing a reader
+// (ReactiveSystem.cleanup) removes it from every computed it read.
+const COMPUTED_VALUE_KEY = "value";
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -2528,8 +2538,8 @@ class ComputedRef {
         this.explicitDeps = explicitDeps;
         this.value = undefined;
         this.dirty = true;
-        this.dependents = new Set();
         this.deps = new Set();
+        this._generation = reactiveSystem._generation;
         this.id = Math.random().toString(36).substr(2, 9);
         this.isComputedRef = true;
 
@@ -2547,15 +2557,8 @@ class ComputedRef {
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
-        this.dependents.forEach((dependent) => {
-            if (dependent.isComputedRef) {
-                dependent.markDirty();
-            } else if (dependent.options && dependent.options.batch) {
-                this.reactiveSystem.batchScheduler.queue(dependent);
-            } else {
-                dependent();
-            }
-        });
+        // Notify readers (effects and computeds) through the system's dependency map.
+        this.reactiveSystem.trigger(this, COMPUTED_VALUE_KEY);
     }
 
     evaluate() {
@@ -2585,16 +2588,10 @@ class ComputedRef {
     }
 
     get() {
-        const currentEffect = this.reactiveSystem.currentEffect;
-        if (currentEffect) {
-            this.dependents.add(currentEffect);
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log(
-                "computed",
-                `COMPUTED TRACKED (id: ${this.id}) by effect ${currentEffect.id || "unknown"}`
-            );
-        }
+        this.reactiveSystem.track(this, COMPUTED_VALUE_KEY);
 
-        if (this.dirty) {
+        // A disposed system no longer invalidates computeds, so never serve a cached value.
+        if (this.dirty || this.reactiveSystem.disposed) {
             return this.evaluate();
         }
 
@@ -2605,15 +2602,13 @@ class ComputedRef {
     }
 
     cleanup() {
-        this.deps.forEach((dep) => {
-            dep.delete(this);
-        });
-        this.deps.clear();
+        this.reactiveSystem._untrack(this);
     }
 }
 
 module.exports = {
-    ComputedRef
+    ComputedRef,
+    COMPUTED_VALUE_KEY
 };
 
   };
@@ -2621,7 +2616,7 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 class MessageBus {
     constructor(options = {}) {
@@ -2771,15 +2766,21 @@ module.exports = {
 
 const { MessageBus, NOOP_DEBUG } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
+const { REACTIVE_TOTALS } = __stitchRequire(20);
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
         this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
-        this.effects = new Set();
         this.effectStack = [];
         this.depsMap = new WeakMap();
+        // Live counts for this system (Stitch.debug.stats() sums every system).
+        this._stats = { effects: 0, subscriptions: 0 };
+        // Bumped by dispose(): subscribers of an older generation sit in dependency
+        // sets that no longer exist, so releasing them changes no live count.
+        this._generation = 0;
+        this.disposed = false;
 
         const BatchSchedulerCtor = options.BatchScheduler || BatchScheduler;
         const MessageBusCtor = options.MessageBus || MessageBus;
@@ -2848,7 +2849,7 @@ class ReactiveSystem {
     track(target, key) {
         const currentEffect = this.currentEffect;
 
-        if (!currentEffect) {
+        if (!currentEffect || this.disposed) {
             this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
@@ -2865,9 +2866,10 @@ class ReactiveSystem {
             deps.set(key, dep);
         }
 
-        dep.add(currentEffect);
-        if (currentEffect.deps) {
+        if (!dep.has(currentEffect)) {
+            dep.add(currentEffect);
             currentEffect.deps.add(dep);
+            this._countSubscriptions(1);
         }
 
         this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
@@ -2893,6 +2895,9 @@ class ReactiveSystem {
 
         const effectsToRun = new Set(dep);
         effectsToRun.forEach((dependent) => {
+            if (dependent.disposed) {
+                return;
+            }
             if (dependent.isComputedRef) {
                 dependent.markDirty();
             } else if (dependent.options && dependent.options.batch) {
@@ -2914,11 +2919,22 @@ class ReactiveSystem {
         }
     }
 
+    /**
+     * Creates an effect: runs fn now (unless options.lazy) and again whenever a
+     * reactive value it read changes. Release it with cleanup(effect).
+     * If the first run throws, the effect is released and the error is rethrown.
+     */
     effect(fn, options = {}) {
+        if (this.disposed) {
+            throw new Error(`[Stitch.js ${this.version}] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
+        }
         const effectId = Math.random().toString(36).substr(2, 9);
 
         const effect = () => {
-            this.cleanup(effect);
+            if (effect.disposed || this.disposed) {
+                return undefined;
+            }
+            this._untrack(effect);
             this.effectStack.push(effect);
 
             this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
@@ -2936,6 +2952,9 @@ class ReactiveSystem {
         effect.deps = new Set();
         effect.options = options;
         effect.id = effectId;
+        effect.disposed = false;
+        effect._generation = this._generation;
+        this._countEffects(1);
 
         this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
             lazy: !!options.lazy,
@@ -2943,17 +2962,89 @@ class ReactiveSystem {
         });
 
         if (!options.lazy) {
-            effect();
+            try {
+                effect();
+            } catch (error) {
+                this.cleanup(effect);
+                throw error;
+            }
         }
 
         return effect;
     }
 
+    /**
+     * Releases an effect for good: it leaves every dependency set it joined
+     * (reactive properties and computeds), leaves the batch queue, and never runs again.
+     * Safe to call more than once.
+     */
     cleanup(effect) {
-        effect.deps.forEach((dep) => {
-            dep.delete(effect);
+        this._untrack(effect);
+        if (effect.disposed) {
+            return;
+        }
+        effect.disposed = true;
+        if (this.batchScheduler && typeof this.batchScheduler.dequeue === "function") {
+            this.batchScheduler.dequeue(effect);
+        }
+        if (effect._generation === this._generation) {
+            this._countEffects(-1);
+        }
+    }
+
+    /**
+     * Removes a subscriber (effect or computed) from every dependency set it joined.
+     * Used before each re-run (dependencies are collected afresh) and on release.
+     * @private
+     */
+    _untrack(subscriber) {
+        const live = subscriber._generation === this._generation;
+        let removed = 0;
+        subscriber.deps.forEach((dep) => {
+            if (dep.delete(subscriber)) {
+                removed++;
+            }
         });
-        effect.deps.clear();
+        subscriber.deps.clear();
+        if (live && removed > 0) {
+            this._countSubscriptions(-removed);
+        }
+    }
+
+    /**
+     * Releases the whole reactive graph of this system: every effect stops for good,
+     * every subscription is dropped, the batch queue is cleared. Models keep their
+     * plain values (computeds recompute on each read) but nothing reacts any more.
+     */
+    dispose() {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
+        REACTIVE_TOTALS.effects -= this._stats.effects;
+        REACTIVE_TOTALS.subscriptions -= this._stats.subscriptions;
+        this._stats.effects = 0;
+        this._stats.subscriptions = 0;
+        this._generation++;
+        this.depsMap = new WeakMap();
+        this.batchScheduler.clear();
+    }
+
+    /** Live counts for this system: { effects, subscriptions }. */
+    stats() {
+        return { effects: this._stats.effects, subscriptions: this._stats.subscriptions };
+    }
+
+    /** @private */
+    _countEffects(delta) {
+        this._stats.effects += delta;
+        REACTIVE_TOTALS.effects += delta;
+    }
+
+    /** @private */
+    _countSubscriptions(delta) {
+        this._stats.subscriptions += delta;
+        REACTIVE_TOTALS.subscriptions += delta;
     }
 }
 
@@ -2965,15 +3056,16 @@ module.exports = {
   __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
-const helpers = __stitchRequire(20);
+const { VERSION } = __stitchRequire(24);
+const helpers = __stitchRequire(21);
 const debugConfig = __stitchRequire(16);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(22);
-const typeConverters = __stitchRequire(21);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
 const foreachTemplateHelpers = __stitchRequire(18);
 const foreachReconcileHelpers = __stitchRequire(17);
 const reactiveObjectHelpers = __stitchRequire(19);
+const { readReactiveStats } = __stitchRequire(20);
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -3004,6 +3096,13 @@ const debug = {
     categories() {
         console.log("[Stitch.js Debug] Available categories:");
         console.table(debugState.categories);
+    },
+    /**
+     * Live reactive-graph counts across the page, read-only: { effects, subscriptions }.
+     * Works whether or not debug output is enabled.
+     */
+    stats() {
+        return readReactiveStats();
     }
 };
 
@@ -3465,7 +3564,37 @@ module.exports = {
   __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+/**
+ * Live counts of the reactive graph, summed over every ReactiveSystem in the page.
+ * Read-only from outside: Stitch.debug.stats() returns a copy.
+ *
+ * - effects: effects created and not yet disposed (one per live effect-backed binding,
+ *   plus any $watch or custom-binding effect).
+ * - subscriptions: subscriber edges that a change can reach: an effect or computed
+ *   subscribed to a reactive property, or an effect / computed subscribed to a computed.
+ */
+const REACTIVE_TOTALS = {
+    effects: 0,
+    subscriptions: 0
+};
+
+function readReactiveStats() {
+    return {
+        effects: REACTIVE_TOTALS.effects,
+        subscriptions: REACTIVE_TOTALS.subscriptions
+    };
+}
+
+module.exports = {
+    REACTIVE_TOTALS,
+    readReactiveStats
+};
+
+  };
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+"use strict";
+
+const { VERSION } = __stitchRequire(24);
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -3605,10 +3734,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION: DEFAULT_VERSION } = __stitchRequire(23);
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(24);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -3821,7 +3950,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4048,7 +4177,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
 module.exports = { VERSION: "2.1.0" };

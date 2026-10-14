@@ -73,6 +73,11 @@ class BatchScheduler {
         }
     }
 
+    /** Drops a queued effect (used when the effect is released before the flush). */
+    dequeue(effect) {
+        this._pendingEffects.delete(effect);
+    }
+
     hasQueued() {
         return this._pendingEffects.size > 0;
     }

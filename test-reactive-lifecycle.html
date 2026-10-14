@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js reactive lifecycle tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Reactive lifecycle</h1>
+    <p>
+        An effect that is released never runs again and holds no subscription, whatever it
+        read (plain properties, computeds, computeds of computeds). ReactiveSystem.dispose()
+        releases a whole system. Counts come from <code>Stitch.debug.stats()</code>.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'stats-is-read-only-snapshot',
+            'cleanup-releases-every-subscription',
+            'rerun-drops-computed-it-no-longer-reads',
+            'cleanup-drops-a-queued-run',
+            'first-run-throw-releases-the-effect',
+            'system-dispose-releases-everything',
+            'binder-dispose-returns-counts-to-baseline'
+        ]);
+
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+        const stats = () => Stitch.debug.stats();
+        // Each test uses its own reactive system, so its counts are its own.
+        const isolated = data => Stitch.Observable.create(data, { isolated: true });
+        const systemOf = model => model._factory.reactiveSystem;
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        (async () => {
+            await StitchTest.test('stats-is-read-only-snapshot', async (t) => {
+                t.equal(typeof Stitch.debug.stats, 'function', 'Stitch.debug.stats is a function');
+                const before = stats();
+                t.deepEqual(Object.keys(before).sort(), ['effects', 'subscriptions'], 'stats() reports effects and subscriptions');
+                before.effects += 1000;
+                t.equal(stats().effects === before.effects, false, 'changing the returned object does not change the counts');
+            });
+
+            // An effect reading a plain property, a computed and a computed of a computed:
+            // releasing it removes every subscription it made, including those on computeds.
+            await StitchTest.test('cleanup-releases-every-subscription', async (t) => {
+                const model = isolated({
+                    a: 1,
+                    b: 2,
+                    sum: Stitch.computed(function () { return this.a + this.b; }),
+                    double: Stitch.computed(function () { return this.sum * 2; })
+                });
+                const rs = systemOf(model);
+                const base = stats();
+                let runs = 0;
+                const effect = rs.effect(() => { runs++; void model.a; void model.double; });
+                const during = stats();
+                t.equal(during.effects - base.effects, 1, 'one live effect while it exists');
+                // a (effect), double (effect), sum (double), a + b (sum) = 5 subscriptions
+                t.equal(during.subscriptions - base.subscriptions, 5, 'five subscriptions while it exists');
+                rs.cleanup(effect);
+                const after = stats();
+                t.equal(after.effects, base.effects, 'no live effect after cleanup');
+                // The computeds keep their own subscriptions to a and b (they belong to the
+                // model); everything the effect made is gone.
+                t.equal(after.subscriptions - base.subscriptions, 3, 'only the computeds\' own subscriptions remain (sum: a, b; double: sum)');
+                const runsBefore = runs;
+                for (let i = 0; i < 5; i++) { model.a = 10 + i; model.b = 20 + i; }
+                await tick();
+                t.equal(runs - runsBefore, 0, 'the released effect never ran again');
+                t.equal(model.double, (14 + 24) * 2, 'the computeds still compute');
+            });
+
+            // Dynamic dependencies: once an effect stops reading a computed, a change to the
+            // computed does not run it.
+            await StitchTest.test('rerun-drops-computed-it-no-longer-reads', async (t) => {
+                const model = isolated({
+                    useComputed: true,
+                    n: 1,
+                    other: 'x',
+                    doubled: Stitch.computed(function () { return this.n * 2; })
+                });
+                const rs = systemOf(model);
+                let runs = 0;
+                const effect = rs.effect(() => { runs++; return model.useComputed ? model.doubled : model.other; });
+                model.useComputed = false;
+                const runsBefore = runs;
+                for (let i = 0; i < 5; i++) model.n = i + 2;
+                await tick();
+                t.equal(runs - runsBefore, 0, 'changing a computed the effect stopped reading ran it 0 times');
+                model.other = 'y';
+                t.equal(runs - runsBefore, 1, 'control: a property it still reads runs it once');
+                rs.cleanup(effect);
+            });
+
+            // A batched effect that is released while a run is queued does not run.
+            await StitchTest.test('cleanup-drops-a-queued-run', async (t) => {
+                const model = isolated({ n: 1 });
+                const rs = systemOf(model);
+                let runs = 0;
+                const effect = rs.effect(() => { runs++; void model.n; }, { batch: true });
+                t.equal(runs, 1, 'precondition: the effect ran once on creation');
+                model.n = 2;
+                rs.cleanup(effect);
+                await tick();
+                t.equal(runs, 1, 'the queued run was dropped');
+            });
+
+            // If an effect throws on its first run, effect() rethrows and the effect is released:
+            // what it read before throwing does not run it again.
+            await StitchTest.test('first-run-throw-releases-the-effect', async (t) => {
+                const model = isolated({ n: 1 });
+                const rs = systemOf(model);
+                const base = stats();
+                let runs = 0;
+                let error = null;
+                try {
+                    rs.effect(() => { runs++; void model.n; throw new Error('boom on first run'); });
+                } catch (e) {
+                    error = e;
+                }
+                t.ok(error instanceof Error && error.message === 'boom on first run', 'effect() rethrows the first-run error');
+                t.deepEqual(stats(), base, 'no live effect and no subscription left behind');
+                model.n = 2;
+                await tick();
+                t.equal(runs, 1, 'the failed effect never ran again');
+            });
+
+            await StitchTest.test('system-dispose-releases-everything', async (t) => {
+                const host = mount(
+                    '<p data-text="title"></p><b data-text="total"></b>' +
+                    '<ul data-foreach="items"><li><span data-text="name"></span> <i data-text="$parent.title"></i></li></ul>');
+                const model = isolated({
+                    title: 'T',
+                    items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }],
+                    total: Stitch.computed(function () { return this.items.length; })
+                });
+                const rs = systemOf(model);
+                const base = stats();
+                const watched = [];
+                model.$watch('title', value => watched.push(value));
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.ok(stats().effects - base.effects > 0, 'precondition: the bound page has live effects');
+                t.ok(typeof rs.dispose === 'function', 'ReactiveSystem has dispose()');
+                rs.dispose();
+                t.deepEqual(rs.stats(), { effects: 0, subscriptions: 0 }, 'the disposed system has zero effects and zero subscriptions');
+                t.deepEqual(stats(), base, 'the page-wide counts are back to what they were before');
+                const html = host.innerHTML;
+                model.title = 'changed';
+                model.items[0].name = 'changed';
+                model.items.push({ id: 3, name: 'c' });
+                await tick();
+                t.equal(host.innerHTML, html, 'no binding ran after dispose');
+                t.deepEqual(watched, [], 'no $watch callback ran after dispose');
+                t.equal(model.total, 3, 'a computed read after dispose is fresh, not a stale cache');
+                let error = null;
+                try { rs.effect(() => {}); } catch (e) { error = e; }
+                t.match(error ? error.message : '', /disposed/, 'creating an effect on a disposed system throws and says why');
+            });
+
+            await StitchTest.test('binder-dispose-returns-counts-to-baseline', async (t) => {
+                const host = mount(
+                    '<input data-value="query"><ul data-foreach="items"><li data-class="cls"><span data-text="name"></span>' +
+                    '<ol data-foreach="tags"><li data-text="$data"></li></ol></li></ul>');
+                const model = isolated({
+                    query: '',
+                    items: [{ id: 1, name: 'a', cls: { on: true }, tags: ['x', 'y'] }, { id: 2, name: 'b', cls: { on: false }, tags: [] }]
+                });
+                const base = stats();
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                await tick();
+                t.ok(stats().effects - base.effects > 0, 'precondition: bindings created effects');
+                binder.dispose();
+                t.deepEqual(stats(), base, 'after binder.dispose() no effect or subscription it made is left');
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -1,5 +1,10 @@
 "use strict";
 
+// The dependency key under which readers of a computed subscribe to it. Readers live in
+// the system's dependency map like any other subscription, so releasing a reader
+// (ReactiveSystem.cleanup) removes it from every computed it read.
+const COMPUTED_VALUE_KEY = "value";
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -8,8 +13,8 @@ class ComputedRef {
         this.explicitDeps = explicitDeps;
         this.value = undefined;
         this.dirty = true;
-        this.dependents = new Set();
         this.deps = new Set();
+        this._generation = reactiveSystem._generation;
         this.id = Math.random().toString(36).substr(2, 9);
         this.isComputedRef = true;
 
@@ -27,15 +32,8 @@ class ComputedRef {
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
-        this.dependents.forEach((dependent) => {
-            if (dependent.isComputedRef) {
-                dependent.markDirty();
-            } else if (dependent.options && dependent.options.batch) {
-                this.reactiveSystem.batchScheduler.queue(dependent);
-            } else {
-                dependent();
-            }
-        });
+        // Notify readers (effects and computeds) through the system's dependency map.
+        this.reactiveSystem.trigger(this, COMPUTED_VALUE_KEY);
     }
 
     evaluate() {
@@ -65,16 +63,10 @@ class ComputedRef {
     }
 
     get() {
-        const currentEffect = this.reactiveSystem.currentEffect;
-        if (currentEffect) {
-            this.dependents.add(currentEffect);
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log(
-                "computed",
-                `COMPUTED TRACKED (id: ${this.id}) by effect ${currentEffect.id || "unknown"}`
-            );
-        }
+        this.reactiveSystem.track(this, COMPUTED_VALUE_KEY);
 
-        if (this.dirty) {
+        // A disposed system no longer invalidates computeds, so never serve a cached value.
+        if (this.dirty || this.reactiveSystem.disposed) {
             return this.evaluate();
         }
 
@@ -85,13 +77,11 @@ class ComputedRef {
     }
 
     cleanup() {
-        this.deps.forEach((dep) => {
-            dep.delete(this);
-        });
-        this.deps.clear();
+        this.reactiveSystem._untrack(this);
     }
 }
 
 module.exports = {
-    ComputedRef
+    ComputedRef,
+    COMPUTED_VALUE_KEY
 };

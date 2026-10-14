@@ -54,15 +54,6 @@
         "with Stitch.debug enabled, binding a missing property reports it"
       ]
     },
-    "test-v3-defects.html#d6-computed-reader-stops-after-cleanup": {
-      "defect": 6,
-      "sprint": "T1",
-      "summary": "An effect that read a computed keeps running after cleanup",
-      "expect": [
-        "the computed reader ran 0 times after cleanup",
-        "the cleaned-up computed reader kept its last text"
-      ]
-    },
     "test-v3-defects.html#d7-multi-root-row-template-throws": {
       "defect": 7,
       "sprint": "T1",
