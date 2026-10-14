@@ -3,11 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = process.cwd();
-const DIST_DIR = path.join(ROOT, "dist");
-const ENTRY_FILE = path.join(ROOT, "stitch.entry.js");
-const GENERATED_SOURCE_FILE = path.join(ROOT, "stitch.js");
-const OUTPUT_FILE = path.join(DIST_DIR, "stitch.assembled.js");
+// Paths resolve against the repository root (the parent of _tools/), not the
+// caller's working directory, so the build is the same wherever it is started.
+const DEFAULT_ROOT = path.resolve(__dirname, "..");
 
 const PACKAGE_DIRS = [
     "packages/core",
@@ -16,8 +14,8 @@ const PACKAGE_DIRS = [
     "packages/browser"
 ];
 
-function getBuildMode() {
-    const arg = process.argv.find((item) => item.startsWith("--mode="));
+function getBuildMode(argv) {
+    const arg = argv.find((item) => item.startsWith("--mode="));
     const mode = arg ? arg.split("=")[1] : (process.env.STITCH_ASSEMBLY_MODE || "reachable");
     if (mode !== "reachable" && mode !== "all") {
         throw new Error(`Invalid assembly mode "${mode}". Use "reachable" or "all".`);
@@ -35,7 +33,7 @@ function normalizeModuleId(moduleId) {
     return id;
 }
 
-function listModuleFiles() {
+function listModuleFiles(ROOT) {
     const files = [];
     for (const pkgRoot of PACKAGE_DIRS) {
         const absPkgRoot = path.join(ROOT, pkgRoot);
@@ -166,14 +164,22 @@ function patchEntrySourceForInlineRequire(entrySource, pathToNumericId) {
     });
 }
 
-function main() {
+/**
+ * Assembles the single-file bundle from stitch.entry.js and packages/*.
+ * Pure: reads sources, returns the bundle text. The output depends only on the
+ * sources and package.json (no timestamps), so rebuilding unchanged sources is
+ * byte-identical and `git diff --exit-code` after a build is meaningful.
+ */
+function assemble(options = {}) {
+    const ROOT = options.root || DEFAULT_ROOT;
+    const mode = options.mode || "reachable";
+    const ENTRY_FILE = path.join(ROOT, "stitch.entry.js");
     if (!fs.existsSync(ENTRY_FILE)) {
         throw new Error("Cannot build assembly: stitch.entry.js not found.");
     }
 
-    const mode = getBuildMode();
     const entrySource = fs.readFileSync(ENTRY_FILE, "utf8");
-    const moduleFiles = listModuleFiles();
+    const moduleFiles = listModuleFiles(ROOT);
     const moduleIds = moduleFiles.map(file => normalizeModuleId(toPosix(path.relative(ROOT, file))));
     const knownIds = new Set(moduleIds);
     const moduleSourceById = new Map();
@@ -211,7 +217,6 @@ function main() {
     }
 
     const metadata = {
-        generatedAt: new Date().toISOString(),
         source: "stitch.entry.js",
         mode,
         availableModuleCount: moduleFiles.length,
@@ -230,17 +235,32 @@ function main() {
         patchedEntrySource
     ].join("\n\n");
 
+    return { output, metadata, entrySource };
+}
+
+function main() {
+    const ROOT = DEFAULT_ROOT;
+    const mode = getBuildMode(process.argv);
+    const { output, metadata, entrySource } = assemble({ root: ROOT, mode });
+
+    const DIST_DIR = path.join(ROOT, "dist");
+    const OUTPUT_FILE = path.join(DIST_DIR, "stitch.assembled.js");
+    const GENERATED_SOURCE_FILE = path.join(ROOT, "stitch.js");
     fs.mkdirSync(DIST_DIR, { recursive: true });
     fs.writeFileSync(OUTPUT_FILE, output, "utf8");
     fs.writeFileSync(GENERATED_SOURCE_FILE, output, "utf8");
 
-    const entrySize = fs.statSync(ENTRY_FILE).size;
-    const outputSize = fs.statSync(OUTPUT_FILE).size;
+    const entrySize = Buffer.byteLength(entrySource, "utf8");
+    const outputSize = Buffer.byteLength(output, "utf8");
     const growthRatio = (outputSize - entrySize) / entrySize;
 
-    console.log(`Built ${path.relative(ROOT, OUTPUT_FILE)} from ${modules.length}/${moduleFiles.length} inline modules (mode=${mode}).`);
+    console.log(`Built ${path.relative(ROOT, OUTPUT_FILE)} from ${metadata.moduleCount}/${metadata.availableModuleCount} inline modules (mode=${mode}).`);
     console.log(`Synced generated source: ${path.relative(ROOT, GENERATED_SOURCE_FILE)}.`);
     console.log(`Size: entry=${entrySize} bytes, assembled=${outputSize} bytes, growth-vs-entry=${(growthRatio * 100).toFixed(2)}%.`);
 }
 
-main();
+module.exports = { assemble };
+
+if (require.main === module) {
+    main();
+}
