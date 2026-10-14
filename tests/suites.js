@@ -1,0 +1,34 @@
+/*
+ * THE suite list. One list, read by:
+ *   - _tools/run-tests.js (`npm test`), which runs every page below against
+ *     stitch.js and stitch.min.js, and fails if a test page exists that is
+ *     not listed here;
+ *   - run-tests.html, which links each page for running by hand.
+ * Each page reports through tests/harness.js. Paths are relative to the
+ * repository root.
+ */
+(function (root, factory) {
+    var suites = factory();
+    if (typeof module !== "undefined" && module.exports) {
+        module.exports = suites;
+    } else {
+        root.STITCH_SUITES = suites;
+    }
+})(this, function () {
+    "use strict";
+    return [
+        { page: "test-core-reactivity.html", title: "Core reactivity", about: "Property updates, nested objects, text binding" },
+        { page: "test-computed-properties.html", title: "Computed properties", about: "Top-level, nested, array-dependent and chained computeds" },
+        { page: "test-array-reactivity.html", title: "Array reactivity", about: "Mutators, index writes, nested arrays, foreach rendering" },
+        { page: "test-map-set-reactivity.html", title: "Map and Set reactivity", about: "Map/Set size, get, has and iteration through computeds and bindings" },
+        { page: "test-messagebus.html", title: "MessageBus", about: "Events, wildcards, middleware, once/off" },
+        { page: "test-all-bindings.html", title: "Bindings", about: "text, value, visible, enabled, class, attr, click, event" },
+        { page: "test-edge-cases.html", title: "Edge cases", about: "Null/undefined values, circular references, rapid updates" },
+        { page: "test-dispose.html", title: "Dispose", about: "DataBinder.dispose and listener cleanup" },
+        { page: "test-unbind-memory.html", title: "Unbind", about: "An unbound element stops updating" },
+        { page: "test-foreach-context.html", title: "Foreach context", about: "Row context ($index, $parent) does not leak between lists" },
+        { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },
+        { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
+        { page: "test-warnings.html", title: "Debug warnings", about: "Debug mode warns about missing properties, missing keys, large selects" },
+    ];
+});

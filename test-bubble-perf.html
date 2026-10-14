@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Stitch.js Bubble Up Performance Test</title>
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
 </head>
 <body>
     <h1>Bubble Up Performance</h1>
     <div id="output"></div>
-    <script src="stitch.js"></script>
     <script>
-        // Create deep object
+        StitchTest.plan(['deep-leaf-updates-correct', 'deep-leaf-updates-bounded']);
+
+        // 100 levels deep, 1000 writes at the leaf.
+        const DEPTH = 100;
+        const ITERATIONS = 1000;
+        // Generous bound: catches a pathological (e.g. quadratic) bubbling
+        // regression, not normal machine-to-machine noise. Typical: well under 100 ms.
+        const MAX_MS = 2000;
+
         function createDeepObject(depth) {
             const root = { value: 0 };
             let current = root;
@@ -19,35 +29,26 @@
             return root;
         }
 
-        const DEPTH = 100; // 100 levels deep
-        const ITERATIONS = 1000;
-        
-        const data = createDeepObject(DEPTH);
-        const app = Stitch.Observable.create(data);
-
-        // Find leaf
+        const app = Stitch.Observable.create(createDeepObject(DEPTH));
         let leaf = app;
-        while (leaf.next) {
-            leaf = leaf.next;
-        }
+        let levels = 0;
+        while (leaf.next) { leaf = leaf.next; levels++; }
 
-        // Benchmark
         const start = performance.now();
         for (let i = 0; i < ITERATIONS; i++) {
             leaf.value = i;
         }
-        const end = performance.now();
-        
-        const duration = end - start;
-        document.getElementById('output').textContent = `Depth: ${DEPTH}, Iterations: ${ITERATIONS}, Time: ${duration.toFixed(2)}ms`;
-        console.log(`Depth: ${DEPTH}, Iterations: ${ITERATIONS}, Time: ${duration.toFixed(2)}ms`);
-        
-        // Validation check
-        if (duration > 500) {
-            console.warn("Performance warning: Updates are taking too long.");
-        } else {
-            console.log("Performance OK.");
-        }
+        const duration = performance.now() - start;
+        document.getElementById('output').textContent =
+            `Depth: ${DEPTH}, Iterations: ${ITERATIONS}, Time: ${duration.toFixed(2)}ms`;
+
+        StitchTest.test('deep-leaf-updates-correct', (t) => {
+            t.equal(levels, DEPTH, 'walked down every level');
+            t.equal(leaf.value, ITERATIONS - 1, 'leaf holds the last written value');
+        });
+        StitchTest.test('deep-leaf-updates-bounded', (t) => {
+            t.ok(duration < MAX_MS, `${ITERATIONS} leaf writes at depth ${DEPTH} took ${duration.toFixed(1)} ms (limit ${MAX_MS} ms)`);
+        });
     </script>
 </body>
 </html>

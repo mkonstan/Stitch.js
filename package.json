@@ -7,16 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "validate:browser": "node _scratch/run-browser-validation.js",
+    "test": "node _tools/run-tests.js",
+    "test:static": "node _tools/check-repo.js",
+    "build": "npm run build:assembly && npm run build:min",
     "build:assembly": "node _tools/build-stitch-assembly.js",
     "build:assembly:all": "node _tools/build-stitch-assembly.js --mode=all",
-    "build:min": "node minify.js",
-    "build:all": "npm run build:assembly && npm run build:min",
-    "kpi:gate": "node _tools/check-kpi-gate.js _scratch/browser-validation-report-assembly.json",
-    "validate:assembly": "npm run build:assembly && node _scratch/run-browser-validation.js > _scratch/browser-validation-report-assembly.json && npm run kpi:gate",
-    "validate:release-candidate": "npm run build:assembly && node _scratch/run-browser-validation-release-candidate.js > _scratch/browser-validation-report-release-candidate.json",
-    "compare:build-output": "node _tools/compare-build-output.js _scratch/browser-validation-report-source.json _scratch/browser-validation-report-release-candidate.json _scratch/build-output-delta.json",
-    "pipeline:build-compare": "node _tools/run-build-compare-pipeline.js"
+    "build:min": "node minify.js"
   },
   "license": "MIT",
   "keywords": [

@@ -1,0 +1,20 @@
+{
+  "_about": "Tests that fail today because of a known defect. Listed + failed = reported as known-failing. Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
+  "tests": {
+    "test-warnings.html#warns-missing-property": {
+      "defect": 5,
+      "sprint": "T2",
+      "summary": "Debug mode does not warn about a missing property"
+    },
+    "test-warnings.html#warns-missing-keys": {
+      "defect": 5,
+      "sprint": "T2",
+      "summary": "Debug mode does not warn about list items without keys"
+    },
+    "test-warnings.html#warns-select-performance": {
+      "defect": 5,
+      "sprint": "T2",
+      "summary": "Debug mode does not warn about large select lists"
+    }
+  }
+}

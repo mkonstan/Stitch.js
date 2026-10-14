@@ -5,10 +5,8 @@ node_modules/
 _artifacts/
 _publish/
 
-# Generated reports
-_scratch/browser-validation-report-*.json
-_scratch/build-output-delta.json
-_scratch/kpi-gate-result.json
+# Generated test reports and self-test trees (npm test writes here)
+_scratch/
 
 # OS/editor noise
 .DS_Store

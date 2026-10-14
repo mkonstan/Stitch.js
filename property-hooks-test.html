@@ -376,6 +376,10 @@
     </div>
 
     <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan(['test1', 'test2', 'test3', 'test4', 'test5', 'test6', 'test7', 'test8', 'test9', 'test10']);
+    </script>
     <script>
         console.log('🧪 Property Hooks Test Suite Starting...');
         console.log('📋 Testing restoration of deleted _applyBinding() functionality');
@@ -386,6 +390,7 @@
         let failedTests = 0;
 
         function markTestPassed(testId) {
+            StitchTest.pass(testId);
             const statusEl = document.getElementById(`${testId}-status`);
             statusEl.textContent = 'PASS';
             statusEl.classList.remove('pending', 'fail');
@@ -395,6 +400,7 @@
         }
 
         function markTestFailed(testId) {
+            StitchTest.fail(testId);
             const statusEl = document.getElementById(`${testId}-status`);
             statusEl.textContent = 'FAIL';
             statusEl.classList.remove('pending', 'pass');

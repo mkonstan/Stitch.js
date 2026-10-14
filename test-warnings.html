@@ -31,7 +31,10 @@
     </div>
 
     <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
     <script>
+        StitchTest.plan(['warns-missing-property', 'warns-missing-keys', 'warns-select-performance']);
+
         const output = document.getElementById('output');
         const logBox = document.getElementById('console-log');
         const capturedWarnings = [];
@@ -96,16 +99,17 @@
         // Verify Results
         setTimeout(() => {
             const expectedWarnings = [
-                'Property "nonExistentProperty" not found',
-                "objects but missing 'id' or 'key'",
-                "triggers full re-render"
+                { id: 'warns-missing-property', text: 'Property "nonExistentProperty" not found' },
+                { id: 'warns-missing-keys', text: "objects but missing 'id' or 'key'" },
+                { id: 'warns-select-performance', text: "triggers full re-render" }
             ];
 
             let passed = true;
             let html = '<ul>';
 
-            expectedWarnings.forEach(expect => {
+            expectedWarnings.forEach(({ id, text: expect }) => {
                 const found = capturedWarnings.some(w => w.includes(expect));
+                StitchTest.result(id, found, found ? 'warning seen' : `no warning containing "${expect}" (captured ${capturedWarnings.length})`);
                 if (found) {
                     html += `<li class="pass">✅ Found warning: "${expect}"</li>`;
                 } else {

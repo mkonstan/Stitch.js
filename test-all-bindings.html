@@ -53,6 +53,11 @@
 
     <div id="testContainer"></div>
     <script id="stitchScript" src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        // Every test this page reports; the runner fails the page if one is missing.
+        StitchTest.plan(['1.1', '2.1', '3.1', '4.1', '5.1', '6.1']);
+    </script>
 
     <script>
         Stitch.debug.enable(); // Enable debug mode for detailed logging
@@ -88,6 +93,7 @@
         }
 
         function updateSummary() {
+            StitchTest.sync(testResults);
             const total = testResults.length;
             const passed = testResults.filter(r => r.passed).length;
             document.getElementById('totalTests').textContent = total;
