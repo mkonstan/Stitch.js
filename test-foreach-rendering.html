@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js Foreach Rendering Test</title>
+    <style>.stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }</style>
+</head>
+<body>
+    <h1>Foreach rendering (keyed lists)</h1>
+    <p>Passing coverage for the list behaviour the parked defect tests also use: nested lists,
+        lists driven by a computed, replacing a list, and hiding/showing a list.</p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'nested-foreach-renders-and-updates',
+            'computed-filtered-list',
+            'replace-list-with-new-ids',
+            'hide-and-show-list',
+            'debug-toggle-keeps-bindings-working'
+        ]);
+
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+        const texts = (host, selector) => Array.from(host.querySelectorAll(selector)).map(el => el.textContent);
+
+        (async () => {
+            await StitchTest.test('nested-foreach-renders-and-updates', async (t) => {
+                // One root element per row (a row template with several roots is not covered here).
+                const host = mount(
+                    '<div data-foreach="groups"><section><h4 data-text="title"></h4>' +
+                    '<ul data-foreach="items"><li data-text="name"></li></ul></section></div>');
+                const model = Stitch.Observable.create({
+                    groups: [
+                        { id: 'g1', title: 'G1', items: [{ id: 'a', name: 'a' }, { id: 'b', name: 'b' }] },
+                        { id: 'g2', title: 'G2', items: [{ id: 'c', name: 'c' }] }
+                    ]
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.deepEqual(texts(host, 'h4'), ['G1', 'G2'], 'outer rows render');
+                t.deepEqual(texts(host, 'li'), ['a', 'b', 'c'], 'inner rows render inside each outer row');
+                model.groups[1].items[0].name = 'c2';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['a', 'b', 'c2'], 'a change to an inner item updates its row');
+                model.groups[0].items.push({ id: 'd', name: 'd' });
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['a', 'b', 'd', 'c2'], 'pushing into an inner list adds a row');
+            });
+
+            await StitchTest.test('computed-filtered-list', async (t) => {
+                const host = mount('<ul data-foreach="shown"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({
+                    items: [{ id: 1, name: 'alpha' }, { id: 2, name: 'beta' }, { id: 3, name: 'gamma' }],
+                    q: '',
+                    shown: Stitch.computed(function () {
+                        const q = this.q;
+                        return this.items.filter(item => item.name.includes(q));
+                    })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['alpha', 'beta', 'gamma'], 'unfiltered');
+                model.q = 'g';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['gamma'], 'filter "g" (keyed rows)');
+                model.q = 'et';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['beta'], 'filter "et" (keyed rows)');
+                model.q = '';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['alpha', 'beta', 'gamma'], 'filter cleared');
+            });
+
+            await StitchTest.test('replace-list-with-new-ids', async (t) => {
+                const host = mount('<ul data-foreach="list"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({ list: [{ id: 1, name: 'one' }, { id: 2, name: 'two' }] });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                model.list = [{ id: 3, name: 'three' }, { id: 4, name: 'four' }, { id: 5, name: 'five' }];
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['three', 'four', 'five'], 'a replaced list shows its rows');
+                model.list[0].name = 'THREE';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['THREE', 'four', 'five'], 'and its rows follow later changes');
+            });
+
+            await StitchTest.test('hide-and-show-list', async (t) => {
+                const host = mount('<ul data-foreach="shown"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({
+                    items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }],
+                    hide: false,
+                    shown: Stitch.computed(function () { return this.hide ? [] : this.items.slice(); })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                for (let cycle = 0; cycle < 3; cycle++) {
+                    model.hide = true; await tick();
+                    t.equal(host.querySelectorAll('li').length, 0, `cycle ${cycle}: hidden list has no rows`);
+                    model.hide = false; await tick();
+                    t.deepEqual(texts(host, 'li'), ['a', 'b', 'c'], `cycle ${cycle}: shown list has its rows`);
+                }
+                model.items[0].name = 'a2';
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['a2', 'b', 'c'], 'a change after the cycles reaches the live row');
+            });
+
+            await StitchTest.test('debug-toggle-keeps-bindings-working', async (t) => {
+                const host = mount('<span data-text="label"></span>');
+                const model = Stitch.Observable.create({ label: 'one' });
+                Stitch.debug.enable();
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.equal(host.textContent, 'one', 'binds with debug enabled');
+                Stitch.debug.disable();
+                model.label = 'two';
+                await tick();
+                t.equal(host.textContent, 'two', 'updates after debug is disabled');
+            });
+        })();
+    </script>
+</body>
+</html>

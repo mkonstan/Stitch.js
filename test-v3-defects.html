@@ -89,7 +89,17 @@
             // Defect 1 (T1, D2/D10/D16): a list row without its key throws, naming the
             // list, the row index, the key field and the fix (data-key). The initial render
             // runs inside bind(), so the error must reach the bind() caller.
-            await StitchTest.test('d1-keyless-row-throws', (t) => {
+            await StitchTest.test('d1-keyless-row-throws', async (t) => {
+                // Control: a fully keyed list binds and renders, so this test cannot pass
+                // merely because foreach throws for every list.
+                const good = mount('<ul data-foreach="people"><li data-text="name"></li></ul>');
+                const goodError = tryBind(good, Stitch.Observable.create({
+                    people: [{ id: 1, name: 'Ann' }, { id: 2, name: 'Bob' }]
+                }));
+                t.equal(goodError, null, 'control: a fully keyed list binds without error');
+                await tick();
+                t.deepEqual(texts(good, 'li'), ['Ann', 'Bob'], 'control: the keyed list renders both rows');
+
                 const host = mount('<ul data-foreach="people"><li data-text="name"></li></ul>');
                 const error = tryBind(host, Stitch.Observable.create({
                     people: [{ id: 1, name: 'Ann' }, { name: 'Bob' }]
@@ -193,6 +203,22 @@
                 t.match(message, /span|v3-misspelled/i, 'the error names the element');
                 const listed = ['text', 'value', 'visible', 'foreach', 'click'].filter(name => new RegExp('\\b' + name + '\\b').test(message));
                 t.deepEqual(listed, ['text', 'value', 'visible', 'foreach', 'click'], 'the error lists the valid bindings');
+
+                // Control: data-* attributes that are not Stitch bindings (test ids, Bootstrap,
+                // app data) must not throw and must not warn, with debug on. HOW the binder tells
+                // data-txet from data-testid is a T2 design decision; only the outcome is fixed here.
+                const friendly = mount('<span data-text="name" data-testid="greeting" data-bs-toggle="tooltip" data-id="7"></span>');
+                let friendlyError = null;
+                const friendlyLines = await captureConsole(async () => {
+                    Stitch.debug.enable();
+                    friendlyError = tryBind(friendly, Stitch.Observable.create({ name: 'Ann' }));
+                    await tick();
+                    Stitch.debug.disable();
+                });
+                t.equal(friendlyError, null, 'control: data-testid, data-bs-toggle and data-id do not throw');
+                t.equal(friendly.textContent, 'Ann', 'control: the element still binds its data-text');
+                t.deepEqual(friendlyLines.filter(line => /testid|bs-toggle|data-id|greeting|tooltip/.test(line)), [],
+                    'control: nothing warns about the non-Stitch attributes');
 
                 const enabledLines = await captureConsole(async () => {
                     Stitch.debug.enable();

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js Custom Bindings Test</title>
+    <style>.stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }</style>
+</head>
+<body>
+    <h1>Custom bindings (DataBinder.registerBinding)</h1>
+    <p>The documented contract (STITCH_API.md, "Custom bindings"): <code>bind(element, viewModel, path, context)</code>,
+        with <code>context.reactiveSystem</code> for effects and <code>context.binder._trackCleanup</code> for cleanup.</p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'bind-receives-documented-arguments',
+            'effect-reruns-on-change',
+            'cleanup-runs-on-unbind',
+            'cleanup-runs-on-dispose',
+            'binding-inside-foreach-row',
+            'registration-rejects-bad-input'
+        ]);
+
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        // Records every bind() call.
+        const bindCalls = [];
+        Stitch.DataBinder.registerBinding('cbrecord', {
+            bind(element, viewModel, path, context) {
+                bindCalls.push({ element, viewModel, path, context });
+            }
+        });
+
+        // The documented pattern; counts runs per element.
+        const runs = new Map();
+        Stitch.DataBinder.registerBinding('cbtext', {
+            bind(element, viewModel, path, context) {
+                runs.set(element, 0);
+                const effect = context.reactiveSystem.effect(() => {
+                    runs.set(element, runs.get(element) + 1);
+                    element.textContent = 'cb:' + viewModel[path];
+                });
+                context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
+            }
+        });
+
+        (async () => {
+            await StitchTest.test('bind-receives-documented-arguments', (t) => {
+                const host = mount('<span id="cb-rec" data-cbrecord="label"></span>');
+                const model = Stitch.Observable.create({ label: 'x' });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                t.equal(bindCalls.length, 1, 'bind() ran once for the one attribute');
+                const call = bindCalls[0] || {};
+                t.ok(call.element === document.getElementById('cb-rec'), 'element is the bound element');
+                t.ok(call.viewModel === model, 'viewModel is the bound model');
+                t.equal(call.path, 'label', 'path is the attribute value');
+                t.ok(!!call.context && call.context.binder === binder, 'context.binder is the DataBinder');
+                const rs = call.context && call.context.reactiveSystem;
+                t.ok(!!rs && typeof rs.effect === 'function' && typeof rs.cleanup === 'function',
+                    'context.reactiveSystem has effect() and cleanup()');
+            });
+
+            await StitchTest.test('effect-reruns-on-change', async (t) => {
+                const host = mount('<span id="cb-live" data-cbtext="label"></span>');
+                const model = Stitch.Observable.create({ label: 'one' });
+                new Stitch.DataBinder().bind(host, model);
+                const el = document.getElementById('cb-live');
+                await tick();
+                t.equal(el.textContent, 'cb:one', 'the custom binding rendered');
+                t.equal(runs.get(el), 1, 'its effect ran once on bind');
+                model.label = 'two';
+                await tick();
+                t.equal(el.textContent, 'cb:two', 'it re-rendered after a change');
+                t.equal(runs.get(el), 2, 'its effect ran exactly once more');
+            });
+
+            await StitchTest.test('cleanup-runs-on-unbind', async (t) => {
+                const host = mount('<span id="cb-unbind" data-cbtext="label"></span>');
+                const model = Stitch.Observable.create({ label: 'one' });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                const el = document.getElementById('cb-unbind');
+                await tick();
+                t.equal(el.textContent, 'cb:one', 'precondition: rendered');
+                binder.unbind(el);
+                model.label = 'two';
+                await tick();
+                t.equal(runs.get(el), 1, 'after unbind the effect did not run again');
+                t.equal(el.textContent, 'cb:one', 'after unbind the element keeps its text');
+            });
+
+            await StitchTest.test('cleanup-runs-on-dispose', async (t) => {
+                const host = mount('<span id="cb-dispose" data-cbtext="label"></span>');
+                const model = Stitch.Observable.create({ label: 'one' });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                const el = document.getElementById('cb-dispose');
+                await tick();
+                t.equal(el.textContent, 'cb:one', 'precondition: rendered');
+                binder.dispose();
+                model.label = 'two';
+                await tick();
+                t.equal(runs.get(el), 1, 'after dispose the effect did not run again');
+                t.equal(el.textContent, 'cb:one', 'after dispose the element keeps its text');
+            });
+
+            await StitchTest.test('binding-inside-foreach-row', async (t) => {
+                const host = mount('<ul data-foreach="rows"><li data-cbtext="name"></li></ul>');
+                const model = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }] });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                const texts = () => Array.from(host.querySelectorAll('li')).map(li => li.textContent);
+                t.deepEqual(texts(), ['cb:a', 'cb:b'], 'the custom binding resolves row fields');
+                model.rows[1].name = 'b2';
+                await tick();
+                t.deepEqual(texts(), ['cb:a', 'cb:b2'], 'and follows changes to the row item');
+            });
+
+            await StitchTest.test('registration-rejects-bad-input', (t) => {
+                const threw = (fn) => { try { fn(); return false; } catch (e) { return e instanceof Error; } };
+                t.ok(threw(() => Stitch.DataBinder.registerBinding(42, { bind() {} })), 'a non-string name throws');
+                t.ok(threw(() => Stitch.DataBinder.registerBinding('cbnobind', {})), 'a handler without bind() throws');
+            });
+        })();
+    </script>
+</body>
+</html>
