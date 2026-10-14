@@ -75,6 +75,7 @@ function write(dir, files) {
 
 const PKG = JSON.stringify({ name: "fixture", version: "9.8.7", scripts: { build: "echo build" } }, null, 2);
 const DRIVE = "C" + ":";
+const OLD = "v" + "1.0.0";
 const BUILD_TREE = ["package.json", "stitch.entry.js", "packages", "stitch.js", "stitch.min.js", "dist"];
 
 const staticFixtures = {
@@ -92,6 +93,26 @@ const staticFixtures = {
         check: "version-literal",
         create: (dir) => write(dir, { "package.json": PKG, "packages/core/package.json": "{ \"name\": \"core\", \"version\": \"9.8.7\" }\n" }),
         expect: FAIL("packages/core/package.json:1: version literal")
+    },
+    "stale-version-control": {
+        check: "stale-version",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            // Bare triplets are not Stitch versions; archived history docs may name old versions.
+            "notes.md": "Uses jquery-3.6.0.min.js on 127.0.0.1; devDependency ^1.58.2.\n",
+            "MIGRATION.md": "Upgrading from " + OLD + " is described here.\n"
+        }),
+        expect: PASS
+    },
+    "stale-version": {
+        check: "stale-version",
+        create: (dir) => write(dir, { "package.json": PKG, "example.html": "<title>Demo - Stitch.js " + OLD + "</title>\n" }),
+        expect: FAIL('example.html:1: stale version "' + OLD + '"')
+    },
+    "stale-version-word": {
+        check: "stale-version",
+        create: (dir) => write(dir, { "package.json": PKG, "README.md": "Version " + "2.0.1 is current.\n" }),
+        expect: FAIL('README.md:1: stale version "Version ' + "2.0.1\"")
     },
     "local-path-control": {
         check: "local-path",

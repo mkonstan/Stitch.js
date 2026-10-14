@@ -1804,7 +1804,7 @@ This section covers common mistakes and how to fix them.
 You'll see errors in the console like:
 
 ```
-[Stitch.js v1.0.0] Invalid binding syntax: "{ highlight: isActive, disabled: !isEnabled }"
+[Stitch.js v<version>] Invalid binding syntax: "{ highlight: isActive, disabled: !isEnabled }"
 
 ❌ Inline object literals are NOT supported in bindings.
 ✅ Use a property reference instead.
@@ -1813,7 +1813,7 @@ You'll see errors in the console like:
 Or:
 
 ```
-[Stitch.js v1.0.0] Property "{ highlight: isActive }" does not exist on object at path ""
+[Stitch.js v<version>] Property "{ highlight: isActive }" does not exist on object at path ""
 ```
 
 **Why It Fails:**

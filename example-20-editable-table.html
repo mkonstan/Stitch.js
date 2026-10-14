@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editable Table Rows - Stitch.js v1.0.0</title>
+    <title>Editable Table Rows - Stitch.js</title>
     <!-- Change line 7 to: -->
 <script src="stitch.js"></script>
     <style>
@@ -186,7 +186,7 @@
             </template>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>foreach:</strong> External template for table rows<br>
                     <strong>Nested Stitch.computed():</strong> isNotEditing computed at row level<br>
@@ -205,7 +205,7 @@
         Stitch.debug.disableCategory('bindings');
         Stitch.debug.disableCategory('messageBus');
 
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Table data with NESTED COMPUTED PROPERTIES
             tableUsers: [
@@ -217,7 +217,7 @@
                     isEditing: false,
                     editName: '',
                     editEmail: '',
-                    // v1.0.0: Nested computed property!
+                    // Nested computed property!
                     isNotEditing: Stitch.computed(function() {
                         return !this.isEditing;
                     })
@@ -229,7 +229,7 @@
                     isEditing: false,
                     editName: '',
                     editEmail: '',
-                    // v1.0.0: Nested computed property!
+                    // Nested computed property!
                     isNotEditing: Stitch.computed(function() {
                         return !this.isEditing;
                     })
@@ -241,7 +241,7 @@
                     isEditing: false,
                     editName: '',
                     editEmail: '',
-                    // v1.0.0: Nested computed property!
+                    // Nested computed property!
                     isNotEditing: Stitch.computed(function() {
                         return !this.isEditing;
                     })
@@ -254,7 +254,7 @@
                     isEditing: false,
                     editName: '',
                     editEmail: '',
-                    // v1.0.0: Nested computed property!
+                    // Nested computed property!
                     isNotEditing: Stitch.computed(function() {
                         return !this.isEditing;
                     })
@@ -262,12 +262,12 @@
 
             ],
 
-            // v1.0.0: Computed - Count of users
+            // Computed - Count of users
             tableUserCount: Stitch.computed(function() {
                 return this.tableUsers.length;
             }),
 
-            // v1.0.0: Computed - Count editing
+            // Computed - Count editing
             tableEditingCount: Stitch.computed(function() {
                 return this.tableUsers.filter(u => u.isEditing).length;
             }),
@@ -312,7 +312,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Editable Table Rows example initialized (v1.0.0)');
+        console.log('✅ Editable Table Rows example initialized');
     </script>
 </body>
 </html>

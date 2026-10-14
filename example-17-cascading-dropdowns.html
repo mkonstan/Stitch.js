@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cascading Dropdowns - Stitch.js v1.0.0</title>
+    <title>Cascading Dropdowns - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -154,7 +154,7 @@
             </div>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>data-foreach:</strong> Custom attribute for external templates<br>
                     <strong>Stitch.computed():</strong> Available states/cities auto-update<br>
@@ -165,7 +165,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Data structures
             cascadeCountries: [
@@ -219,7 +219,7 @@
             cascadeSelectedState: '',
             cascadeSelectedCity: '',
 
-            // v1.0.0: Computed - Available states based on selected country
+            // Computed - Available states based on selected country
             cascadeAvailableStates: Stitch.computed(function() {
                 if (!this.cascadeSelectedCountry) return [];
                 return this.cascadeStates.filter(state =>
@@ -227,7 +227,7 @@
                 );
             }),
 
-            // v1.0.0: Computed - Available cities based on selected state
+            // Computed - Available cities based on selected state
             cascadeAvailableCities: Stitch.computed(function() {
                 if (!this.cascadeSelectedState) return [];
                 return this.cascadeCities.filter(city =>
@@ -235,7 +235,7 @@
                 );
             }),
 
-            // v1.0.0: Computed - Display selected location
+            // Computed - Display selected location
             cascadeFullLocation: Stitch.computed(function() {
                 const parts = [];
                 if (this.cascadeSelectedCity) {
@@ -254,14 +254,14 @@
             })
         });
 
-        // v1.0.0: Message Bus API - Watch for country changes and auto-reset children
+        // Message Bus API - Watch for country changes and auto-reset children
         model.$watch('cascadeSelectedCountry', (newCountry, oldCountry) => {
             console.log(`Country changed: ${oldCountry} → ${newCountry}`);
             model.cascadeSelectedState = '';
             model.cascadeSelectedCity = '';
         });
 
-        // v1.0.0: Message Bus API - Watch for state changes and auto-reset city
+        // Message Bus API - Watch for state changes and auto-reset city
         model.$watch('cascadeSelectedState', (newState, oldState) => {
             console.log(`State changed: ${oldState} → ${newState}`);
             model.cascadeSelectedCity = '';
@@ -280,7 +280,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Cascading Dropdowns example initialized (v1.0.0 - custom attributes)');
+        console.log('✅ Cascading Dropdowns example initialized (custom attributes)');
     </script>
 </body>
 </html>

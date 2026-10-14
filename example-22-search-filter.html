@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Search/Filter - Stitch.js v1.0.0</title>
+    <title>Interactive Search/Filter - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -250,9 +250,9 @@
             </template>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
-                    <strong>event:</strong> Binding for search input (v1.0.0)<br>
+                    <strong>event:</strong> Binding for search input<br>
                     <strong>Stitch.computed():</strong> Live filtering with multiple criteria<br>
                     <strong>foreach:</strong> External template for product cards
                 </p>
@@ -261,7 +261,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Search/filter state
             searchQuery: '',
@@ -271,7 +271,7 @@
             filterMinPrice: '',
             filterMaxPrice: '',
 
-            // v1.0.0: Event binding for search
+            // Event binding for search
             searchEvents: {
                 input: 'onSearchInput'
             },
@@ -290,7 +290,7 @@
                 { id: 10, name: 'USB Cable', category: 'electronics', price: 9.99 }
             ],
 
-            // v1.0.0: Computed - Filtered products
+            // Computed - Filtered products
             filteredProducts: Stitch.computed(function() {
                 let results = this.searchProducts;
 
@@ -332,12 +332,12 @@
                 return results;
             }),
 
-            // v1.0.0: Computed - Result count
+            // Computed - Result count
             filteredCount: Stitch.computed(function() {
                 return this.filteredProducts.length;
             }),
 
-            // v1.0.0: Computed - Has active filters
+            // Computed - Has active filters
             hasActiveFilters: Stitch.computed(function() {
                 return this.searchQuery.length > 0 ||
                        this.filterElectronics ||
@@ -347,7 +347,7 @@
                        this.filterMaxPrice.length > 0;
             }),
 
-            // v1.0.0: Computed - Filter summary
+            // Computed - Filter summary
             filterSummary: Stitch.computed(function() {
                 const parts = [];
                 if (this.searchQuery) parts.push(`Query: "${this.searchQuery}"`);
@@ -384,7 +384,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Interactive Search/Filter example initialized (v1.0.0)');
+        console.log('✅ Interactive Search/Filter example initialized');
     </script>
 </body>
 </html>

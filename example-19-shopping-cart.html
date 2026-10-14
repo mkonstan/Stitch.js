@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shopping Cart - Stitch.js v1.0.0</title>
+    <title>Shopping Cart - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -235,7 +235,7 @@
             </div>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>foreach:</strong> External templates for products and cart items<br>
                     <strong>Stitch.computed():</strong> Cart totals auto-calculate<br>
@@ -246,7 +246,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Product catalog
             products: [
@@ -260,7 +260,7 @@
             // Shopping cart items (with quantity)
             cartItems: [],
 
-            // v1.0.0: Computed - Cart subtotal (before tax)
+            // Computed - Cart subtotal (before tax)
             cartSubtotal: Stitch.computed(function() {
                 const total = this.cartItems.reduce((sum, item) => {
                     return sum + (item.price * item.quantity);
@@ -268,30 +268,30 @@
                 return total.toFixed(2);
             }),
 
-            // v1.0.0: Computed - Cart tax (10%)
+            // Computed - Cart tax (10%)
             cartTax: Stitch.computed(function() {
                 const subtotal = parseFloat(this.cartSubtotal);
                 return (subtotal * 0.10).toFixed(2);
             }),
 
-            // v1.0.0: Computed - Cart total (subtotal + tax)
+            // Computed - Cart total (subtotal + tax)
             cartTotal: Stitch.computed(function() {
                 const subtotal = parseFloat(this.cartSubtotal);
                 const tax = parseFloat(this.cartTax);
                 return (subtotal + tax).toFixed(2);
             }),
 
-            // v1.0.0: Computed - Has cart items
+            // Computed - Has cart items
             hasCartItems: Stitch.computed(function() {
                 return this.cartItems.length > 0;
             }),
 
-            // v1.0.0: Computed - Cart is empty
+            // Computed - Cart is empty
             isCartEmpty: Stitch.computed(function() {
                 return this.cartItems.length === 0;
             }),
 
-            // v1.0.0: Computed - Cart item count
+            // Computed - Cart item count
             cartItemCount: Stitch.computed(function() {
                 return this.cartItems.reduce((sum, item) => sum + item.quantity, 0);
             }),
@@ -348,7 +348,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Shopping Cart example initialized (v1.0.0)');
+        console.log('✅ Shopping Cart example initialized');
     </script>
 </body>
 </html>

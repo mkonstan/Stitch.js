@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Step Wizard - Stitch.js v1.0.0</title>
+    <title>Multi-Step Wizard - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -62,7 +62,7 @@
             transform: scale(1.05);
         }
 
-        /* Step-specific colors when active - v1.0.0 enhancement */
+        /* Step-specific colors when active */
         .progress-step:nth-child(1).active {
             background: #667eea;  /* Royal Blue/Purple - Personal Info */
         }
@@ -311,7 +311,7 @@
             </div>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>visible:</strong> Step-by-step navigation with conditional visibility<br>
                     <strong>Stitch.computed():</strong> Step validation and progress tracking<br>
@@ -322,7 +322,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Wizard state
             wizardCurrentStep: 1,  // 1, 2, 3, or 4
@@ -343,7 +343,7 @@
             wizardCardExpiry: '',
             wizardCardCVV: '',
 
-            // v1.0.0: Computed - Step visibility
+            // Computed - Step visibility
             isWizardStep1: Stitch.computed(function() {
                 return this.wizardCurrentStep === 1;
             }),
@@ -360,7 +360,7 @@
                 return this.wizardCurrentStep === 4;
             }),
 
-            // v1.0.0: Computed - Class objects for progress steps (object mode class binding)
+            // Computed - Class objects for progress steps (object mode class binding)
             step1Classes: Stitch.computed(function() {
                 return { 'active': this.isWizardStep1 };
             }),
@@ -377,7 +377,7 @@
                 return { 'active': this.isWizardStep4 };
             }),
 
-            // v1.0.0: Computed - Step validation
+            // Computed - Step validation
             isStep1Valid: Stitch.computed(function() {
                 return this.wizardFirstName.length > 0 &&
                        this.wizardLastName.length > 0 &&
@@ -396,7 +396,7 @@
                        this.wizardCardCVV.length === 3;
             }),
 
-            // v1.0.0: Computed - Can proceed to next step
+            // Computed - Can proceed to next step
             canProceedFromStep1: Stitch.computed(function() {
                 return this.isStep1Valid;
             }),
@@ -472,7 +472,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Multi-Step Wizard example initialized (v1.0.0)');
+        console.log('✅ Multi-Step Wizard example initialized');
     </script>
 </body>
 </html>

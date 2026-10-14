@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conditional Form Fields - Stitch.js v1.0.0</title>
+    <title>Conditional Form Fields - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -186,7 +186,7 @@
             </div>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>visible:</strong> Conditional field visibility based on account type<br>
                     <strong>Stitch.computed():</strong> Dynamic validation and summaries<br>
@@ -197,7 +197,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Account type selection
             conditionalAccountType: 'individual',  // 'individual' or 'business'
@@ -212,31 +212,31 @@
             conditionalEIN: '',
             conditionalIncorporationDate: '',
 
-            // v1.0.0: Computed - Show individual fields
+            // Computed - Show individual fields
             showIndividualFields: Stitch.computed(function() {
                 return this.conditionalAccountType === 'individual';
             }),
 
-            // v1.0.0: Computed - Show business fields
+            // Computed - Show business fields
             showBusinessFields: Stitch.computed(function() {
                 return this.conditionalAccountType === 'business';
             }),
 
-            // v1.0.0: Computed - Individual form valid
+            // Computed - Individual form valid
             isIndividualFormValid: Stitch.computed(function() {
                 return this.conditionalFirstName.length > 0 &&
                        this.conditionalLastName.length > 0 &&
                        this.conditionalSSN.length === 9;
             }),
 
-            // v1.0.0: Computed - Business form valid
+            // Computed - Business form valid
             isBusinessFormValid: Stitch.computed(function() {
                 return this.conditionalCompanyName.length > 0 &&
                        this.conditionalEIN.length === 9 &&
                        this.conditionalIncorporationDate.length > 0;
             }),
 
-            // v1.0.0: Computed - Current form valid
+            // Computed - Current form valid
             isConditionalFormValid: Stitch.computed(function() {
                 if (this.conditionalAccountType === 'individual') {
                     return this.isIndividualFormValid;
@@ -245,7 +245,7 @@
                 }
             }),
 
-            // v1.0.0: Computed - Form summary
+            // Computed - Form summary
             conditionalFormSummary: Stitch.computed(function() {
                 if (this.conditionalAccountType === 'individual') {
                     return `Individual: ${this.conditionalFirstName} ${this.conditionalLastName}`.trim() || 'No name entered';
@@ -290,7 +290,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Conditional Form Fields example initialized (v1.0.0)');
+        console.log('✅ Conditional Form Fields example initialized');
     </script>
 </body>
 </html>

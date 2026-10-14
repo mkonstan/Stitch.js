@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nested Computed Properties - Stitch.js v1.0.0</title>
+    <title>Nested Computed Properties - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -179,7 +179,7 @@
 <body>
     <div class="container">
         <h1>🎯 Nested Computed Properties</h1>
-        <p class="subtitle">Computed properties at any nesting level (v1.0.0+)</p>
+        <p class="subtitle">Computed properties at any nesting level</p>
 
         <div id="example">
             <div class="controls">
@@ -217,7 +217,7 @@
             </template>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>Nested Computed Properties:</strong> Each user object has its own <code>fullName</code>, <code>statusLabel</code>, and <code>statusClass</code> computed properties<br><br>
                     <strong>Parent-Level Computed:</strong> Top-level <code>displayedUsers</code> computed depends on nested <code>isActive</code> properties<br><br>
@@ -228,7 +228,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API - Nested Computed Properties!
+        // Model definition - Nested Computed Properties!
         const model = Stitch.Observable.create({
             // Top-level state
             showInactive: false,
@@ -241,17 +241,17 @@
                     lastName: 'Anderson',
                     isActive: true,
 
-                    // v1.0.0: NESTED COMPUTED - fullName
+                    // NESTED COMPUTED - fullName
                     fullName: Stitch.computed(function() {
                         return `${this.firstName} ${this.lastName}`;
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status label
+                    // NESTED COMPUTED - status label
                     statusLabel: Stitch.computed(function() {
                         return this.isActive ? 'Active' : 'Inactive';
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    // NESTED COMPUTED - status CSS class
                     statusClass: Stitch.computed(function() {
                         return this.isActive ? 'status-active' : 'status-inactive';
                     })
@@ -262,17 +262,17 @@
                     lastName: 'Brown',
                     isActive: true,
 
-                    // v1.0.0: NESTED COMPUTED - fullName
+                    // NESTED COMPUTED - fullName
                     fullName: Stitch.computed(function() {
                         return `${this.firstName} ${this.lastName}`;
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status label
+                    // NESTED COMPUTED - status label
                     statusLabel: Stitch.computed(function() {
                         return this.isActive ? 'Active' : 'Inactive';
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    // NESTED COMPUTED - status CSS class
                     statusClass: Stitch.computed(function() {
                         return this.isActive ? 'status-active' : 'status-inactive';
                     })
@@ -283,17 +283,17 @@
                     lastName: 'Chen',
                     isActive: false,
 
-                    // v1.0.0: NESTED COMPUTED - fullName
+                    // NESTED COMPUTED - fullName
                     fullName: Stitch.computed(function() {
                         return `${this.firstName} ${this.lastName}`;
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status label
+                    // NESTED COMPUTED - status label
                     statusLabel: Stitch.computed(function() {
                         return this.isActive ? 'Active' : 'Inactive';
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    // NESTED COMPUTED - status CSS class
                     statusClass: Stitch.computed(function() {
                         return this.isActive ? 'status-active' : 'status-inactive';
                     })
@@ -304,24 +304,24 @@
                     lastName: 'Davis',
                     isActive: false,
 
-                    // v1.0.0: NESTED COMPUTED - fullName
+                    // NESTED COMPUTED - fullName
                     fullName: Stitch.computed(function() {
                         return `${this.firstName} ${this.lastName}`;
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status label
+                    // NESTED COMPUTED - status label
                     statusLabel: Stitch.computed(function() {
                         return this.isActive ? 'Active' : 'Inactive';
                     }),
 
-                    // v1.0.0: NESTED COMPUTED - status CSS class
+                    // NESTED COMPUTED - status CSS class
                     statusClass: Stitch.computed(function() {
                         return this.isActive ? 'status-active' : 'status-inactive';
                     })
                 }
             ],
 
-            // v1.0.0: Top-level COMPUTED that depends on NESTED COMPUTED properties!
+            // Top-level COMPUTED that depends on NESTED COMPUTED properties!
             displayedUsers: Stitch.computed(function() {
                 if (this.showInactive) {
                     return this.nestedUsers;
@@ -330,17 +330,17 @@
                 }
             }),
 
-            // v1.0.0: Top-level computed using nested computed values
+            // Top-level computed using nested computed values
             activeUserCount: Stitch.computed(function() {
                 return this.nestedUsers.filter(user => user.isActive).length;
             }),
 
-            // v1.0.0: Top-level computed using nested computed values
+            // Top-level computed using nested computed values
             inactiveUserCount: Stitch.computed(function() {
                 return this.nestedUsers.filter(user => !user.isActive).length;
             }),
 
-            // v1.0.0: Top-level computed
+            // Top-level computed
             totalUserCount: Stitch.computed(function() {
                 return this.nestedUsers.length;
             }),
@@ -361,7 +361,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Nested Computed Properties example initialized (v1.0.0)');
+        console.log('✅ Nested Computed Properties example initialized');
         console.log('');
         console.log('🎯 This example demonstrates:');
         console.log('  1. Computed properties at the nested object level (fullName, statusLabel, statusClass)');

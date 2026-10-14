@@ -7,6 +7,9 @@
  *                     Any other occurrence of that version string fails, except the
  *                     generated bundles (stamped by the build, compared byte-for-byte
  *                     by build-match) and npm's own lock-file fields (compared).
+ *   stale-version     No OTHER version is named either (x.y.z after "v" or "Version "):
+ *                     a stale version on a page or in a doc is a false claim. Archived
+ *                     history docs (ARCHIVE_PATHS) are exempt.
  *   local-path        No absolute local path (Windows drive paths, /Users/<name>/,
  *                     /home/<name>/, file URLs) in any file.
  *   missing-reference Every file a doc or page points to exists, and every
@@ -26,6 +29,9 @@ const { execFileSync } = require("child_process");
 const REPO_ROOT = path.resolve(__dirname, "..");
 const GENERATED_BUNDLES = ["stitch.js", "stitch.min.js", "dist/stitch.assembled.js"];
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
+// History documents that legitimately name old versions. PLAN.md, V2-TEST-REPORT.md and
+// MIGRATION.md (the v1 -> v2 guide) are due to move to docs/history/; drop them here then.
+const ARCHIVE_PATHS = ["PLAN.md", "V2-TEST-REPORT.md", "MIGRATION.md", "docs/history/"];
 
 // ---------------------------------------------------------------------------
 // File listing
@@ -109,6 +115,28 @@ function checkLockVersions(root, version) {
         if (!ours || entry.version === undefined) continue;
         if (key === "" && entry.version === version) continue;
         problems.push(`package-lock.json: "${key || "<root>"}" carries version ${entry.version}; only the root package.json may (run npm install)`);
+    }
+    return problems;
+}
+
+// ---------------------------------------------------------------------------
+// stale-version
+
+function checkStaleVersions(root, files) {
+    const problems = [];
+    const version = JSON.parse(readText(root, "package.json")).version;
+    // A version written as a Stitch version: x.y.z prefixed by "v", "V" or "Version ".
+    // Bare triplets (dependency ranges, IP addresses, CDN file names) are not matched.
+    const mention = /(?<![0-9A-Za-z.])(?:[vV]|[Vv]ersion\s+)(\d+\.\d+\.\d+)(?![0-9]|\.[0-9])/g;
+    for (const rel of files) {
+        if (rel === "package.json" || rel === "package-lock.json" || GENERATED_BUNDLES.includes(rel)) continue;
+        if (ARCHIVE_PATHS.some((archived) => rel === archived || (archived.endsWith("/") && rel.startsWith(archived)))) continue;
+        const text = readText(root, rel);
+        let match;
+        while ((match = mention.exec(text)) !== null) {
+            if (match[1] === version) continue; // reported by version-literal
+            problems.push(`${rel}:${lineOf(text, match.index)}: stale version "${match[0]}" (the version is ${version}; drop the number, or move the text to an archived history doc)`);
+        }
     }
     return problems;
 }
@@ -305,6 +333,7 @@ async function checkBuildMatch(root) {
 
 const CHECKS = {
     "version-literal": (root, files) => checkVersionLiterals(root, files),
+    "stale-version": (root, files) => checkStaleVersions(root, files),
     "local-path": (root, files) => checkLocalPaths(root, files),
     "missing-reference": (root, files) => checkReferences(root, files),
     "build-match": (root) => checkBuildMatch(root)

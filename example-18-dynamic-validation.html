@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Form Validation - Stitch.js v1.0.0</title>
+    <title>Dynamic Form Validation - Stitch.js</title>
     <script src="stitch.js"></script>
     <style>
         * {
@@ -214,7 +214,7 @@
             </div>
 
             <div class="info-box">
-                <h4>💡 v1.0.0 Features Demonstrated</h4>
+                <h4>💡 Features Demonstrated</h4>
                 <p>
                     <strong>data-event:</strong> Custom attribute for input validation<br>
                     <strong>Stitch.computed():</strong> Live validation status<br>
@@ -225,7 +225,7 @@
     </div>
 
     <script>
-        // Model definition with v1.0.0 API
+        // Model definition
         const model = Stitch.Observable.create({
             // Form fields
             validationUsername: '',
@@ -234,14 +234,14 @@
             validationConfirmPassword: '',
             validationAge: '',
 
-            // v1.0.0: Event bindings for validation
+            // Event bindings for validation
             usernameEvents: { input: 'validateUsername' },
             emailEvents: { input: 'validateEmail' },
             passwordEvents: { input: 'validatePassword' },
             confirmEvents: { input: 'validateConfirmPassword' },
             ageEvents: { input: 'validateAge' },
 
-            // v1.0.0: Computed - Field validations
+            // Computed - Field validations
             isUsernameValid: Stitch.computed(function() {
                 return this.validationUsername.length >= 3;
             }),
@@ -264,7 +264,7 @@
                 return !isNaN(age) && age >= 18 && age <= 120;
             }),
 
-            // v1.0.0: Computed - CSS classes for visual feedback
+            // Computed - CSS classes for visual feedback
             usernameClass: Stitch.computed(function() {
                 if (this.validationUsername.length === 0) return '';
                 return this.isUsernameValid ? 'valid' : 'invalid';
@@ -290,7 +290,7 @@
                 return this.isAgeValid ? 'valid' : 'invalid';
             }),
 
-            // v1.0.0: Computed - Error messages
+            // Computed - Error messages
             usernameError: Stitch.computed(function() {
                 if (this.validationUsername.length === 0) return '';
                 return this.isUsernameValid ? '' : 'Username must be at least 3 characters';
@@ -316,7 +316,7 @@
                 return this.isAgeValid ? '' : 'Age must be between 18 and 120';
             }),
 
-            // v1.0.0: Computed - Overall form validation
+            // Computed - Overall form validation
             isFormValidForSubmit: Stitch.computed(function() {
                 return this.isUsernameValid &&
                        this.isEmailValid &&
@@ -325,7 +325,7 @@
                        this.isAgeValid;
             }),
 
-            // v1.0.0: Computed - Validation summary
+            // Computed - Validation summary
             validationSummary: Stitch.computed(function() {
                 const valid = [
                     this.isUsernameValid,
@@ -384,7 +384,7 @@
         const binder = new Stitch.DataBinder();
         binder.bind('#example', model);
 
-        console.log('✅ Dynamic Form Validation example initialized (v1.0.0)');
+        console.log('✅ Dynamic Form Validation example initialized');
     </script>
 </body>
 </html>
