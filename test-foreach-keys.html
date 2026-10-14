@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js foreach key rule tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>foreach: the key rule and the one-root rule</h1>
+    <p>
+        Every list row has a unique key: an object row's <code>id</code>, or the field named by
+        <code>data-key</code>; a plain value is its own key. No fallback to the row index or to
+        <code>row.key</code>. A missing or duplicate key throws. A row template has exactly one
+        root element. The same rules hold on every list path: inline template, data-template,
+        &lt;select&gt; options, table bodies, and lists that are re-rendered or set to null.
+    </p>
+    <template id="tpl-name"><li data-text="name"></li></template>
+    <template id="tpl-value"><li data-text="$data"></li></template>
+    <template id="tpl-two-roots"><li data-text="name"></li><li data-text="name"></li></template>
+    <template id="tpl-commented">
+        <!-- one row element; the comment and whitespace do not count -->
+        <li data-text="name"></li>
+    </template>
+    <template id="tpl-empty">  <!-- nothing --> </template>
+    <template id="tpl-text">just text</template>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        const PATHS = {
+            // Each builds a list bound to "rows"; expr is the row's text binding;
+            // keyAttr is an optional data-key attribute.
+            'inline': (expr, keyAttr) => `<ul data-foreach="rows"${keyAttr}><li data-text="${expr}"></li></ul>`,
+            'data-template': (expr, keyAttr) => `<ul data-foreach="rows"${keyAttr} data-template="${expr === '$data' ? 'tpl-value' : 'tpl-name'}"></ul>`,
+            'select': (expr, keyAttr) => `<select data-foreach="rows"${keyAttr}><option data-text="${expr}"></option></select>`,
+            'tbody': (expr, keyAttr) => `<table><tbody data-foreach="rows"${keyAttr}><tr><td data-text="${expr}"></td></tr></tbody></table>`
+        };
+        const ROW_SELECTOR = { 'inline': 'li', 'data-template': 'li', 'select': 'option', 'tbody': 'td' };
+
+        StitchTest.plan([
+            ...Object.keys(PATHS).map(path => 'key-rule-' + path),
+            'key-rule-on-rerender-and-null-lists',
+            'keys-compare-as-values',
+            'data-key-misuse-throws',
+            'one-root-rule-data-template',
+            'one-root-rule-inline-ignores-whitespace-and-comments'
+        ]);
+
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        function tryBind(html, data) {
+            const host = mount(html);
+            try {
+                new Stitch.DataBinder().bind(host, Stitch.Observable.create(data));
+                return { host, error: null };
+            } catch (error) {
+                return { host, error };
+            }
+        }
+
+        const texts = (host, selector) => Array.from(host.querySelectorAll(selector)).map(el => el.textContent);
+
+        // Collects console.error lines while fn runs (a re-render error is reported there).
+        async function captureErrors(fn) {
+            const original = console.error;
+            const lines = [];
+            console.error = (...args) => { lines.push(args.map(a => a instanceof Error ? a.message : String(a)).join(' ')); };
+            try {
+                await fn();
+            } finally {
+                console.error = original;
+            }
+            return lines;
+        }
+
+        (async () => {
+            for (const path of Object.keys(PATHS)) {
+                const build = PATHS[path];
+                const rowsOf = host => texts(host, ROW_SELECTOR[path]);
+                await StitchTest.test('key-rule-' + path, async (t) => {
+                    // Control: rows keyed by id render, in order.
+                    let r = tryBind(build('name', ''), { rows: [{ id: 1, name: 'Ann' }, { id: 2, name: 'Bob' }] });
+                    t.equal(r.error, null, `${path}: rows keyed by id bind without error`);
+                    t.deepEqual(rowsOf(r.host), ['Ann', 'Bob'], `${path}: rows keyed by id render`);
+
+                    // A row without its key throws: list, row index, key field, fix.
+                    r = tryBind(build('name', ''), { rows: [{ id: 1, name: 'Ann' }, { id: 2, name: 'Bob' }, { name: 'Cy' }] });
+                    t.ok(r.error instanceof Error, `${path}: a row without an id throws`);
+                    let message = r.error ? r.error.message : '';
+                    t.match(message, /data-foreach="rows"/, `${path}: missing-key error names the list`);
+                    t.match(message, /\brow 2\b/, `${path}: missing-key error names the row index`);
+                    t.match(message, /"id"/, `${path}: missing-key error names the key field`);
+                    t.match(message, /data-key/, `${path}: missing-key error names the fix`);
+                    t.equal(rowsOf(r.host).length, 0, `${path}: nothing rendered for the rejected list`);
+
+                    // No fallback to row.key: such a row throws, and the error suggests data-key="key".
+                    r = tryBind(build('name', ''), { rows: [{ key: 'a', name: 'Ann' }] });
+                    t.ok(r.error instanceof Error, `${path}: a row with "key" but no "id" throws (no key fallback)`);
+                    t.match(r.error ? r.error.message : '', /data-key="key"/, `${path}: the error suggests data-key="key"`);
+
+                    // Duplicate keys throw: list, both row indices, the key.
+                    r = tryBind(build('name', ''), { rows: [{ id: 7, name: 'Ann' }, { id: 8, name: 'Bob' }, { id: 7, name: 'Cy' }] });
+                    t.ok(r.error instanceof Error, `${path}: duplicate ids throw`);
+                    message = r.error ? r.error.message : '';
+                    t.match(message, /data-foreach="rows"/, `${path}: duplicate-key error names the list`);
+                    t.match(message, /\brows 0 and 2\b/, `${path}: duplicate-key error names both rows`);
+                    t.match(message, /\bkey 7\b/, `${path}: duplicate-key error names the key`);
+
+                    // Plain values are their own keys: unique ones render, duplicates throw.
+                    r = tryBind(build('$data', ''), { rows: ['x', 'y', 3] });
+                    t.equal(r.error, null, `${path}: unique plain values bind`);
+                    t.deepEqual(rowsOf(r.host), ['x', 'y', '3'], `${path}: unique plain values render`);
+                    r = tryBind(build('$data', ''), { rows: ['x', 'y', 'x'] });
+                    t.ok(r.error instanceof Error, `${path}: duplicate plain values throw`);
+                    t.match(r.error ? r.error.message : '', /rows 0 and 2 have the same value "x"/, `${path}: duplicate-value error names the rows and value`);
+
+                    // data-key names the key field.
+                    r = tryBind(build('name', ' data-key="sku"'), { rows: [{ sku: 'A1', name: 'Ann' }, { sku: 'B2', name: 'Bob' }] });
+                    t.equal(r.error, null, `${path}: rows keyed by data-key bind`);
+                    t.deepEqual(rowsOf(r.host), ['Ann', 'Bob'], `${path}: rows keyed by data-key render`);
+                    r = tryBind(build('name', ' data-key="sku"'), { rows: [{ sku: 'A1', name: 'Ann' }, { id: 2, name: 'Bob' }] });
+                    t.ok(r.error instanceof Error, `${path}: a row without the data-key field throws, even with an id`);
+                    t.match(r.error ? r.error.message : '', /row 1 has no "sku"/, `${path}: the error names the data-key field and the row`);
+                });
+            }
+
+            // The rule holds when the list changes after binding, and null / undefined
+            // mean "no rows". A re-render error cannot reach bind(), so it is reported on
+            // the console, and the list stays as it was.
+            await StitchTest.test('key-rule-on-rerender-and-null-lists', async (t) => {
+                const host = mount('<ul data-foreach="rows"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({ rows: null });
+                let error = null;
+                try { new Stitch.DataBinder().bind(host, model); } catch (e) { error = e; }
+                t.equal(error, null, 'a null list binds');
+                t.equal(host.querySelectorAll('li').length, 0, 'a null list renders no rows');
+
+                model.rows = [{ id: 1, name: 'Ann' }, { id: 2, name: 'Bob' }];
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['Ann', 'Bob'], 'rows render when the list arrives');
+
+                let lines = await captureErrors(async () => {
+                    model.rows = [{ id: 1, name: 'Ann' }, { name: 'no id' }];
+                    await tick();
+                });
+                t.equal(lines.filter(line => /data-foreach="rows"/.test(line) && /row 1 has no "id"/.test(line)).length, 1,
+                    'a keyless row on re-render is reported once, naming the list and row');
+                t.deepEqual(texts(host, 'li'), ['Ann', 'Bob'], 'the rejected re-render left the rows as they were');
+
+                lines = await captureErrors(async () => {
+                    model.rows = [{ id: 3, name: 'Cy' }, { id: 3, name: 'Dee' }];
+                    await tick();
+                });
+                t.equal(lines.filter(line => /rows 0 and 1 have the same key 3/.test(line)).length, 1, 'a duplicate on re-render is reported once');
+
+                model.rows = undefined;
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 0, 'an undefined list removes every row');
+
+                lines = await captureErrors(async () => {
+                    model.rows = 'not a list';
+                    await tick();
+                });
+                t.equal(lines.filter(line => /"rows" must be an array/.test(line)).length, 1, 'a non-array list is reported, not ignored');
+
+                const direct = tryBind('<ul data-foreach="rows"><li></li></ul>', { rows: { a: 1 } });
+                t.match(direct.error ? direct.error.message : '', /"rows" must be an array.*got object/, 'binding a non-array list throws from bind()');
+            });
+
+            // Keys are compared as values: 1 and "1" are different rows; no string collision.
+            await StitchTest.test('keys-compare-as-values', async (t) => {
+                const host = mount('<ul data-foreach="rows"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({ rows: [{ id: 1, name: 'number one' }, { id: '1', name: 'string one' }] });
+                let error = null;
+                try { new Stitch.DataBinder().bind(host, model); } catch (e) { error = e; }
+                t.equal(error, null, 'ids 1 and "1" are not duplicates');
+                t.deepEqual(texts(host, 'li'), ['number one', 'string one'], 'both rows render');
+                model.rows = [model.rows[1], model.rows[0]];
+                await tick();
+                t.deepEqual(texts(host, 'li'), ['string one', 'number one'], 'after a reorder each row still shows its own object');
+                t.equal(host.querySelectorAll('li').length, 2, 'no ghost row is left behind');
+            });
+
+            await StitchTest.test('data-key-misuse-throws', async (t) => {
+                let r = tryBind('<ul data-foreach="rows" data-key=" "><li data-text="name"></li></ul>', { rows: [{ id: 1, name: 'a' }] });
+                t.match(r.error ? r.error.message : '', /data-key is empty/, 'an empty data-key throws');
+                r = tryBind('<ul data-foreach="rows" data-key="sku"><li data-text="$data"></li></ul>', { rows: ['a', 'b'] });
+                t.match(r.error ? r.error.message : '', /row 0 is a plain string.*remove data-key/, 'data-key on a list of plain values throws with the fix');
+                r = tryBind('<ul data-foreach="rows"><li data-text="$data"></li></ul>', { rows: ['a', null] });
+                t.match(r.error ? r.error.message : '', /row 1 is null/, 'a null row throws');
+            });
+
+            await StitchTest.test('one-root-rule-data-template', async (t) => {
+                let r = tryBind('<ul data-foreach="rows" data-template="tpl-two-roots"></ul>', { rows: [{ id: 1, name: 'a' }] });
+                t.ok(r.error instanceof Error, 'a data-template with 2 root elements throws');
+                const message = r.error ? r.error.message : '';
+                t.match(message, /data-foreach="rows"/, 'the error names the list');
+                t.match(message, /tpl-two-roots/, 'the error names the template');
+                t.match(message, /\b2 root elements\b/, 'the error gives the number of roots');
+                t.match(message, /\bWrap\b/, 'the error names the fix');
+
+                r = tryBind('<ul data-foreach="rows" data-template="tpl-commented"></ul>', { rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }] });
+                t.equal(r.error, null, 'comments and whitespace around the one root do not count');
+                t.deepEqual(texts(r.host, 'li'), ['a', 'b'], 'the commented template renders its rows');
+
+                r = tryBind('<ul data-foreach="rows" data-template="tpl-empty"></ul>', { rows: [] });
+                t.match(r.error ? r.error.message : '', /is empty/, 'an empty data-template throws');
+                r = tryBind('<ul data-foreach="rows" data-template="tpl-text"></ul>', { rows: [] });
+                t.match(r.error ? r.error.message : '', /text "just text".*must be one element/, 'a text-only data-template throws');
+                r = tryBind('<ul data-foreach="rows" data-template="tpl-missing"></ul>', { rows: [] });
+                t.match(r.error ? r.error.message : '', /data-template="tpl-missing" names no element/, 'a missing data-template throws');
+            });
+
+            await StitchTest.test('one-root-rule-inline-ignores-whitespace-and-comments', async (t) => {
+                let r = tryBind('<ul data-foreach="rows">\n  <!-- the row -->\n  <li data-text="name"></li>\n</ul>', { rows: [{ id: 1, name: 'a' }] });
+                t.equal(r.error, null, 'whitespace and a comment around the inline root do not count');
+                t.deepEqual(texts(r.host, 'li'), ['a'], 'the row renders');
+                r = tryBind('<ul data-foreach="rows">\n</ul>', { rows: [] });
+                t.match(r.error ? r.error.message : '', /inline row template is empty/, 'an empty inline template throws');
+                r = tryBind('<div data-foreach="rows"><b data-text="name"></b> stray <i></i></div>', { rows: [] });
+                t.match(r.error ? r.error.message : '', /3 root nodes \(<b>, text "stray", <i>\).*Wrap/, 'stray text counts as a root');
+            });
+        })();
+    </script>
+</body>
+</html>

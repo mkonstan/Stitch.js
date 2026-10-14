@@ -124,6 +124,7 @@
                 <label for="state">State / Province</label>
                 <select id="state"
                         data-foreach="cascadeAvailableStates"
+                        data-key="code"
                         data-value="cascadeSelectedState"
                         data-template="state-template"
                         data-default-text="Select a state...">
@@ -138,6 +139,7 @@
                 <label for="city">City</label>
                 <select id="city"
                         data-foreach="cascadeAvailableCities"
+                        data-key="name"
                         data-value="cascadeSelectedCity"
                         data-template="city-template"
                         data-default-text="Select a city...">

@@ -231,7 +231,7 @@
 
                 <div class="demo-box">
                     <input
-                        data-value="username" data-event="usernameEvents, class: usernameClass"
+                        data-value="username" data-event="usernameEvents" data-class="usernameClass"
                         type="text"
                         placeholder="Enter username (min 3 chars)">
                     <div class="helper-text" data-text="usernameHelperText" data-class="usernameHelperClass"></div>
@@ -299,7 +299,7 @@
                     </select>
 
                     <select
-                        data-value="selectedItem, foreach: availableItems, visible: hasCategory"
+                        data-value="selectedItem" data-foreach="availableItems" data-visible="hasCategory"
                         data-template="item-option">
                     </select>
                     <template id="item-option">
@@ -320,7 +320,7 @@
                 <div class="demo-box">
                     <div class="grid">
                         <button
-                            data-event="hoverEvents, class: hoverButtonClass"
+                            data-event="hoverEvents" data-class="hoverButtonClass"
                             style="padding: 40px;">
                             Hover Over Me
                         </button>
@@ -392,6 +392,8 @@
     </div>
 
     <script>
+        // Every list row needs a unique key: each log entry gets the next number as its id.
+        let nextEventId = 1;
         const model = Stitch.Observable.create({
             // Example 1: Username Input
             username: '',
@@ -638,6 +640,7 @@
                 const timestamp = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
                 this.eventLog.unshift({
+                    id: nextEventId++,
                     timestamp,
                     eventType,
                     message

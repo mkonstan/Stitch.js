@@ -1,38 +1,6 @@
 {
   "_about": "Tests that fail today because of a known defect. Listed + failed with exactly its \"expect\" failures = reported as known-failing. Listed + failed for any other reason = the runner FAILS (\"expect\" lists one entry per failed assertion: the failed-assertion messages, as prefixes matched on a word boundary, each at least 3 words and 15 characters and not a generic throw/precondition/control/harness line; every failure line must match one, and every one must match a failure line). Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
   "tests": {
-    "test-v3-defects.html#d1-keyless-row-throws": {
-      "defect": 1,
-      "sprint": "T1",
-      "summary": "A list row without its key renders by position instead of throwing",
-      "expect": [
-        "bind() throws when row 1 of \"people\" has no id",
-        "the error names the list",
-        "the error names the row index",
-        "the error names the key field",
-        "the error names the fix (data-key)",
-        "bind() throws when row 1 of \"holdings\" has no ticker",
-        "the data-key error names the list",
-        "the data-key error names the key field from data-key"
-      ]
-    },
-    "test-v3-defects.html#d2-same-id-new-object-rebinds": {
-      "defect": 2,
-      "sprint": "T1",
-      "summary": "Rows reloaded as new objects with the same ids keep showing the old values",
-      "expect": [
-        "rows show the new objects after a same-id reload",
-        "rows follow later changes to the new objects"
-      ]
-    },
-    "test-v3-defects.html#d3-hidden-rows-release-bindings": {
-      "defect": 3,
-      "sprint": "T1",
-      "summary": "Removed rows keep their bindings alive; one change runs once per leaked binding",
-      "expect": [
-        "one change ran exactly one binding update"
-      ]
-    },
     "test-v3-defects.html#d4-root-handler-in-nested-foreach": {
       "defect": 4,
       "sprint": "T2",
@@ -52,17 +20,6 @@
         "the error names the element",
         "the error lists the valid bindings",
         "with Stitch.debug enabled, binding a missing property reports it"
-      ]
-    },
-    "test-v3-defects.html#d7-multi-root-row-template-throws": {
-      "defect": 7,
-      "sprint": "T1",
-      "summary": "A foreach row template with several root elements silently drops all but the first",
-      "expect": [
-        "bind() throws when the row template of \"items\" has 2 root elements",
-        "the multi-root error names the list",
-        "the multi-root error gives the number of root elements",
-        "the multi-root error names the fix (wrap them in one element)"
       ]
     },
     "test-warnings.html#warns-missing-property": {

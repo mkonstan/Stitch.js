@@ -227,33 +227,8 @@ class DataBinder {
     }
 
     /**
-     * Extracts template for foreach binding.
-     * Supports inline or external (data-template).
-     * @private
-     */
-    _getTemplateSource(element) {
-        const templateId = element.getAttribute("data-template");
-        const useExternalTemplate = !!templateId;
-        if (useExternalTemplate) {
-            const templateElement = document.getElementById(templateId);
-            if (!templateElement) {
-                throw new Error(`Template '${templateId}' not found. Ensure <template id="${templateId}"> exists.`);
-            }
-            if (templateElement.tagName !== "TEMPLATE") {
-                throw new Error(`Element '${templateId}' must be a <template> element, got <${templateElement.tagName.toLowerCase()}>.`);
-            }
-            const templateContent = templateElement.content.firstElementChild;
-            if (!templateContent) {
-                throw new Error(`Template '${templateId}' is empty. Add at least one child element inside <template>.`);
-            }
-            return templateContent.outerHTML;
-        } else {
-            return element.innerHTML;
-        }
-    }
-
-    /**
-     * Removes element from tracking (does NOT clean up effects).
+     * Unbinds an element AND every element inside it: runs all their cleanups (effects
+     * released, listeners removed) and forgets them. The DOM is left as it is.
      *
      * @param {string|HTMLElement} element - CSS selector or HTMLElement
      */
@@ -262,19 +237,36 @@ class DataBinder {
             element = document.querySelector(element);
         }
         if (element) {
-            // 1. Remove from bound set
-            if (this.boundElements.has(element)) {
-                this.boundElements.delete(element);
+            this._unbindTree(element);
+        }
+    }
+
+    /**
+     * Releases the bindings of root and all of its descendants.
+     * @private
+     */
+    _unbindTree(root) {
+        this._releaseElement(root);
+        if (typeof root.querySelectorAll === "function" && root.firstElementChild) {
+            const descendants = root.querySelectorAll("*");
+            for (let i = 0; i < descendants.length; i++) {
+                this._releaseElement(descendants[i]);
             }
-            
-            // 2. Run cleanups
-            const cleanups = this._elementCleanups.get(element);
-            if (cleanups) {
-                cleanups.forEach(fn => {
-                    try { fn(); } catch(e) { console.error(e); }
-                });
-                this._elementCleanups.delete(element);
-            }
+        }
+    }
+
+    /**
+     * Runs one element's cleanups and forgets the element.
+     * @private
+     */
+    _releaseElement(element) {
+        this.boundElements.delete(element);
+        const cleanups = this._elementCleanups.get(element);
+        if (cleanups) {
+            this._elementCleanups.delete(element);
+            cleanups.forEach(fn => {
+                try { fn(); } catch (e) { console.error(`[Stitch.js ${Version}] unbind cleanup error:`, e); }
+            });
         }
     }
 

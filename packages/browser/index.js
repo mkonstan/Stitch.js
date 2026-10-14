@@ -1,7 +1,6 @@
 "use strict";
 
 const { VERSION } = require("../utils/src/version");
-const foreachRenderingDelegates = require("./src/foreach-rendering-delegates");
 const foreachBindingOrchestrator = require("./src/foreach-binding-orchestrator");
 const bindingScanHelpers = require("./src/binding-scan-helpers");
 const bindingRuntime = require("./src/binding-runtime");
@@ -11,8 +10,8 @@ const debugConfig = require("../utils/src/debug-config");
 const attrValueHandlers = require("../utils/src/attr-value-handlers");
 const valueBindingHelpers = require("../utils/src/value-binding-helpers");
 const typeConverters = require("../utils/src/type-converters");
-const foreachTemplateHelpers = require("../utils/src/foreach-template-helpers");
-const foreachReconcileHelpers = require("../utils/src/foreach-reconcile-helpers");
+const foreachKeys = require("../utils/src/foreach-keys");
+const foreachRowContext = require("../utils/src/foreach-row-context");
 
 const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
 const stitchDebug = {
@@ -44,25 +43,6 @@ function getValueHandler(element) {
     return valueBindingHelpers.getValueHandler(element, valueHandlerRegistry);
 }
 
-const renderingDelegateBundle = foreachRenderingDelegates.createRenderingDelegates({
-    stitchDebug,
-    getProperty: runtimeHelpers.getProperty,
-    getValueValidator,
-    createItemContext: foreachReconcileHelpers.createItemContext,
-    createTemplateElement: foreachTemplateHelpers.createTemplateElement,
-    reconcileRows: foreachReconcileHelpers.reconcileRows,
-    doc: typeof document !== "undefined" ? document : null
-});
-const foreachDelegates = renderingDelegateBundle.FOREACH_RENDERING_DELEGATES;
-
-function resolveExternalForeachIntegration() {
-    return {
-        bindForeach: foreachBindingOrchestrator.bindForeach,
-        getRenderingDelegate: foreachRenderingDelegates.getRenderingDelegate,
-        delegates: foreachDelegates
-    };
-}
-
 const runtimeBinding = bindingRuntime.createBindingRuntime({
     version: VERSION,
     debug: stitchDebug,
@@ -72,12 +52,19 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
     getValueValidator,
     getTypeConverter,
     getAttrHandler: attrValueHandlers.getAttrHandler,
-    getRenderingDelegate(element) {
-        return foreachRenderingDelegates.getRenderingDelegate(element, foreachDelegates);
-    },
     propertyExists: runtimeHelpers.propertyExists,
     findSimilarProperty: runtimeHelpers.findSimilarProperty,
-    resolveExternalForeachIntegration
+    bindForeach(element, viewModel, path, context, validateBinding) {
+        return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
+            validateBinding,
+            getProperty: runtimeHelpers.getProperty,
+            getValueValidator,
+            createItemContext: foreachRowContext.createItemContext,
+            resolveRowKeys: foreachKeys.resolveRowKeys,
+            version: `v${VERSION}`,
+            doc: typeof document !== "undefined" ? document : null
+        });
+    }
 });
 
 const DataBinder = dataBinderFactory.createDataBinderClass({
@@ -92,7 +79,6 @@ const DataBinder = dataBinderFactory.createDataBinderClass({
 module.exports = {
     DataBinder,
     version: VERSION,
-    ...foreachRenderingDelegates,
     ...foreachBindingOrchestrator,
     ...bindingScanHelpers,
     ...bindingRuntime,

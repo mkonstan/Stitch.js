@@ -6,8 +6,8 @@ const debugConfig = require("./src/debug-config");
 const attrValueHandlers = require("./src/attr-value-handlers");
 const valueBindingHelpers = require("./src/value-binding-helpers");
 const typeConverters = require("./src/type-converters");
-const foreachTemplateHelpers = require("./src/foreach-template-helpers");
-const foreachReconcileHelpers = require("./src/foreach-reconcile-helpers");
+const foreachKeys = require("./src/foreach-keys");
+const foreachRowContext = require("./src/foreach-row-context");
 const reactiveObjectHelpers = require("./src/reactive-object-helpers");
 const { readReactiveStats } = require("./src/reactive-stats");
 
@@ -58,7 +58,7 @@ module.exports = {
     ...attrValueHandlers,
     ...valueBindingHelpers,
     ...typeConverters,
-    ...foreachTemplateHelpers,
-    ...foreachReconcileHelpers,
+    ...foreachKeys,
+    ...foreachRowContext,
     ...reactiveObjectHelpers
 };

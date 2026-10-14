@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":25,"moduleCount":25,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/browser/src/foreach-rendering-delegates.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-reconcile-helpers.js","packages/utils/src/foreach-template-helpers.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/browser/src/foreach-rendering-delegates.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/foreach-reconcile-helpers.js","18":"packages/utils/src/foreach-template-helpers.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/reactive-stats.js","21":"packages/utils/src/runtime-helpers.js","22":"packages/utils/src/type-converters.js","23":"packages/utils/src/value-binding-helpers.js","24":"packages/utils/src/version.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":24,"moduleCount":24,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/core/index.js","9":"packages/core/src/batch-scheduler.js","10":"packages/core/src/computed-ref.js","11":"packages/core/src/message-bus.js","12":"packages/core/src/reactive-system.js","13":"packages/utils/index.js","14":"packages/utils/src/attr-value-handlers.js","15":"packages/utils/src/debug-config.js","16":"packages/utils/src/foreach-keys.js","17":"packages/utils/src/foreach-row-context.js","18":"packages/utils/src/reactive-object-helpers.js","19":"packages/utils/src/reactive-stats.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js","23":"packages/utils/src/version.js"}} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(23);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -25,11 +25,11 @@ module.exports = {
 "use strict";
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
-const { MessageBus } = __stitchRequire(12);
-const runtimeHelpers = __stitchRequire(21);
-const { defineHidden } = __stitchRequire(19);
+const { MessageBus } = __stitchRequire(11);
+const runtimeHelpers = __stitchRequire(20);
+const { defineHidden } = __stitchRequire(18);
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(23);
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
@@ -295,12 +295,12 @@ module.exports = {
   __stitchModuleFactories[2] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { ReactiveSystem } = __stitchRequire(13);
-const { ComputedRef } = __stitchRequire(11);
-const runtimeHelpers = __stitchRequire(21);
-const objectHelpers = __stitchRequire(19);
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(24);
+const { ReactiveSystem } = __stitchRequire(12);
+const { ComputedRef } = __stitchRequire(10);
+const runtimeHelpers = __stitchRequire(20);
+const objectHelpers = __stitchRequire(18);
+const { NOOP_DEBUG } = __stitchRequire(15);
+const { VERSION } = __stitchRequire(23);
 const defineHidden = objectHelpers.defineHidden;
 
 /**
@@ -1086,19 +1086,18 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
-const foreachRenderingDelegates = __stitchRequire(8);
+const { VERSION } = __stitchRequire(23);
 const foreachBindingOrchestrator = __stitchRequire(7);
 const bindingScanHelpers = __stitchRequire(5);
 const bindingRuntime = __stitchRequire(4);
 const dataBinderFactory = __stitchRequire(6);
-const runtimeHelpers = __stitchRequire(21);
-const debugConfig = __stitchRequire(16);
-const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(23);
-const typeConverters = __stitchRequire(22);
-const foreachTemplateHelpers = __stitchRequire(18);
-const foreachReconcileHelpers = __stitchRequire(17);
+const runtimeHelpers = __stitchRequire(20);
+const debugConfig = __stitchRequire(15);
+const attrValueHandlers = __stitchRequire(14);
+const valueBindingHelpers = __stitchRequire(22);
+const typeConverters = __stitchRequire(21);
+const foreachKeys = __stitchRequire(16);
+const foreachRowContext = __stitchRequire(17);
 
 const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
 const stitchDebug = {
@@ -1130,25 +1129,6 @@ function getValueHandler(element) {
     return valueBindingHelpers.getValueHandler(element, valueHandlerRegistry);
 }
 
-const renderingDelegateBundle = foreachRenderingDelegates.createRenderingDelegates({
-    stitchDebug,
-    getProperty: runtimeHelpers.getProperty,
-    getValueValidator,
-    createItemContext: foreachReconcileHelpers.createItemContext,
-    createTemplateElement: foreachTemplateHelpers.createTemplateElement,
-    reconcileRows: foreachReconcileHelpers.reconcileRows,
-    doc: typeof document !== "undefined" ? document : null
-});
-const foreachDelegates = renderingDelegateBundle.FOREACH_RENDERING_DELEGATES;
-
-function resolveExternalForeachIntegration() {
-    return {
-        bindForeach: foreachBindingOrchestrator.bindForeach,
-        getRenderingDelegate: foreachRenderingDelegates.getRenderingDelegate,
-        delegates: foreachDelegates
-    };
-}
-
 const runtimeBinding = bindingRuntime.createBindingRuntime({
     version: VERSION,
     debug: stitchDebug,
@@ -1158,12 +1138,19 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
     getValueValidator,
     getTypeConverter,
     getAttrHandler: attrValueHandlers.getAttrHandler,
-    getRenderingDelegate(element) {
-        return foreachRenderingDelegates.getRenderingDelegate(element, foreachDelegates);
-    },
     propertyExists: runtimeHelpers.propertyExists,
     findSimilarProperty: runtimeHelpers.findSimilarProperty,
-    resolveExternalForeachIntegration
+    bindForeach(element, viewModel, path, context, validateBinding) {
+        return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
+            validateBinding,
+            getProperty: runtimeHelpers.getProperty,
+            getValueValidator,
+            createItemContext: foreachRowContext.createItemContext,
+            resolveRowKeys: foreachKeys.resolveRowKeys,
+            version: `v${VERSION}`,
+            doc: typeof document !== "undefined" ? document : null
+        });
+    }
 });
 
 const DataBinder = dataBinderFactory.createDataBinderClass({
@@ -1178,7 +1165,6 @@ const DataBinder = dataBinderFactory.createDataBinderClass({
 module.exports = {
     DataBinder,
     version: VERSION,
-    ...foreachRenderingDelegates,
     ...foreachBindingOrchestrator,
     ...bindingScanHelpers,
     ...bindingRuntime,
@@ -1189,8 +1175,8 @@ module.exports = {
   __stitchModuleFactories[4] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(24);
+const { NOOP_DEBUG } = __stitchRequire(15);
+const { VERSION } = __stitchRequire(23);
 
 function createBindingRuntime(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1201,10 +1187,9 @@ function createBindingRuntime(deps = {}) {
     const getValueValidator = deps.getValueValidator;
     const getTypeConverter = deps.getTypeConverter;
     const getAttrHandler = deps.getAttrHandler;
-    const getRenderingDelegate = deps.getRenderingDelegate;
     const propertyExists = deps.propertyExists;
     const findSimilarProperty = deps.findSimilarProperty;
-    const resolveExternalForeachIntegration = deps.resolveExternalForeachIntegration || function () { return null; };
+    const bindForeach = deps.bindForeach;
 
 function validateBinding(viewModel, path, bindingType, element) {
     if (!StitchDebug.enabled) return true;
@@ -1539,32 +1524,16 @@ const BINDING_HANDLERS = {
         }
     },
     /**
-     * foreach binding - Reactive list rendering with smart reconciliation.
-     * Delegates to element-specific handlers for specialized rendering.
+     * foreach binding - Keyed list rendering (see foreach-binding-orchestrator.js).
+     * One implementation for every list element, <select> included.
      * Provides $data, $index, $parent context variables.
      */
     foreach: {
         bind(element, viewModel, path, context) {
-            const external = resolveExternalForeachIntegration();
-            if (external && typeof external.bindForeach === "function") {
-                return external.bindForeach(element, viewModel, path, context, {
-                    validateBinding: validateBinding,
-                    getProperty: getProperty,
-                    getRenderingDelegate: external.getRenderingDelegate,
-                    foreachRenderingDelegates: external.delegates
-                });
+            if (typeof bindForeach !== "function") {
+                throw new Error(`[Stitch.js ${Version}] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
             }
-
-            validateBinding(viewModel, path, "foreach", element);
-            const templateSource = context.binder._getTemplateSource(element);
-            const delegate = getRenderingDelegate(element);
-            const config = delegate.prepareConfig(element, templateSource);
-            element.innerHTML = "";
-            const eff = context.reactiveSystem.effect(() => {
-                const items = getProperty(viewModel, path);
-                delegate.render(element, items, config, context.binder, viewModel, path);
-            }, { batch: true });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            return bindForeach(element, viewModel, path, context, validateBinding);
         }
     },
     /**
@@ -1759,8 +1728,8 @@ module.exports = {
   __stitchModuleFactories[6] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(24);
+const { NOOP_DEBUG } = __stitchRequire(15);
+const { VERSION } = __stitchRequire(23);
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1986,33 +1955,8 @@ class DataBinder {
     }
 
     /**
-     * Extracts template for foreach binding.
-     * Supports inline or external (data-template).
-     * @private
-     */
-    _getTemplateSource(element) {
-        const templateId = element.getAttribute("data-template");
-        const useExternalTemplate = !!templateId;
-        if (useExternalTemplate) {
-            const templateElement = document.getElementById(templateId);
-            if (!templateElement) {
-                throw new Error(`Template '${templateId}' not found. Ensure <template id="${templateId}"> exists.`);
-            }
-            if (templateElement.tagName !== "TEMPLATE") {
-                throw new Error(`Element '${templateId}' must be a <template> element, got <${templateElement.tagName.toLowerCase()}>.`);
-            }
-            const templateContent = templateElement.content.firstElementChild;
-            if (!templateContent) {
-                throw new Error(`Template '${templateId}' is empty. Add at least one child element inside <template>.`);
-            }
-            return templateContent.outerHTML;
-        } else {
-            return element.innerHTML;
-        }
-    }
-
-    /**
-     * Removes element from tracking (does NOT clean up effects).
+     * Unbinds an element AND every element inside it: runs all their cleanups (effects
+     * released, listeners removed) and forgets them. The DOM is left as it is.
      *
      * @param {string|HTMLElement} element - CSS selector or HTMLElement
      */
@@ -2021,19 +1965,36 @@ class DataBinder {
             element = document.querySelector(element);
         }
         if (element) {
-            // 1. Remove from bound set
-            if (this.boundElements.has(element)) {
-                this.boundElements.delete(element);
+            this._unbindTree(element);
+        }
+    }
+
+    /**
+     * Releases the bindings of root and all of its descendants.
+     * @private
+     */
+    _unbindTree(root) {
+        this._releaseElement(root);
+        if (typeof root.querySelectorAll === "function" && root.firstElementChild) {
+            const descendants = root.querySelectorAll("*");
+            for (let i = 0; i < descendants.length; i++) {
+                this._releaseElement(descendants[i]);
             }
-            
-            // 2. Run cleanups
-            const cleanups = this._elementCleanups.get(element);
-            if (cleanups) {
-                cleanups.forEach(fn => {
-                    try { fn(); } catch(e) { console.error(e); }
-                });
-                this._elementCleanups.delete(element);
-            }
+        }
+    }
+
+    /**
+     * Runs one element's cleanups and forgets the element.
+     * @private
+     */
+    _releaseElement(element) {
+        this.boundElements.delete(element);
+        const cleanups = this._elementCleanups.get(element);
+        if (cleanups) {
+            this._elementCleanups.delete(element);
+            cleanups.forEach(fn => {
+                try { fn(); } catch (e) { console.error(`[Stitch.js ${Version}] unbind cleanup error:`, e); }
+            });
         }
     }
 
@@ -2121,45 +2082,304 @@ module.exports = {
 "use strict";
 
 /**
- * Orchestrates foreach binding lifecycle:
- * - validate binding path
- * - resolve template + rendering delegate
- * - install reactive effect
- * - track cleanup
+ * foreach: keyed list rendering. The ONE implementation used for every list element
+ * (ul/ol/tbody/div/... and <select> options), whether the row template is inline or
+ * comes from data-template.
  *
- * @param {HTMLElement} element
- * @param {Object} viewModel
- * @param {string} path
- * @param {Object} context
- * @param {Object} deps
- * @param {Function} deps.validateBinding
- * @param {Function} deps.getProperty
- * @param {Function} deps.getRenderingDelegate
- * @param {Object} deps.foreachRenderingDelegates
- * @returns {*}
+ * Rules:
+ * - The row template has exactly one root element (whitespace and comments ignored).
+ * - Every row has a unique key (resolveRowKeys: data-key field, default "id"; a plain
+ *   value is its own key). A list that breaks the rule throws before the DOM changes.
+ * - Same key + same object: the row is reused untouched (DOM state kept); only its
+ *   $index is updated if it moved.
+ * - Same key + a different object: the old row is released and a fresh row is bound
+ *   to the new object.
+ * - Every row that leaves the list is released (all bindings in its subtree disposed)
+ *   before it is removed. Releasing the foreach binding releases all of its rows.
  */
-function bindForeach(element, viewModel, path, context, deps) {
-    deps.validateBinding(viewModel, path, "foreach", element);
 
-    const templateSource = context.binder._getTemplateSource(element);
-    const delegate = deps.getRenderingDelegate(element, deps.foreachRenderingDelegates);
-    const config = delegate.prepareConfig(element, templateSource);
+function describeList(element, path) {
+    const keyAttr = element.getAttribute("data-key");
+    return `<${element.tagName.toLowerCase()} data-foreach="${path}"${keyAttr !== null ? ` data-key="${keyAttr}"` : ""}>`;
+}
 
-    element.innerHTML = "";
-
-    const eff = context.reactiveSystem.effect(() => {
-        const items = deps.getProperty(viewModel, path);
-        delegate.render(element, items, config, context.binder, viewModel, path);
-    }, { batch: true });
-
-    context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
-    return eff;
+function describeNode(node) {
+    if (node.nodeType === 1) return `<${node.tagName.toLowerCase()}>`;
+    const text = node.textContent.trim();
+    return `text "${text.length > 20 ? text.slice(0, 20) + "..." : text}"`;
 }
 
 /**
- * Builds a foreach binding handler compatible with BINDING_HANDLERS contract.
+ * Reads the list's key field from data-key. Absent = null (the default, "id").
+ */
+function readKeyField(element, path, version) {
+    if (!element.hasAttribute("data-key")) {
+        return null;
+    }
+    const field = element.getAttribute("data-key").trim();
+    if (!field) {
+        throw new Error(
+            `[Stitch.js ${version}] ${describeList(element, path)}: data-key is empty. ` +
+            `Set it to the field that identifies a row (e.g. data-key="sku"), or remove it to use "id".`
+        );
+    }
+    return field;
+}
+
+/**
+ * Takes the row template out of the list element (inline) or out of the <template>
+ * named by data-template, enforcing the one-root rule. Returns a detached element
+ * that is cloned for every row; it is never bound itself.
+ */
+function readRowTemplate(element, path, version, doc) {
+    const templateId = element.getAttribute("data-template");
+    const where = describeList(element, path);
+    let nodes;
+    let source;
+    if (templateId) {
+        const templateElement = doc.getElementById(templateId);
+        if (!templateElement) {
+            throw new Error(`[Stitch.js ${version}] ${where}: data-template="${templateId}" names no element. Add <template id="${templateId}"> with one row element inside.`);
+        }
+        if (templateElement.tagName !== "TEMPLATE") {
+            throw new Error(`[Stitch.js ${version}] ${where}: data-template="${templateId}" must name a <template> element, got <${templateElement.tagName.toLowerCase()}>.`);
+        }
+        nodes = Array.from(templateElement.content.childNodes);
+        source = `the row template <template id="${templateId}">`;
+    } else {
+        nodes = Array.from(element.childNodes);
+        source = "the inline row template";
+    }
+
+    const roots = nodes.filter(node =>
+        node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim() !== ""));
+
+    if (roots.length === 0) {
+        throw new Error(
+            `[Stitch.js ${version}] ${where}: ${source} is empty. ` +
+            (templateId
+                ? `Put one row element inside <template id="${templateId}">.`
+                : `Put one row element inside the list element, e.g. <li data-text="name"></li>, or point data-template at a <template>.`)
+        );
+    }
+    if (roots.length > 1) {
+        const kind = roots.every(node => node.nodeType === 1) ? "root elements" : "root nodes";
+        throw new Error(
+            `[Stitch.js ${version}] ${where}: ${source} has ${roots.length} ${kind} (${roots.map(describeNode).join(", ")}), ` +
+            `but a row must be exactly one element. Wrap them in one element, e.g. <div>...</div>.`
+        );
+    }
+    if (roots[0].nodeType !== 1) {
+        throw new Error(
+            `[Stitch.js ${version}] ${where}: ${source} is ${describeNode(roots[0])}, but a row must be one element. ` +
+            `Wrap it in an element, e.g. <span data-text="$data"></span>.`
+        );
+    }
+
+    // Inline template nodes were never bound (foreach is a binding boundary), so they can
+    // simply be taken out of the list element.
+    while (element.firstChild) {
+        element.removeChild(element.firstChild);
+    }
+    return templateId ? doc.importNode(roots[0], true) : roots[0];
+}
+
+/**
+ * Gives a row context a reactive $index, so bindings that show it follow moves.
+ */
+function defineRowIndex(itemContext, index, reactiveSystem) {
+    const holder = { index };
+    Object.defineProperty(itemContext, "$index", {
+        configurable: true,
+        enumerable: false,
+        get() {
+            reactiveSystem.track(holder, "index");
+            return holder.index;
+        }
+    });
+    return function setIndex(next) {
+        if (holder.index !== next) {
+            const previous = holder.index;
+            holder.index = next;
+            reactiveSystem.trigger(holder, "index", previous, next);
+        }
+    };
+}
+
+/**
+ * Binds a foreach list.
  *
+ * @param {HTMLElement} element - the list element (has data-foreach)
+ * @param {Object} viewModel
+ * @param {string} path - the data-foreach path
+ * @param {{reactiveSystem: Object, binder: Object}} context
  * @param {Object} deps
+ * @param {Function} deps.validateBinding
+ * @param {Function} deps.getProperty
+ * @param {Function} deps.getValueValidator
+ * @param {Function} deps.createItemContext
+ * @param {Function} deps.resolveRowKeys
+ * @param {string} deps.version
+ * @param {Document} [deps.doc]
+ * @returns {Function} the list's effect
+ */
+function bindForeach(element, viewModel, path, context, deps) {
+    const version = deps.version;
+    const doc = deps.doc || element.ownerDocument;
+    const binder = context.binder;
+    const reactiveSystem = context.reactiveSystem;
+
+    deps.validateBinding(viewModel, path, "foreach", element);
+
+    const list = {
+        name: path,
+        keyField: readKeyField(element, path, version),
+        tagName: element.tagName
+    };
+    const rowTemplate = readRowTemplate(element, path, version, doc);
+
+    const isSelect = element.tagName === "SELECT";
+    const valuePath = isSelect ? element.getAttribute("data-value") : null;
+    let placeholder = null;
+    if (isSelect && element.getAttribute("data-default-text")) {
+        placeholder = doc.createElement("option");
+        placeholder.value = element.getAttribute("data-default-value") || "";
+        placeholder.textContent = element.getAttribute("data-default-text");
+        element.appendChild(placeholder);
+    }
+
+    /** @type {Map<*, {el: HTMLElement, item: *, setIndex: Function}>} key -> row */
+    let rows = new Map();
+
+    function createRow(item, index) {
+        const el = rowTemplate.cloneNode(true);
+        const itemContext = deps.createItemContext(item, index, viewModel);
+        const setIndex = defineRowIndex(itemContext, index, reactiveSystem);
+        const row = { el, item, setIndex };
+        try {
+            // Untracked: what the row's bindings read while they are set up belongs to
+            // their own effects, not to the list (a row change must not re-render the list).
+            reactiveSystem.untracked(() => binder._bindElement(el, itemContext, []));
+        } catch (error) {
+            binder._unbindTree(el);
+            throw error;
+        }
+        return row;
+    }
+
+    function releaseRow(row) {
+        binder._unbindTree(row.el);
+        if (row.el.parentNode === element) {
+            element.removeChild(row.el);
+        }
+    }
+
+    function readItems() {
+        const value = deps.getProperty(viewModel, path);
+        if (value === undefined || value === null) {
+            return [];
+        }
+        if (!Array.isArray(value)) {
+            throw new TypeError(
+                `[Stitch.js ${version}] ${describeList(element, path)}: "${path}" must be an array (or null/undefined for no rows), ` +
+                `got ${typeof value}. Bind data-foreach to an array.`
+            );
+        }
+        return value;
+    }
+
+    function reconcile(items) {
+        // 1. Keys first: a list that breaks the key rule throws before anything changes.
+        const keys = deps.resolveRowKeys(items, list, version);
+
+        // 2. Reuse a row only for the same key AND the same object; build the others.
+        //    If building a row throws, release what was built and leave the DOM as it was.
+        const next = new Map();
+        const ordered = new Array(items.length);
+        const created = [];
+        try {
+            for (let index = 0; index < items.length; index++) {
+                const item = items[index];
+                const existing = rows.get(keys[index]);
+                let row;
+                if (existing && Object.is(existing.item, item)) {
+                    row = existing;
+                } else {
+                    row = createRow(item, index);
+                    created.push(row);
+                }
+                ordered[index] = row;
+                next.set(keys[index], row);
+            }
+        } catch (error) {
+            created.forEach(row => binder._unbindTree(row.el));
+            throw error;
+        }
+
+        // 3. Release every old row that is not reused (key gone, or a new object).
+        rows.forEach((row, key) => {
+            if (next.get(key) !== row) {
+                releaseRow(row);
+            }
+        });
+
+        // 4. Put rows in order after the placeholder (if any).
+        let cursor = placeholder ? placeholder.nextSibling : element.firstChild;
+        for (const row of ordered) {
+            if (row.el === cursor) {
+                cursor = cursor.nextSibling;
+            } else {
+                element.insertBefore(row.el, cursor);
+            }
+        }
+
+        // 5. Moved rows show their new position.
+        for (let index = 0; index < ordered.length; index++) {
+            ordered[index].setIndex(index);
+        }
+        rows = next;
+    }
+
+    function restoreSelectValue() {
+        if (valuePath) {
+            const currentValue = deps.getProperty(viewModel, valuePath);
+            if (currentValue !== undefined && currentValue !== null) {
+                const validator = deps.getValueValidator(element);
+                const validValue = validator.validate(element, currentValue, viewModel, valuePath, "render");
+                if (validValue !== undefined) {
+                    element.value = validValue;
+                }
+            } else if (placeholder) {
+                element.value = placeholder.value;
+            }
+            return;
+        }
+        // No data-value: options are reused, so the user's choice stays selected unless
+        // its option left the list.
+        if (placeholder && element.selectedIndex < 0) {
+            element.value = placeholder.value;
+        }
+    }
+
+    const effect = reactiveSystem.effect(() => {
+        reconcile(readItems());
+        if (isSelect) {
+            restoreSelectValue();
+        }
+    }, { batch: true });
+
+    binder._trackCleanup(element, () => {
+        reactiveSystem.cleanup(effect);
+        rows.forEach(row => binder._unbindTree(row.el));
+        rows = new Map();
+    });
+    return effect;
+}
+
+/**
+ * Builds a foreach binding handler compatible with the BINDING_HANDLERS contract.
+ *
+ * @param {Object} deps - see bindForeach
  * @returns {{bind: Function}}
  */
 function createForeachBindingHandler(deps) {
@@ -2172,249 +2392,20 @@ function createForeachBindingHandler(deps) {
 
 module.exports = {
     bindForeach,
-    createForeachBindingHandler
+    createForeachBindingHandler,
+    readRowTemplate,
+    readKeyField
 };
 
   };
   __stitchModuleFactories[8] = function(module, exports, __stitchRequire){
 "use strict";
 
-/**
- * Standard item rendering with full re-render on every change.
- *
- * @param {HTMLElement} element
- * @param {Array} items
- * @param {string} templateSource
- * @param {Object} binder
- * @param {Object} viewModel
- * @param {Object} deps
- * @param {Function} deps.createItemContext
- * @param {Function} deps.createTemplateElement
- */
-function renderItemsStandard(element, items, templateSource, binder, viewModel, deps) {
-    const containerTag = element.tagName.toLowerCase();
-    items.forEach((item, index) => {
-        const itemContext = deps.createItemContext(item, index, viewModel);
-        const templateEl = deps.createTemplateElement(templateSource, containerTag);
-        binder._bindElement(templateEl, itemContext, []);
-        element.appendChild(templateEl);
-    });
-}
-
-/**
- * Smart item rendering with DOM reconciliation.
- *
- * @param {HTMLElement} element
- * @param {Array} items
- * @param {string} templateSource
- * @param {Object} binder
- * @param {Object} viewModel
- * @param {Object} deps
- * @param {Function} deps.reconcileRows
- * @param {Function} deps.createItemContext
- * @param {Object} deps.stitchDebug
- */
-function renderItemsSmart(element, items, templateSource, binder, viewModel, deps) {
-    const containerTag = element.tagName.toLowerCase();
-    const stitchDebug = deps.stitchDebug;
-
-    if (stitchDebug && stitchDebug.enabled && items.length > 0 && typeof items[0] === "object" && items[0] !== null) {
-        const firstItem = items[0];
-        if (!firstItem.hasOwnProperty("id") && !firstItem.hasOwnProperty("key")) {
-            stitchDebug.log("warnings", `Performance Warning: foreach items in <${containerTag}> are objects but missing 'id' or 'key' property.`, {
-                element: element,
-                hint: "Add an 'id' or 'key' property to your items to enable smart DOM reconciliation."
-            });
-        }
-    }
-
-    const rows = deps.reconcileRows(element, items, templateSource, containerTag);
-    items.forEach((item, index) => {
-        const row = rows[index];
-        const itemContext = deps.createItemContext(item, index, viewModel);
-        if (!row._stitchItemContext) {
-            binder._bindElement(row, itemContext, []);
-            row._stitchItemContext = itemContext;
-        } else {
-            row._stitchItemContext = itemContext;
-            row._stitchItemContext.$index = index;
-        }
-    });
-}
-
-/**
- * Builds foreach rendering delegates with injected dependencies.
- *
- * @param {Object} deps
- * @param {Object} [deps.stitchDebug]
- * @param {Function} deps.getProperty
- * @param {Function} deps.getValueValidator
- * @param {Function} deps.createItemContext
- * @param {Function} deps.createTemplateElement
- * @param {Function} deps.reconcileRows
- * @param {Document} [deps.doc]
- * @returns {Object}
- */
-function createRenderingDelegates(deps) {
-    const stitchDebug = deps.stitchDebug || { enabled: false, log: function () {} };
-    const getProperty = deps.getProperty;
-    const getValueValidator = deps.getValueValidator;
-    const doc = deps.doc || (typeof document !== "undefined" ? document : null);
-
-    const renderStandard = function (element, items, templateSource, binder, viewModel) {
-        return renderItemsStandard(element, items, templateSource, binder, viewModel, deps);
-    };
-    const renderSmart = function (element, items, templateSource, binder, viewModel) {
-        return renderItemsSmart(element, items, templateSource, binder, viewModel, {
-            reconcileRows: deps.reconcileRows,
-            createItemContext: deps.createItemContext,
-            stitchDebug
-        });
-    };
-
-    const SELECT_RENDERING_DELEGATE = {
-        prepareConfig(element, templateSource) {
-            return {
-                templateSource: templateSource,
-                placeholderText: element.getAttribute("data-default-text"),
-                placeholderValue: element.getAttribute("data-default-value") || "",
-                hasPlaceholder: !!element.getAttribute("data-default-text")
-            };
-        },
-        render(element, items, config, binder, viewModel, path) {
-            if (stitchDebug.enabled && Array.isArray(items) && items.length > 100) {
-                stitchDebug.log("warnings", `Performance Warning: <select> with ${items.length} items triggers full re-render on every update.`, {
-                    element: element,
-                    hint: "Consider using a virtualization library or custom component for large dropdowns."
-                });
-            }
-
-            const valuePath = element.getAttribute("data-value");
-            const currentValue = valuePath ? getProperty(viewModel, valuePath) : element.value;
-            element.innerHTML = "";
-
-            if (config.hasPlaceholder) {
-                if (!doc) {
-                    throw new Error("createRenderingDelegates requires a document instance for select placeholder rendering.");
-                }
-                const placeholderOpt = doc.createElement("option");
-                placeholderOpt.value = config.placeholderValue;
-                placeholderOpt.textContent = config.placeholderText;
-                element.appendChild(placeholderOpt);
-            }
-
-            if (Array.isArray(items)) {
-                renderStandard(element, items, config.templateSource, binder, viewModel);
-            }
-
-            if (currentValue !== undefined && currentValue !== null) {
-                if (valuePath) {
-                    const validator = getValueValidator(element);
-                    const validValue = validator.validate(element, currentValue, viewModel, valuePath, "render");
-                    if (validValue !== undefined) {
-                        element.value = validValue;
-                    }
-                } else if (config.hasPlaceholder) {
-                    element.value = config.placeholderValue;
-                }
-            } else if (config.hasPlaceholder) {
-                element.value = config.placeholderValue;
-            }
-        }
-    };
-
-    const LIST_RENDERING_DELEGATE = {
-        prepareConfig(element, templateSource) {
-            return {
-                templateSource: templateSource
-            };
-        },
-        render(element, items, config, binder, viewModel, path) {
-            if (Array.isArray(items)) {
-                renderSmart(element, items, config.templateSource, binder, viewModel);
-            } else {
-                element.innerHTML = "";
-            }
-        }
-    };
-
-    const TABLE_RENDERING_DELEGATE = {
-        prepareConfig(element, templateSource) {
-            return {
-                templateSource: templateSource
-            };
-        },
-        render(element, items, config, binder, viewModel, path) {
-            if (Array.isArray(items)) {
-                renderSmart(element, items, config.templateSource, binder, viewModel);
-            } else {
-                element.innerHTML = "";
-            }
-        }
-    };
-
-    const DEFAULT_RENDERING_DELEGATE = {
-        prepareConfig(element, templateSource) {
-            return {
-                templateSource: templateSource
-            };
-        },
-        render(element, items, config, binder, viewModel, path) {
-            if (Array.isArray(items)) {
-                renderSmart(element, items, config.templateSource, binder, viewModel);
-            } else {
-                element.innerHTML = "";
-            }
-        }
-    };
-
-    const FOREACH_RENDERING_DELEGATES = {
-        select: SELECT_RENDERING_DELEGATE,
-        ul: LIST_RENDERING_DELEGATE,
-        ol: LIST_RENDERING_DELEGATE,
-        tbody: TABLE_RENDERING_DELEGATE,
-        thead: TABLE_RENDERING_DELEGATE,
-        tfoot: TABLE_RENDERING_DELEGATE,
-        default: DEFAULT_RENDERING_DELEGATE
-    };
-
-    return {
-        SELECT_RENDERING_DELEGATE,
-        LIST_RENDERING_DELEGATE,
-        TABLE_RENDERING_DELEGATE,
-        DEFAULT_RENDERING_DELEGATE,
-        FOREACH_RENDERING_DELEGATES
-    };
-}
-
-/**
- * Selects rendering delegate by tag name.
- *
- * @param {HTMLElement} element
- * @param {Object} delegates
- * @returns {Object}
- */
-function getRenderingDelegate(element, delegates) {
-    const tagName = element.tagName.toLowerCase();
-    return delegates[tagName] || delegates.default;
-}
-
-module.exports = {
-    renderItemsStandard,
-    renderItemsSmart,
-    createRenderingDelegates,
-    getRenderingDelegate
-};
-
-  };
-  __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
-"use strict";
-
-const { VERSION } = __stitchRequire(24);
-const { MessageBus } = __stitchRequire(12);
-const { BatchScheduler } = __stitchRequire(10);
-const { ComputedRef } = __stitchRequire(11);
-const { ReactiveSystem } = __stitchRequire(13);
+const { VERSION } = __stitchRequire(23);
+const { MessageBus } = __stitchRequire(11);
+const { BatchScheduler } = __stitchRequire(9);
+const { ComputedRef } = __stitchRequire(10);
+const { ReactiveSystem } = __stitchRequire(12);
 
 module.exports = {
     MessageBus,
@@ -2426,11 +2417,11 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[10] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(24);
+const { NOOP_DEBUG } = __stitchRequire(15);
+const { VERSION } = __stitchRequire(23);
 
 class BatchScheduler {
     constructor(options = {}) {
@@ -2522,7 +2513,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[11] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[10] = function(module, exports, __stitchRequire){
 "use strict";
 
 // The dependency key under which readers of a computed subscribe to it. Readers live in
@@ -2612,11 +2603,11 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[12] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[11] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(24);
+const { NOOP_DEBUG } = __stitchRequire(15);
+const { VERSION } = __stitchRequire(23);
 
 class MessageBus {
     constructor(options = {}) {
@@ -2761,13 +2752,13 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[13] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[12] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { MessageBus, NOOP_DEBUG } = __stitchRequire(12);
-const { BatchScheduler } = __stitchRequire(10);
-const { VERSION } = __stitchRequire(24);
-const { REACTIVE_TOTALS } = __stitchRequire(20);
+const { MessageBus, NOOP_DEBUG } = __stitchRequire(11);
+const { BatchScheduler } = __stitchRequire(9);
+const { VERSION } = __stitchRequire(23);
+const { REACTIVE_TOTALS } = __stitchRequire(19);
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
@@ -2974,6 +2965,19 @@ class ReactiveSystem {
     }
 
     /**
+     * Runs fn without subscribing the current effect to anything fn reads.
+     * Effects created inside fn still track their own reads.
+     */
+    untracked(fn) {
+        this.effectStack.push(null);
+        try {
+            return fn();
+        } finally {
+            this.effectStack.pop();
+        }
+    }
+
+    /**
      * Releases an effect for good: it leaves every dependency set it joined
      * (reactive properties and computeds), leaves the batch queue, and never runs again.
      * Safe to call more than once.
@@ -3053,19 +3057,19 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[13] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
-const helpers = __stitchRequire(21);
-const debugConfig = __stitchRequire(16);
-const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(23);
-const typeConverters = __stitchRequire(22);
-const foreachTemplateHelpers = __stitchRequire(18);
-const foreachReconcileHelpers = __stitchRequire(17);
-const reactiveObjectHelpers = __stitchRequire(19);
-const { readReactiveStats } = __stitchRequire(20);
+const { VERSION } = __stitchRequire(23);
+const helpers = __stitchRequire(20);
+const debugConfig = __stitchRequire(15);
+const attrValueHandlers = __stitchRequire(14);
+const valueBindingHelpers = __stitchRequire(22);
+const typeConverters = __stitchRequire(21);
+const foreachKeys = __stitchRequire(16);
+const foreachRowContext = __stitchRequire(17);
+const reactiveObjectHelpers = __stitchRequire(18);
+const { readReactiveStats } = __stitchRequire(19);
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -3114,13 +3118,13 @@ module.exports = {
     ...attrValueHandlers,
     ...valueBindingHelpers,
     ...typeConverters,
-    ...foreachTemplateHelpers,
-    ...foreachReconcileHelpers,
+    ...foreachKeys,
+    ...foreachRowContext,
     ...reactiveObjectHelpers
 };
 
   };
-  __stitchModuleFactories[15] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3207,7 +3211,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[15] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3305,13 +3309,141 @@ module.exports = {
 };
 
   };
+  __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
+"use strict";
+
+/**
+ * THE key rule for list rows. Every foreach path (inline template, data-template,
+ * <select> options, lists that come and go) resolves row keys here and nowhere else.
+ *
+ * - A row that is an object: its key is row[keyField]. keyField is the list's data-key
+ *   attribute, or "id" when the list has none.
+ * - A row that is a plain value (string, number, boolean, ...): the value is its own key.
+ * - No fallback to the row index and none to row.key: a missing key throws.
+ * - Two rows with the same key throw.
+ *
+ * Keys are compared as JavaScript values (Map semantics): 1 and "1" are different keys.
+ */
+
+// Field names worth suggesting when a row lacks its key field.
+const LIKELY_KEY_FIELD = /^(key|uuid|guid|code|sku|ticker|slug|symbol)$|[a-z0-9](Id|ID|Key|Code)$|_(id|key|code)$/;
+
+function describeList(list) {
+    const tag = list.tagName ? list.tagName.toLowerCase() : "element";
+    const keyAttr = list.keyField ? ` data-key="${list.keyField}"` : "";
+    return `<${tag} data-foreach="${list.name}"${keyAttr}>`;
+}
+
+function formatKey(value) {
+    if (typeof value === "string") return JSON.stringify(value);
+    if (typeof value === "symbol") return value.toString();
+    return String(value);
+}
+
+function suggestKeyField(row, missingField) {
+    let names;
+    try {
+        names = Object.keys(row);
+    } catch (error) {
+        return null;
+    }
+    for (const name of names) {
+        if (name === missingField || !LIKELY_KEY_FIELD.test(name)) continue;
+        const value = row[name];
+        if (value !== undefined && value !== null && typeof value !== "object" && typeof value !== "function") {
+            return name;
+        }
+    }
+    return null;
+}
+
+function missingKeyError(version, list, index, field, row) {
+    const where = describeList(list);
+    const which = list.keyField ? "the key field set by data-key" : "the default key field";
+    const suggestion = list.keyField ? null : suggestKeyField(row, field);
+    let fix;
+    if (suggestion) {
+        fix = `This row has "${suggestion}": if that identifies a row, add data-key="${suggestion}" to ${where}.`;
+    } else if (list.keyField) {
+        fix = `Give every row a "${field}", or set data-key to a field that every row has.`;
+    } else {
+        fix = `Give every row an "id", or name the key field with data-key, e.g. <${(list.tagName || "ul").toLowerCase()} data-foreach="${list.name}" data-key="sku">.`;
+    }
+    return new Error(
+        `[Stitch.js ${version}] ${where}: row ${index} has no "${field}" (${which}). ` +
+        `Every row of a list needs a unique key. ${fix}`
+    );
+}
+
+/**
+ * Resolves the key of every row, in order. Throws (and changes nothing) if any row has
+ * no key or two rows share one.
+ *
+ * @param {Array} items - the list's rows
+ * @param {{name: string, keyField: (string|null), tagName: string}} list
+ *        name = the data-foreach path; keyField = the data-key value (null = "id");
+ *        tagName = the list element's tag, for the message
+ * @param {string} version - for the error prefix
+ * @returns {Array} keys, one per row
+ */
+function resolveRowKeys(items, list, version) {
+    const keys = new Array(items.length);
+    const seen = new Map();
+    const field = list.keyField || "id";
+
+    for (let index = 0; index < items.length; index++) {
+        const row = items[index];
+        let key;
+        if (row !== null && typeof row === "object") {
+            key = row[field];
+            if (key === undefined || key === null) {
+                throw missingKeyError(version, list, index, field, row);
+            }
+        } else if (row === undefined || row === null) {
+            throw new Error(
+                `[Stitch.js ${version}] ${describeList(list)}: row ${index} is ${row}. ` +
+                `A list row must be an object with a key, or a plain value (string, number, boolean). ` +
+                `Remove the empty row from the list.`
+            );
+        } else if (list.keyField) {
+            throw new Error(
+                `[Stitch.js ${version}] ${describeList(list)}: row ${index} is a plain ${typeof row} (${formatKey(row)}), ` +
+                `so it has no "${list.keyField}" field. data-key is for lists of objects; ` +
+                `remove data-key and each plain value is its own key.`
+            );
+        } else {
+            key = row;
+        }
+
+        if (seen.has(key)) {
+            const first = seen.get(key);
+            const what = (row !== null && typeof row === "object")
+                ? `the same key ${formatKey(key)} (field "${field}")`
+                : `the same value ${formatKey(key)} (in a list of plain values each value is its own key)`;
+            throw new Error(
+                `[Stitch.js ${version}] ${describeList(list)}: rows ${first} and ${index} have ${what}. ` +
+                `Keys must be unique within a list: remove the duplicate, or key the rows by a field that is unique.`
+            );
+        }
+        seen.set(key, index);
+        keys[index] = key;
+    }
+    return keys;
+}
+
+module.exports = {
+    resolveRowKeys
+};
+
+  };
   __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { createTemplateElement: defaultCreateTemplateElement } = __stitchRequire(18);
-
 /**
- * Creates item context object with $data, $index, $parent for foreach templates.
+ * Creates the binding context of one foreach row: the row's own fields (through the
+ * prototype chain, so two-way bindings write to the row object), plus $data (the row
+ * itself), $index and $parent (the list's view model).
+ * The foreach binding replaces $index with a reactive accessor.
  *
  * @param {*} item
  * @param {number} index
@@ -3336,185 +3468,12 @@ function createItemContext(item, index, viewModel) {
     return context;
 }
 
-/**
- * Generates a stable key for array reconciliation.
- *
- * @param {*} item
- * @param {number} index
- * @returns {string}
- */
-function getItemKey(item, index) {
-    if (typeof item === "object" && item !== null) {
-        if (item.id !== undefined) return `item-${item.id}`;
-        if (item.key !== undefined) return `item-${item.key}`;
-    }
-    return `item-${index}`;
-}
-
-/**
- * Reconciles container rows by keyed reuse and creation.
- *
- * @param {HTMLElement} container
- * @param {Array} newItems
- * @param {string} templateSource
- * @param {string} containerTag
- * @param {Object} [deps]
- * @param {Function} [deps.createTemplateElement]
- * @returns {HTMLElement[]}
- */
-function reconcileRows(container, newItems, templateSource, containerTag, deps = {}) {
-    const createTemplate = deps.createTemplateElement || defaultCreateTemplateElement;
-
-    const existingRows = Array.from(container.children);
-    const newRowElements = [];
-    const existingRowsByKey = new Map();
-
-    existingRows.forEach((row, index) => {
-        const key = row.dataset.stitchKey || `item-${index}`;
-        existingRowsByKey.set(key, row);
-    });
-
-    newItems.forEach((item, index) => {
-        const key = getItemKey(item, index);
-        if (existingRowsByKey.has(key)) {
-            const existingRow = existingRowsByKey.get(key);
-            newRowElements.push(existingRow);
-            existingRowsByKey.delete(key);
-        } else {
-            const templateEl = createTemplate(templateSource, containerTag);
-            templateEl.dataset.stitchKey = key;
-            newRowElements.push(templateEl);
-        }
-    });
-
-    existingRowsByKey.forEach(row => {
-        row.remove();
-    });
-
-    newRowElements.forEach((row, index) => {
-        if (container.children[index] !== row) {
-            container.insertBefore(row, container.children[index] || null);
-        }
-    });
-
-    return newRowElements;
-}
-
 module.exports = {
-    createItemContext,
-    getItemKey,
-    reconcileRows
+    createItemContext
 };
 
   };
   __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
-"use strict";
-
-/**
- * Configuration registry for HTML container-specific template parsing.
- */
-const FOREACH_CONTAINER_HANDLERS = {
-    tbody: {
-        wrapperTag: "table",
-        innerTag: "tbody",
-        needsWrapper: true
-    },
-    thead: {
-        wrapperTag: "table",
-        innerTag: "thead",
-        needsWrapper: true
-    },
-    tfoot: {
-        wrapperTag: "table",
-        innerTag: "tfoot",
-        needsWrapper: true
-    },
-    ul: {
-        containerTag: "ul",
-        needsWrapper: false
-    },
-    ol: {
-        containerTag: "ol",
-        needsWrapper: false
-    },
-    select: {
-        containerTag: "select",
-        needsWrapper: false
-    },
-    default: {
-        containerTag: "div",
-        needsWrapper: false
-    }
-};
-
-/**
- * Creates temporary DOM container for parsing template HTML strings.
- *
- * @param {string} template
- * @param {Object} handler
- * @param {Document} [doc]
- * @returns {{container: HTMLElement, inner: HTMLElement|null}}
- */
-function createTempContainer(template, handler, doc = (typeof document !== "undefined" ? document : null)) {
-    if (!doc) {
-        throw new Error("createTempContainer requires a document instance.");
-    }
-    if (handler.needsWrapper) {
-        const wrapper = doc.createElement(handler.wrapperTag);
-        const inner = doc.createElement(handler.innerTag);
-        inner.innerHTML = template;
-        wrapper.appendChild(inner);
-        return {
-            container: wrapper,
-            inner
-        };
-    }
-    const container = doc.createElement(handler.containerTag);
-    container.innerHTML = template;
-    return {
-        container,
-        inner: null
-    };
-}
-
-/**
- * Extracts template elements from a temporary container result.
- *
- * @param {{container: HTMLElement, inner: HTMLElement|null}} tempContainerResult
- * @returns {HTMLElement[]}
- */
-function extractElements(tempContainerResult) {
-    const source = tempContainerResult.inner || tempContainerResult.container;
-    return Array.from(source.children);
-}
-
-/**
- * Creates template DOM element from HTML string.
- *
- * @param {string} templateSource
- * @param {string} containerTag
- * @param {Object} [options]
- * @param {Object} [options.handlers]
- * @param {Document} [options.doc]
- * @returns {HTMLElement|undefined}
- */
-function createTemplateElement(templateSource, containerTag, options = {}) {
-    const handlers = options.handlers || FOREACH_CONTAINER_HANDLERS;
-    const handler = handlers[containerTag] || handlers.default;
-    const tempResult = createTempContainer(templateSource, handler, options.doc);
-    const templateElements = extractElements(tempResult);
-    return templateElements[0];
-}
-
-module.exports = {
-    FOREACH_CONTAINER_HANDLERS,
-    createTempContainer,
-    extractElements,
-    createTemplateElement
-};
-
-  };
-  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
 function defineHidden(target, name, value) {
@@ -3561,7 +3520,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3591,10 +3550,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(23);
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -3734,10 +3693,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION: DEFAULT_VERSION } = __stitchRequire(24);
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(23);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -3950,7 +3909,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4177,7 +4136,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
 module.exports = { VERSION: "2.1.0" };
@@ -4212,8 +4171,8 @@ module.exports = { VERSION: "2.1.0" };
 
     const api = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(0) || require("./packages/api/index.js")) : require("./packages/api/index.js"));
     const browser = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(3) || require("./packages/browser/index.js")) : require("./packages/browser/index.js"));
-    const core = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(9) || require("./packages/core/index.js")) : require("./packages/core/index.js"));
-    const utils = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(14) || require("./packages/utils/index.js")) : require("./packages/utils/index.js"));
+    const core = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(8) || require("./packages/core/index.js")) : require("./packages/core/index.js"));
+    const utils = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(13) || require("./packages/utils/index.js")) : require("./packages/utils/index.js"));
 
     if (!api || !browser || !core || !utils) {
         throw new Error("Stitch.js bootstrap failed: one or more package modules could not be resolved.");

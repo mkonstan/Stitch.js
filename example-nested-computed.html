@@ -126,11 +126,14 @@
 
     <div id="test-container">
         <!-- Template will be repeated for each user -->
-        <div class="user-card" data-foreach="users">
-            <h4 data-text="fullName"></h4>
-            <div class="user-info">
-                <span class="status-badge" data-text="statusLabel" data-class="statusClass"></span>
-                <button data-click="$parent.toggleStatus">Toggle Status</button>
+        <!-- A row template has exactly one root element: the card wraps the heading and the info. -->
+        <div data-foreach="users">
+            <div class="user-card">
+                <h4 data-text="fullName"></h4>
+                <div class="user-info">
+                    <span class="status-badge" data-text="statusLabel" data-class="statusClass"></span>
+                    <button data-click="$parent.toggleStatus">Toggle Status</button>
+                </div>
             </div>
         </div>
     </div>
@@ -234,9 +237,10 @@
                 ],
 
                 // Toggle function accessible via $parent in foreach
-                toggleStatus: function(e, context) {
-                    console.log('🔄 Toggling status for:', context.$data);
-                    context.$data.isActive = !context.$data.isActive;
+                // data-click="$parent.toggleStatus" passes the clicked row's user.
+                toggleStatus: function(user) {
+                    console.log('🔄 Toggling status for:', user);
+                    user.isActive = !user.isActive;
                 }
             });
 

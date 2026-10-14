@@ -75,9 +75,10 @@
         Stitch.debug.enable();
 
         // Setup Data
+        // v3: list rows must be keyed (a keyless row throws), so these rows carry ids.
         const itemsNoKeys = [
-            { name: 'Item 1' },
-            { name: 'Item 2' }
+            { id: 1, name: 'Item 1' },
+            { id: 2, name: 'Item 2' }
         ];
 
         const largeList = [];

@@ -414,8 +414,8 @@
 
                 const model2 = Stitch.Observable.create({
                     users: [
-                        { name: 'Alice' },
-                        { name: 'Bob' }
+                        { id: 1, name: 'Alice' },
+                        { id: 2, name: 'Bob' }
                     ]
                 });
 
@@ -459,6 +459,7 @@
             const model1 = Stitch.Observable.create({
                 users: [
                     {
+                        id: 1,
                         firstName: 'John',
                         lastName: 'Doe',
                         fullName: Stitch.computed(function() {
@@ -466,6 +467,7 @@
                         })
                     },
                     {
+                        id: 2,
                         firstName: 'Jane',
                         lastName: 'Smith',
                         fullName: Stitch.computed(function() {
@@ -495,6 +497,7 @@
                     );
 
                     model1.users.push({
+                        id: 3,
                         firstName: 'Bob',
                         lastName: 'Johnson',
                         fullName: Stitch.computed(function() {

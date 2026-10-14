@@ -107,8 +107,7 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/browser/src/data-binder.js` | `DataBinder` class factory, bind traversal, hook dispatch, cleanup/dispose lifecycle | app code |
 | `packages/browser/src/binding-runtime.js` | Built-in binding handler registry + validation + runtime integrations | `DataBinder` |
 | `packages/browser/src/binding-scan-helpers.js` | Attribute scan and binding handler lookup helpers | `binding-runtime`, `DataBinder` |
-| `packages/browser/src/foreach-binding-orchestrator.js` | Foreach binding orchestration (effect setup and cleanup wiring) | `binding-runtime` |
-| `packages/browser/src/foreach-rendering-delegates.js` | Container-specific foreach rendering strategies (select/list/table/default) | foreach runtime |
+| `packages/browser/src/foreach-binding-orchestrator.js` | The one foreach implementation for every list element (`<select>` included): row template (one-root rule), keyed reconciliation, row release | `binding-runtime` |
 
 ### 4.4 Utils Package (`packages/utils`)
 
@@ -120,8 +119,8 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/utils/src/attr-value-handlers.js` | `data-attr` value-type strategy handlers | browser binding runtime |
 | `packages/utils/src/value-binding-helpers.js` | value validators and value handlers (input/select/radio/number/range/default) | browser binding runtime |
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
-| `packages/utils/src/foreach-template-helpers.js` | foreach template parsing/container handling | foreach render/reconcile |
-| `packages/utils/src/foreach-reconcile-helpers.js` | keyed row reconciliation and item context creation | foreach rendering |
+| `packages/utils/src/foreach-keys.js` | The list key rule (`id` / `data-key` / plain values; missing or duplicate keys throw) | foreach binding |
+| `packages/utils/src/foreach-row-context.js` | Row binding context (`$data`, `$index`, `$parent`) | foreach binding |
 | `packages/utils/src/reactive-stats.js` | Live effect and subscription counts behind `Stitch.debug.stats()` | reactive system, utils debug facade |
 | `packages/utils/src/version.js` | The release version: reads the root `package.json` when unbuilt; the build stamps it as a constant in the bundle | every package entry and versioned class |
 | `packages/utils/src/reactive-object-helpers.js` | `defineHidden()` helper, change-handler add/remove, and `toJSON` serialization helpers | reactive factory, observable |

@@ -355,7 +355,7 @@
 
                     <ul data-foreach="todos">
                         <li>
-                            <span data-text="$data"></span>
+                            <span data-text="text"></span>
                             <div class="item-actions">
                                 <span style="color: #666;">#<span data-text="$index"></span></span>
                                 <button data-click="$parent.removeTodo">Remove</button>
@@ -364,7 +364,7 @@
                     </ul>
 
                     <strong style="margin-top: 15px; display: block;">External Template (Dropdown):</strong>
-                    <select data-foreach="countries" data-value="selectedCountry" data-template="country-template"
+                    <select data-foreach="countries" data-key="code" data-value="selectedCountry" data-template="country-template"
                         data-default-text="Select a country...">
                     </select>
 
@@ -547,7 +547,13 @@
                 // Section 5: Rendering Lists (ForEach)
                 // ========================================
                 newTodo: '',
-                todos: ['Buy groceries', 'Walk the dog', 'Write code'],
+                // Every list row needs a unique key: todos carry an id (see addTodo).
+                todos: [
+                    { id: 1, text: 'Buy groceries' },
+                    { id: 2, text: 'Walk the dog' },
+                    { id: 3, text: 'Write code' }
+                ],
+                nextTodoId: 4,
 
                 countries: [
                     { code: 'US', name: 'United States' },
@@ -563,14 +569,17 @@
 
                 addTodo() {
                     if (this.newTodo.trim()) {
-                        this.todos.push(this.newTodo.trim());
+                        this.todos.push({ id: this.nextTodoId++, text: this.newTodo.trim() });
                         this.newTodo = '';
                     }
                 },
 
-                removeTodo(event, context) {
-                    const index = context.$index;
-                    this.todos.splice(index, 1);
+                // data-click="$parent.removeTodo" passes the clicked row's todo.
+                removeTodo(todo) {
+                    const index = this.todos.indexOf(todo);
+                    if (index > -1) {
+                        this.todos.splice(index, 1);
+                    }
                 },
 
                 clearTodos() {

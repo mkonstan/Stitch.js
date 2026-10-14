@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js foreach lifecycle tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>foreach: row lifecycle</h1>
+    <p>
+        Every row that leaves a list releases every binding in its subtree. After many filter,
+        hide/show and &lt;select&gt; re-render cycles the number of live effects equals the
+        number of bindings on the page, and one change runs one update per live binding that
+        reads it. A row is reused only for the same key and the same object.
+        Counts come from <code>Stitch.debug.stats()</code>.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'filter-100-cycles',
+            'hide-show-100-cycles',
+            'select-rerender-100-cycles',
+            'list-replacement-releases-rows',
+            'removed-row-releases-nested-lists',
+            'unbind-releases-descendants',
+            'same-key-same-object-row-untouched',
+            'same-key-new-object-row-rebound',
+            'index-follows-moves',
+            'row-change-does-not-rerender-list'
+        ]);
+
+        const CYCLES = 100;
+        const tick = () => new Promise(resolve => setTimeout(resolve, 20));
+        const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+        const stats = () => Stitch.debug.stats();
+
+        // Bindings that each own exactly one effect. data-click owns none.
+        const EFFECT_BINDINGS = ['text', 'value', 'visible', 'enabled', 'class', 'attr', 'event', 'foreach', 'loading', 'probe'];
+        function countBindings(host) {
+            let count = 0;
+            [host, ...host.querySelectorAll('*')].forEach(el => {
+                EFFECT_BINDINGS.forEach(name => { if (el.hasAttribute('data-' + name)) count++; });
+            });
+            return count;
+        }
+
+        // data-probe: a custom binding written as documented (an effect plus its cleanup),
+        // counting every run of every instance, live or not.
+        let probeRuns = 0;
+        Stitch.DataBinder.registerBinding('probe', {
+            bind(element, viewModel, path, context) {
+                const effect = context.reactiveSystem.effect(() => {
+                    probeRuns++;
+                    const parts = path.split('.');
+                    let value = viewModel;
+                    parts.forEach(part => { value = value == null ? undefined : value[part]; });
+                    element.textContent = value;
+                });
+                context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
+            }
+        });
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        const texts = (host, selector) => Array.from(host.querySelectorAll(selector)).map(el => el.textContent);
+        const makeItems = n => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: 'item' + (i + 1) }));
+
+        // The defect-3 gate, asserted after the cycles of each kind.
+        async function assertLiveCountsAndOneUpdate(t, host, base, model, label) {
+            const liveRows = host.querySelectorAll('[data-probe="name"]').length;
+            t.ok(liveRows > 0, `${label}: precondition: rows are visible`);
+            t.equal(stats().effects - base.effects, countBindings(host), `${label}: live effects = live bindings`);
+
+            let before = probeRuns;
+            model.items[0].name = 'renamed';
+            await tick();
+            t.equal(probeRuns - before, 1, `${label}: one row change ran exactly one update`);
+
+            before = probeRuns;
+            model.suffix = model.suffix + '!';
+            await tick();
+            t.equal(probeRuns - before, liveRows, `${label}: one list-wide change ran one update per live row`);
+        }
+
+        (async () => {
+            await StitchTest.test('filter-100-cycles', async (t) => {
+                const host = mount('<input data-value="mode"><ul data-foreach="shown"><li><span data-probe="name"></span>' +
+                    '<i data-probe="$parent.suffix"></i><b data-text="name"></b></li></ul>');
+                const base = stats();
+                const model = Stitch.Observable.create({
+                    items: makeItems(6), mode: 'all', suffix: '',
+                    shown: Stitch.computed(function () {
+                        return this.mode === 'all' ? this.items.slice() : this.items.filter(item => item.id % 2 === 1);
+                    })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                for (let cycle = 0; cycle < CYCLES; cycle++) {
+                    model.mode = 'odd'; await flush();
+                    model.mode = 'all'; await flush();
+                }
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 6, 'precondition: all 6 rows shown after the cycles');
+                await assertLiveCountsAndOneUpdate(t, host, base, model, 'filter');
+            });
+
+            await StitchTest.test('hide-show-100-cycles', async (t) => {
+                const host = mount('<ul data-foreach="shown"><li><span data-probe="name"></span>' +
+                    '<i data-probe="$parent.suffix"></i><b data-class="flags"></b></li></ul>');
+                const base = stats();
+                const model = Stitch.Observable.create({
+                    items: makeItems(4).map(item => Object.assign(item, { flags: { on: true } })), hide: false, suffix: '',
+                    shown: Stitch.computed(function () { return this.hide ? [] : this.items.slice(); })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                for (let cycle = 0; cycle < CYCLES; cycle++) {
+                    model.hide = true; await flush();
+                    model.hide = false; await flush();
+                }
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 4, 'precondition: 4 rows shown after the cycles');
+                await assertLiveCountsAndOneUpdate(t, host, base, model, 'hide/show');
+            });
+
+            await StitchTest.test('select-rerender-100-cycles', async (t) => {
+                const host = mount('<select data-foreach="shown" data-value="picked" data-default-text="Pick one">' +
+                    '<option data-attr="optionAttrs" data-probe="name"></option></select>' +
+                    '<p data-probe="suffix"></p>');
+                const base = stats();
+                const model = Stitch.Observable.create({
+                    items: makeItems(5).map(item => Object.assign(item, { optionAttrs: { value: 'v' + item.id } })),
+                    short: false, picked: 'v2', suffix: '',
+                    shown: Stitch.computed(function () { return this.short ? this.items.slice(0, 2) : this.items.slice(); })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                // Each cycle also changes the bound value, which re-renders the options too.
+                for (let cycle = 0; cycle < CYCLES; cycle++) {
+                    model.short = true; model.picked = 'v1'; await flush();
+                    model.short = false; model.picked = 'v2'; await flush();
+                }
+                await tick();
+                const select = host.querySelector('select');
+                t.equal(select.options.length, 6, 'precondition: placeholder + 5 options after the cycles');
+                t.equal(select.value, 'v2', 'precondition: the bound value is selected');
+                t.equal(stats().effects - base.effects, countBindings(host), 'select: live effects = live bindings');
+                let before = probeRuns;
+                model.items[0].name = 'renamed';
+                await tick();
+                t.equal(probeRuns - before, 1, 'select: one option change ran exactly one update');
+                t.equal(select.options[1].textContent, 'renamed', 'select: the live option shows it');
+                before = probeRuns;
+                model.suffix = '!';
+                await tick();
+                t.equal(probeRuns - before, 1, 'select: the one probe outside the list ran once');
+            });
+
+            await StitchTest.test('list-replacement-releases-rows', async (t) => {
+                const host = mount('<ul data-foreach="items"><li data-probe="name"></li></ul>');
+                const base = stats();
+                const model = Stitch.Observable.create({ items: makeItems(3) });
+                new Stitch.DataBinder().bind(host, model);
+                for (let round = 0; round < 20; round++) {
+                    model.items = makeItems(3).map(item => Object.assign(item, { id: item.id + 100 * (round + 1) }));
+                    await flush();
+                }
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 3, 'precondition: 3 rows after 20 replacements');
+                t.equal(stats().effects - base.effects, countBindings(host), 'live effects = live bindings after replacements');
+                const before = probeRuns;
+                model.items[1].name = 'x';
+                await tick();
+                t.equal(probeRuns - before, 1, 'one change ran exactly one update');
+            });
+
+            await StitchTest.test('removed-row-releases-nested-lists', async (t) => {
+                const host = mount('<div data-foreach="groups"><section><h4 data-text="title"></h4>' +
+                    '<ul data-foreach="items"><li data-probe="name"></li></ul></section></div>');
+                const base = stats();
+                const model = Stitch.Observable.create({
+                    groups: [
+                        { id: 'g1', title: 'one', items: makeItems(3) },
+                        { id: 'g2', title: 'two', items: makeItems(2) }
+                    ]
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 5, 'precondition: 5 nested rows');
+                const removed = model.groups[0];
+                model.groups.shift();
+                await tick();
+                t.equal(host.querySelectorAll('li').length, 2, 'precondition: the first group is gone');
+                t.equal(stats().effects - base.effects, countBindings(host), 'the removed group released its inner list and rows');
+                const before = probeRuns;
+                removed.items[0].name = 'ghost';
+                removed.items.push({ id: 99, name: 'ghost row' });
+                await tick();
+                t.equal(probeRuns - before, 0, 'changes to the removed group run nothing');
+            });
+
+            await StitchTest.test('unbind-releases-descendants', async (t) => {
+                const host = mount('<div id="lc-unbind-root"><p data-probe="title"></p>' +
+                    '<ul data-foreach="items"><li data-probe="name"></li></ul></div>');
+                const base = stats();
+                const model = Stitch.Observable.create({ title: 't', items: makeItems(3) });
+                const binder = new Stitch.DataBinder();
+                binder.bind(host, model);
+                await tick();
+                t.equal(stats().effects - base.effects, countBindings(host), 'precondition: live effects = live bindings');
+                binder.unbind(host);
+                t.deepEqual(stats(), base, 'unbind(root) released every binding under it, rows included');
+                const before = probeRuns;
+                model.title = 'changed';
+                model.items[0].name = 'changed';
+                model.items.push({ id: 9, name: 'new' });
+                await tick();
+                t.equal(probeRuns - before, 0, 'nothing under the unbound root runs');
+                t.equal(host.querySelectorAll('li').length, 3, 'the list no longer renders');
+            });
+
+            // Same key, same object: the row element is reused untouched (typed input and focus
+            // kept) when rows around it come and go, and moved (not rebuilt) on reorder.
+            await StitchTest.test('same-key-same-object-row-untouched', async (t) => {
+                const host = mount('<ul data-foreach="shown"><li><input class="note"><span data-text="name"></span></li></ul>');
+                const model = Stitch.Observable.create({
+                    items: makeItems(4), view: 'first3',
+                    shown: Stitch.computed(function () {
+                        const list = this.items.slice();
+                        if (this.view === 'first3') return list.slice(0, 3);
+                        if (this.view === 'last3') return list.slice(1);
+                        return list.reverse();
+                    })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                const rowsBefore = Array.from(host.querySelectorAll('li'));
+                const input = rowsBefore[1].querySelector('input');
+                input.value = 'typed by the user';
+                input.focus();
+                t.ok(document.activeElement === input, 'precondition: the input has focus');
+
+                model.view = 'last3';
+                await tick();
+                t.deepEqual(texts(host, 'span'), ['item2', 'item3', 'item4'], 'rows 1 left and 4 arrived');
+                t.ok(host.querySelectorAll('li')[0] === rowsBefore[1], 'the kept row is the same element');
+                t.equal(input.value, 'typed by the user', 'typed input survives');
+                t.ok(document.activeElement === input, 'focus survives');
+
+                const kept = Array.from(host.querySelectorAll('li'));
+                model.view = 'reversed';
+                await tick();
+                t.deepEqual(texts(host, 'span'), ['item4', 'item3', 'item2', 'item1'], 'rows are in the reversed order');
+                const reordered = Array.from(host.querySelectorAll('li'));
+                t.ok(reordered[0] === kept[2] && reordered[1] === kept[1] && reordered[2] === kept[0], 'the same row elements were moved, not rebuilt');
+                t.equal(input.value, 'typed by the user', 'typed input survives a move');
+            });
+
+            // Same key, new object: the row is rebuilt and bound to the new object.
+            await StitchTest.test('same-key-new-object-row-rebound', async (t) => {
+                const host = mount('<ul data-foreach="items"><li><input data-value="name"></li></ul>');
+                const base = stats();
+                const model = Stitch.Observable.create({ items: makeItems(2) });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                const oldFirst = model.items[0];
+                model.items = [{ id: 1, name: 'fresh1' }, { id: 2, name: 'fresh2' }];
+                await tick();
+                const inputs = host.querySelectorAll('input');
+                t.deepEqual(Array.from(inputs).map(i => i.value), ['fresh1', 'fresh2'], 'rows show the new objects');
+                inputs[0].value = 'edited';
+                inputs[0].dispatchEvent(new Event('input'));
+                t.equal(model.items[0].name, 'edited', 'two-way binding writes to the new object');
+                t.equal(oldFirst.name, 'item1', 'the old object is not written');
+                t.equal(stats().effects - base.effects, countBindings(host), 'the old rows were released');
+            });
+
+            await StitchTest.test('index-follows-moves', async (t) => {
+                const host = mount('<ul data-foreach="items"><li><b data-text="$index"></b>:<span data-text="name"></span></li></ul>');
+                const model = Stitch.Observable.create({ items: makeItems(3) });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.deepEqual(texts(host, 'b'), ['0', '1', '2'], 'precondition: indexes 0..2');
+                model.items.shift();
+                await tick();
+                t.deepEqual(texts(host, 'span'), ['item2', 'item3'], 'precondition: first row removed');
+                t.deepEqual(texts(host, 'b'), ['0', '1'], 'the remaining rows show their new indexes');
+            });
+
+            // A change inside one row updates that row's binding only; the list itself does
+            // not re-render. Every re-render reads the list's length, so count those reads.
+            await StitchTest.test('row-change-does-not-rerender-list', async (t) => {
+                let lengthReads = 0;
+                const host = mount('<ul data-foreach="shown"><li><span data-text="name"></span><i data-probe="name"></i></li></ul>');
+                const model = Stitch.Observable.create({
+                    items: makeItems(3),
+                    shown: Stitch.computed(function () {
+                        return new Proxy(this.items.slice(), {
+                            get(target, key) { if (key === 'length') lengthReads++; return Reflect.get(target, key); }
+                        });
+                    })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.ok(lengthReads > 0, 'precondition: rendering the list read its length');
+                let before = lengthReads;
+                const probesBefore = probeRuns;
+                model.items[1].name = 'changed';
+                await tick();
+                t.deepEqual(texts(host, 'span'), ['item1', 'changed', 'item3'], 'the row shows the change');
+                t.equal(probeRuns - probesBefore, 1, 'one row binding ran');
+                t.equal(lengthReads - before, 0, 'the list did not re-render');
+                before = lengthReads;
+                model.items.push({ id: 4, name: 'item4' });
+                await tick();
+                t.ok(lengthReads - before > 0, 'control: a change to the list itself re-renders it');
+                t.deepEqual(texts(host, 'span'), ['item1', 'changed', 'item3', 'item4'], 'control: the new row shows');
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -12,10 +12,9 @@ function createBindingRuntime(deps = {}) {
     const getValueValidator = deps.getValueValidator;
     const getTypeConverter = deps.getTypeConverter;
     const getAttrHandler = deps.getAttrHandler;
-    const getRenderingDelegate = deps.getRenderingDelegate;
     const propertyExists = deps.propertyExists;
     const findSimilarProperty = deps.findSimilarProperty;
-    const resolveExternalForeachIntegration = deps.resolveExternalForeachIntegration || function () { return null; };
+    const bindForeach = deps.bindForeach;
 
 function validateBinding(viewModel, path, bindingType, element) {
     if (!StitchDebug.enabled) return true;
@@ -350,32 +349,16 @@ const BINDING_HANDLERS = {
         }
     },
     /**
-     * foreach binding - Reactive list rendering with smart reconciliation.
-     * Delegates to element-specific handlers for specialized rendering.
+     * foreach binding - Keyed list rendering (see foreach-binding-orchestrator.js).
+     * One implementation for every list element, <select> included.
      * Provides $data, $index, $parent context variables.
      */
     foreach: {
         bind(element, viewModel, path, context) {
-            const external = resolveExternalForeachIntegration();
-            if (external && typeof external.bindForeach === "function") {
-                return external.bindForeach(element, viewModel, path, context, {
-                    validateBinding: validateBinding,
-                    getProperty: getProperty,
-                    getRenderingDelegate: external.getRenderingDelegate,
-                    foreachRenderingDelegates: external.delegates
-                });
+            if (typeof bindForeach !== "function") {
+                throw new Error(`[Stitch.js ${Version}] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
             }
-
-            validateBinding(viewModel, path, "foreach", element);
-            const templateSource = context.binder._getTemplateSource(element);
-            const delegate = getRenderingDelegate(element);
-            const config = delegate.prepareConfig(element, templateSource);
-            element.innerHTML = "";
-            const eff = context.reactiveSystem.effect(() => {
-                const items = getProperty(viewModel, path);
-                delegate.render(element, items, config, context.binder, viewModel, path);
-            }, { batch: true });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            return bindForeach(element, viewModel, path, context, validateBinding);
         }
     },
     /**

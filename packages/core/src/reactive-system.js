@@ -210,6 +210,19 @@ class ReactiveSystem {
     }
 
     /**
+     * Runs fn without subscribing the current effect to anything fn reads.
+     * Effects created inside fn still track their own reads.
+     */
+    untracked(fn) {
+        this.effectStack.push(null);
+        try {
+            return fn();
+        } finally {
+            this.effectStack.pop();
+        }
+    }
+
+    /**
      * Releases an effect for good: it leaves every dependency set it joined
      * (reactive properties and computeds), leaves the batch queue, and never runs again.
      * Safe to call more than once.

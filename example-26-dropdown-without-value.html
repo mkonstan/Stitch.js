@@ -286,7 +286,7 @@
                     </h3>
                     <p class="label">Dropdown has foreach: but NO value: binding</p>
 
-                    <select id="brokenDropdown" data-foreach="countries" data-template="country-option"
+                    <select id="brokenDropdown" data-foreach="countries" data-key="code" data-template="country-option"
                         data-default-text="-- Select a country --" data-default-value="">
                     </select>
 
@@ -322,6 +322,7 @@
 
                     <select id="workingDropdown"
                             data-foreach="countries"
+                            data-key="code"
                             data-value="workingSelected"
                             data-template="country-option">
                     </select>
