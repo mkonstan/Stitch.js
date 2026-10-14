@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: no-library</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). A passing test on a page that never loads stitch.js (it would not test the build). -->
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['ok']);
+StitchTest.test('ok', (t) => { t.ok(true, 'passes without the library'); });
+</script>
+</body>
+</html>

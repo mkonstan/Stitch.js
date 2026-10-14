@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: page-error</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). A passing test during which an uncaught error happens. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['ok']);
+StitchTest.test('ok', async (t) => {
+    setTimeout(() => { throw new Error('fixture: uncaught error during a passing test'); }, 0);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    t.ok(true, 'the assertion itself passes');
+});
+</script>
+</body>
+</html>

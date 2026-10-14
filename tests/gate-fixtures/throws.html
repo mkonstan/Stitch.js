@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: throws</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Throws before it reports anything. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+throw new Error('fixture: thrown before reporting');
+</script>
+</body>
+</html>

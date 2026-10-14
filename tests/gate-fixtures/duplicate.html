@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: duplicate</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Reports the same test twice. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['a', 'b']);
+StitchTest.pass('a');
+StitchTest.pass('a');
+StitchTest.pass('b');
+</script>
+</body>
+</html>

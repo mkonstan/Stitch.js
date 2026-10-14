@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: missing-result</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Finishes early with a planned test that never reported. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['a', 'b']);
+StitchTest.test('a', (t) => { t.ok(true, 'passes'); });
+StitchTest.done();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: console-error</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). A passing test that logs a console error. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['ok']);
+StitchTest.test('ok', (t) => {
+    console.error('fixture: console error during a passing test');
+    t.ok(true, 'the assertion itself passes');
+});
+</script>
+</body>
+</html>

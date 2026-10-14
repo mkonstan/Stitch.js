@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: no-report</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js). Plans a test and never reports it: must fail on the timeout. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script>
+StitchTest.plan(['never']);
+</script>
+</body>
+</html>
