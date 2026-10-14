@@ -286,6 +286,19 @@ async function runPage(browser, baseUrl, page, timeoutMs) {
 }
 
 /** Turn one page run into per-test statuses plus page-level problems. */
+// Chromium reports net::ERR_CONNECTION_FAILED when the TCP connect itself fails with an
+// OS error it has no specific code for: the request never reaches the runner's server.
+// Seen locally on Windows in about 1 run in 4 (a random page, a random resource, while
+// the same server answered the page's other requests in the same moment); not
+// reproduced by 320 page loads through an identical server outside `npm test`. It is
+// not a page result, so it earns one re-run, announced on the console and in the report.
+const CONNECT_FAILURE = /net::ERR_CONNECTION_FAILED/;
+function connectionFailure(raw) {
+    const failures = raw.failedRequests.concat(raw.navigationError ? [raw.navigationError] : []);
+    const hit = failures.find((text) => CONNECT_FAILURE.test(text));
+    return hit ? `connection-level failure before the server was reached (${hit})` : null;
+}
+
 function analysePage(raw, timeoutMs) {
     const problems = [];
     const tests = [];
@@ -489,7 +502,7 @@ async function main() {
     }
     const config = fixtureName ? fixtureConfig(fixtureName) : mainConfig();
     const verdict = [];
-    const report = { config: config.name, version: PKG.version };
+    const report = { config: config.name, version: PKG.version, retries: [] };
 
     if (config.staticChecks) {
         console.log("== Static checks");
@@ -514,7 +527,16 @@ async function main() {
             runs[build] = [];
             for (const { page } of config.suites) {
                 if (!fs.existsSync(path.join(ROOT, page))) continue;
-                const raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
+                let raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
+                const connectFailure = connectionFailure(raw);
+                if (connectFailure) {
+                    // Retry ONCE, only for a connect-phase failure (the request never reached
+                    // this server; see connectionFailure). The second run is judged on its own;
+                    // anything it gets wrong, including the same failure, is fatal.
+                    console.log(`RETRY   ${page} [${build}]: ${connectFailure}. Re-running the page once.`);
+                    report.retries.push({ page, build, reason: connectFailure });
+                    raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
+                }
                 const analysed = analysePage(raw, config.pageTimeoutMs);
                 runs[build].push(analysed);
                 const counts = analysed.tests.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
@@ -529,6 +551,9 @@ async function main() {
     const { summary, fatal } = classify(config, runs);
     for (const line of fatal) console.log(line);
     printSummary(config, summary);
+    if (report.retries.length) {
+        console.log(`RETRIED ${report.retries.length} page run(s) after a connection-level failure (listed above as RETRY; details in the report).`);
+    }
     report.summary = summary;
     report.fatal = fatal;
     report.runs = runs;
