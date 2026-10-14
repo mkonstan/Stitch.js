@@ -193,7 +193,7 @@ compress: {
 
 **Option B: Dual build (dev + prod)**
 
-Add a build step that strips all `StitchDebug.log(...)`, `this.debug.log(...)`, `this.debug.group(...)`, `this.debug.groupEnd(...)` calls entirely for production. This could be a simple regex pass in `build-stitch-assembly.js` or a separate `strip-debug.js` script.
+Add a build step that strips all `StitchDebug.log(...)`, `this.debug.log(...)`, `this.debug.group(...)`, `this.debug.groupEnd(...)` calls entirely for production. This could be a simple regex pass in `build-stitch-assembly.js` or a separate strip-debug script.
 
 Option A is preferred because it's simpler, doesn't require a second build pipeline, and still allows debug to be enabled at runtime in the minified build.
 

@@ -128,30 +128,13 @@ Drop the script into your site and reference it in HTML:
 
 No webpack config. No babel. No compilation. Just include and go.
 
-## Packaging Profiles (Contributors)
+## Building (Contributors)
 
 The runtime source of truth is modular (`packages/*` + `stitch.entry.js`), and `stitch.js` is generated.
 
 Build generated artifacts:
 ```bash
 npm run build:assembly
-```
-
-Build package profiles:
-```bash
-npm run package:runtime
-npm run package:contributor
-```
-
-Profile outputs:
-- Runtime package: `_artifacts/profiles/runtime`
-- Contributor package: `_artifacts/profiles/contributor`
-- Each profile includes `PACKAGE_PROFILE_MANIFEST.json` with file list and size.
-
-Report retention cleanup:
-```bash
-npm run clean:reports:dry
-npm run clean:reports
 ```
 
 ## Quick Start
@@ -798,8 +781,6 @@ Key features:
 - External map component integration
 - Message bus event coordination
 
-[View full source code →](./examples/economic-impact/)
-
 ## Debugging
 
 Enable debug logging to track reactivity:
@@ -904,7 +885,6 @@ MIT License - use anywhere, for anything.
 - [User Documentation](./stitch_documentation.md) - full usage guide
 - [Architecture Guide](./ARCHITECTURE.md) - module/resource map and build pipeline
 - [Migration Guide](./MIGRATION.md) - migration notes and compatibility guidance
-- [Modularization Log](./MODULARIZATION_PHASE2.md) - extraction/cutover history
 - [Examples](./example-basic-demo.html) - start here, then explore `example-*.html`
 - [Browser Tests](./run-tests.html) - interactive test runner for `test-*.html` suites
 

@@ -142,24 +142,20 @@ Changes to `model.count` automatically update all bound elements. Clicking the b
 ```bash
 npm install
 npx playwright install chromium
-npm run build:assembly
+npm run build
 ```
 
-`npm run build:assembly` runs `_tools/build-stitch-assembly.js` and writes:
-- `dist/stitch.assembled.js`
-- `stitch.js`
+`npm run build` runs `_tools/build-stitch-assembly.js`, which writes `stitch.js` and
+`dist/stitch.assembled.js`, then `minify.js`, which writes `stitch.min.js`.
 
-### Validation Commands
+### Test Command
 
 ```bash
-npm run validate:browser
-npm run validate:assembly
-npm run pipeline:build-compare
+npm test
 ```
 
-- `validate:browser`: runs browser HTML suites against generated `stitch.js`.
-- `validate:assembly`: builds assembly + runs suites + enforces KPI gate.
-- `pipeline:build-compare`: validates source and assembled artifacts, then compares suite results and export surface parity.
+`npm test` runs the static checks, every browser suite in `tests/suites.js` against both
+`stitch.js` and `stitch.min.js`, and the gate self-tests. See `ARCHITECTURE.md` section 7.
 
 ### Package Entry Points
 

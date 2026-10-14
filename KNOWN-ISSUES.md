@@ -1,103 +1,35 @@
 # Known Issues - Stitch.js
 
-## ✅ FIXED IN V2.0.1
+This file lists the defects known in the current code. None of them is fixed yet.
 
-### Array-Dependent Computed Properties
+Each defect has a test that asserts the intended (v3) behaviour and fails today. The tests are
+listed in `tests/known-failing.json`, so `npm test` reports them as known-failing instead of
+failing the build. When a fix makes its test pass, `npm test` fails until the entry is removed
+from that file, so this list and the code cannot silently drift apart.
 
-**Status**: ✅ FIXED in v2.0.1
-**Previous Severity**: Critical (returned stale values)
-**Test**: `test-computed-properties.html` - Test 4.1 (now passing)
+An earlier version of this file said there were no known issues and that all suites passed. That
+was not true: the defects below were present, and the old test runner could pass without running
+some tests.
 
----
+| # | Defect | Test (`<page>#<test id>`) | Target |
+|---|---|---|---|
+| 1 | A list whose rows have no key (`id`) renders by row position. When the list is filtered or reordered, rows can show the wrong items. No error is raised. | `test-v3-defects.html#d1-keyless-row-throws` | T1 |
+| 2 | Reloading a list with new objects that have the same ids keeps the old rows bound to the old objects, so the page keeps showing the old values. | `test-v3-defects.html#d2-same-id-new-object-rebinds` | T1 |
+| 3 | Rows removed from a list (for example by hiding and showing it) keep their bindings alive. Each later change runs once per leaked binding, and the leak grows with every cycle. | `test-v3-defects.html#d3-hidden-rows-release-bindings` | T1 |
+| 4 | In a nested list, a click handler cannot reach the root model: there is no `$root.` path, and `data-click="$root.remove"` does nothing, silently. | `test-v3-defects.html#d4-root-handler-in-nested-foreach` | T2 |
+| 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch`, `test-warnings.html#warns-missing-property`, `test-warnings.html#warns-missing-keys`, `test-warnings.html#warns-select-performance` | T2 |
+| 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
 
-## No Known Issues in v2.0.1
+"Target" is the planned hardening sprint for the v3.0.0 release: T1 covers list correctness and
+binding lifecycle, T2 covers strictness and debug mode.
 
-All test suites passing: 58/58 tests ✅
+## How to check
 
-### Issue Description
-
-Computed properties that depend on array contents do not automatically recalculate when items are added/removed via array mutation methods (`push`, `splice`, etc.).
-
-### Example
-
-```javascript
-const cart = Stitch.Observable.create({
-    items: [],
-    subtotal: Stitch.computed(function() {
-        return this.items.reduce((sum, item) => sum + item.total, 0);
-    })
-});
-
-console.log(cart.subtotal); // 0 ✅
-
-cart.items.push({ total: 100 });
-console.log(cart.subtotal); // Still 0 ❌ (should be 100)
+```bash
+npm test
 ```
 
-### Root Cause
-
-Array mutations (`push`, `pop`, `splice`, etc.) trigger through the `array-mutation` MessageBus event, which:
-1. Is asynchronous (queued via Promise.resolve)
-2. Only triggers on the array's `length` property
-3. Does NOT trigger on the parent's `items` property that the computed is tracking
-
-**Tracking Flow:**
-```
-Computed tracks: cart.items (the property)
-Mutation triggers: array.length (not cart.items)
-Result: Computed doesn't know to recalculate
-```
-
-### Workaround
-
-Manually trigger recalculation by reassigning the array:
-
-```javascript
-cart.items.push({ total: 100 });
-cart.items = [...cart.items]; // Force trigger ✅
-```
-
-Or use explicit computed dependencies:
-
-```javascript
-subtotal: Stitch.computed(function() {
-    const _ = this.items.length; // Track length explicitly
-    return this.items.reduce((sum, item) => sum + item.total, 0);
-}, ['items'])
-```
-
-### Impact
-
-- **18 of 19 computed tests PASS** ✅
-- Only affects computed properties that:
-  - Depend on array contents
-  - Need to react to push/pop/splice operations
-  - Don't manually trigger updates
-
-### Future Fix
-
-Requires redesigning array mutation tracking to:
-1. Make array mutations synchronous (like v2.0 property triggers)
-2. Trigger on parent property when array mutates
-3. Propagate to computed dependencies correctly
-
-**Estimated effort**: 2-3 hours
-**Priority**: Medium (workaround available, not a blocker)
-
----
-
-## Test Results Summary
-
-| Suite | Total | Pass | Fail | Notes |
-|-------|-------|------|------|-------|
-| test-computed-properties.html | 19 | 18 | 1 | Array-dependent computed (known issue above) |
-| test-all-bindings.html | 6 | TBD | TBD | Pending Phase 4 |
-| test-core-reactivity.html | 6 | TBD | TBD | Pending testing |
-| test-array-reactivity.html | 13 | TBD | TBD | Pending testing |
-| test-edge-cases.html | 7 | TBD | TBD | Pending testing |
-| test-messagebus.html | 7 | TBD | TBD | Pending testing |
-
----
-
-*Last Updated: Phase 3 completion*
-*Next: Continue to Phase 4-8, comprehensive testing in Phase 7*
+The summary prints, for `stitch.js` and `stitch.min.js`, how many tests passed, how many are
+known-failing (the tests above), and how many failed or were skipped (both must be 0).
+To see one defect in a browser, open its page (for example `test-v3-defects.html`); the
+`[harness]` line at the top shows the results and each failed assertion is in the report.

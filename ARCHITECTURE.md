@@ -4,23 +4,21 @@ This document is the source-of-truth technical map for both humans and cold AI i
 
 Use this when you need to:
 - understand where runtime behavior lives,
-- build `stitch.js` from modular sources,
-- validate source vs assembled artifacts,
+- build `stitch.js` and `stitch.min.js` from modular sources,
+- run the test gate,
 - make safe changes with minimal regression risk.
 
 ## 1. TL;DR
 
 - Runtime source-of-truth is the modular workspace under `packages/*`.
-- `stitch.js` is generated (do not hand-edit it as source-of-truth).
-- Build entrypoint is `stitch.entry.js`.
-- Builder is `_tools/build-stitch-assembly.js`.
-- Generated outputs:
-  - `dist/stitch.assembled.js`
-  - `stitch.js` (synced generated artifact)
-- Quality gates:
-  - browser suites (`_scratch/run-browser-validation.js`)
-  - assembly validation + KPI gate (`npm run validate:assembly`)
-  - source-vs-assembly parity pipeline (`npm run pipeline:build-compare`)
+- `stitch.js` and `stitch.min.js` are generated (do not hand-edit them).
+- Build entrypoint is `stitch.entry.js`; builder is `_tools/build-stitch-assembly.js`; minifier is `minify.js`.
+- The version has one source: the `version` field of the root `package.json`.
+- Generated outputs (committed, and checked byte-for-byte by `npm test`):
+  - `stitch.js`
+  - `dist/stitch.assembled.js` (identical copy of `stitch.js`)
+  - `stitch.min.js`
+- Quality gate: `npm test` (static checks, every suite on both builds, gate self-tests).
 
 ## 2. Bootstrap in 5 Minutes
 
@@ -32,25 +30,15 @@ npx playwright install chromium
 
 2. Build generated artifacts from modular sources:
 ```bash
-npm run build:assembly
+npm run build
 ```
 
-3. Validate browser suites against generated `stitch.js`:
+3. Run the gate:
 ```bash
-npm run validate:browser
+npm test
 ```
 
-4. Validate assembled artifact + KPI gate:
-```bash
-npm run validate:assembly
-```
-
-5. Verify source/assembly parity end-to-end:
-```bash
-npm run pipeline:build-compare
-```
-
-If step 5 passes, behavior parity between generated source artifact and release-candidate assembly is intact.
+`npm test` exits 0 only when everything in section 7 holds.
 
 ## 3. Runtime Architecture
 
@@ -91,7 +79,7 @@ The shared `ReactiveSystem` has a separate internal `MessageBus` for framework e
 
 Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus.
 
-## 4. Package and Module Inventory (23 Reachable Modules)
+## 4. Package and Module Inventory (24 Reachable Modules)
 
 ### 4.1 API Package (`packages/api`)
 
@@ -134,6 +122,7 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
 | `packages/utils/src/foreach-template-helpers.js` | foreach template parsing/container handling | foreach render/reconcile |
 | `packages/utils/src/foreach-reconcile-helpers.js` | keyed row reconciliation and item context creation | foreach rendering |
+| `packages/utils/src/version.js` | The release version: reads the root `package.json` when unbuilt; the build stamps it as a constant in the bundle | every package entry and versioned class |
 | `packages/utils/src/reactive-object-helpers.js` | `defineHidden()` helper, change-handler add/remove, and `toJSON` serialization helpers | reactive factory, observable |
 
 ## 5. Repository Resource Map
@@ -143,43 +132,31 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | Path | Role |
 |---|---|
 | `stitch.entry.js` | canonical distribution entry that composes packages |
-| `stitch.js` | generated single-file artifact synced by builder |
-| `dist/stitch.assembled.js` | generated assembled release candidate |
+| `stitch.js` | generated single-file bundle |
+| `dist/stitch.assembled.js` | generated; identical to `stitch.js` |
+| `stitch.min.js` | generated; terser minification of `stitch.js` |
 
-### 5.2 Build/Validation Tooling
+### 5.2 Build and Test Tooling
 
 | Path | Role |
 |---|---|
-| `_tools/build-stitch-assembly.js` | assembly builder: module discovery, reachability graph, inline prelude, metadata stamping |
-| `_tools/check-kpi-gate.js` | KPI enforcement (validation, module count, mode, size growth, smoke exports) |
-| `_tools/compare-build-output.js` | compares suite results + targeted checks + export shape between source and assembled artifacts |
-| `_tools/run-build-compare-pipeline.js` | orchestrates build -> validate source -> validate assembled -> compare |
-| `_tools/clean-scratch-reports.js` | retention-policy cleanup for generated `_scratch` JSON reports |
-| `_tools/scratch-report-retention.json` | canonical retention policy for report pruning |
-| `_tools/phase2_kpi_gate.json` | KPI thresholds and required exports |
-| `_scratch/run-browser-validation.js` | Playwright runner against current `stitch.js` |
-| `_scratch/run-browser-validation-release-candidate.js` | Playwright runner that swaps `stitch.js` with assembled artifact |
+| `_tools/build-stitch-assembly.js` | assembly builder: module discovery, reachability graph, inline prelude, version stamping, metadata |
+| `minify.js` | terser minification of `stitch.js` into `stitch.min.js` |
+| `_tools/run-tests.js` | `npm test`: static checks, browser suites on both builds, gate self-tests |
+| `_tools/check-repo.js` | static checks: version literal, local paths, missing references, build-match |
+| `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`) |
+| `tests/harness.js` | in-page reporting protocol every suite uses |
+| `tests/known-failing.json` | tests that fail today because of a known defect, with the defect and the sprint that fixes it |
+| `tests/gate-fixtures/` | gate self-test fixtures (pages plus `fixtures.js`) |
+| `run-tests.html` | the suite list as links, for running pages by hand |
+
+Generated reports go to `_scratch/` (gitignored): `_scratch/test-report.json` and the self-test trees.
 
 ### 5.3 Test Suites
 
-Primary browser suites:
-- `test-computed-properties.html`
-- `test-array-reactivity.html`
-- `test-core-reactivity.html`
-- `test-messagebus.html`
-- `test-all-bindings.html`
-- `test-edge-cases.html`
-- `test-dispose.html`
-
-### 5.4 State/Process Docs
-
-| Path | Role |
-|---|---|
-| `MODULARIZATION_PHASE2.md` | phase history and extraction progress log |
-| `CODE_REVIEW_FINDINGS.md` | stabilization findings and fix tracking |
-| `BROWSER_VALIDATION_REPORT*.md` | validation snapshots |
-| `_state/gpt_state.md`, `_state/gpt_todo.md` | continuity/checkpoint files |
-| `_tools/context_dump_protocol_v2.4s.md` | checkpoint protocol used for context snapshots |
+The list lives in `tests/suites.js`; do not repeat it elsewhere. Every `test-*.html` or
+`*-test.html` page, and every page that loads `tests/harness.js`, must be in that list or
+`npm test` fails.
 
 ## 6. Build and Assembly Walkthrough (Detailed)
 
@@ -187,102 +164,77 @@ Primary browser suites:
 
 - Node.js 18+
 - npm workspace install complete
-- Playwright Chromium installed for validation runners
-
-```bash
-npm install
-npx playwright install chromium
-```
+- Playwright Chromium installed for the browser suites
 
 ### 6.2 Build Commands
 
-- Build generated artifacts (default reachable mode):
+- Build everything (bundle, then minified bundle):
+```bash
+npm run build
+```
+
+- Bundle only, or minified only:
 ```bash
 npm run build:assembly
+npm run build:min
 ```
 
-- Equivalent alias:
-```bash
-npm run build:stitch
-```
-
-- Build with all modules inlined (diagnostic mode):
+- Build with all modules inlined (diagnostic mode; do not commit its output):
 ```bash
 npm run build:assembly:all
-```
-
-- Build package profiles:
-```bash
-npm run package:runtime
-npm run package:contributor
 ```
 
 ### 6.3 What the Builder Actually Does
 
 `_tools/build-stitch-assembly.js`:
 1. Reads `stitch.entry.js`.
-2. Enumerates package module files (`index.js` + `src/*.js`).
+2. Enumerates package module files (`packages/*/index.js` and `packages/*/src/*.js`).
 3. Resolves internal module graph via `require()` pattern rewrite to `__stitchRequire()`.
 4. Assigns **numeric module IDs** (0, 1, 2, ...) to replace path strings in the registry and require calls. A `moduleMap` in the metadata preserves path-to-ID mapping for debugging.
 5. Selects modules by mode:
 - `reachable`: only transitively reachable from entrypoint
 - `all`: all discovered modules
-6. Emits inline module prelude + patched entry.
-7. Stamps `/*!` metadata comment (preserved through Terser minification):
-- `generatedAt`, `mode`, `moduleCount`, `availableModuleCount`, `modules[]`, `moduleMap`.
-8. Prepends `/*!` license banner from `package.json` version.
-9. Writes output to both:
-- `dist/stitch.assembled.js`
-- `stitch.js`
+6. Stamps the version: `packages/utils/src/version.js` is replaced in the bundle by a constant taken from `package.json`.
+7. Emits inline module prelude + patched entry.
+8. Stamps a `/*!` metadata comment (preserved through Terser minification):
+- `source`, `mode`, `moduleCount`, `availableModuleCount`, `modules[]`, `moduleMap`.
+- No timestamp: the output depends only on the sources, so a rebuild of unchanged sources is byte-identical.
+9. Prepends a `/*!` license banner with the `package.json` version.
+10. Writes output to both `dist/stitch.assembled.js` and `stitch.js`.
 
 ### 6.4 Output Integrity Expectations
 
-- `stitch.js` and `dist/stitch.assembled.js` are both generated from the same source graph.
-- Size delta vs entrypoint is expected (inlined modules).
-- Reachability and growth thresholds are enforced by KPI gate.
+- `stitch.js` and `dist/stitch.assembled.js` equal a fresh assembly of `packages/*`.
+- `stitch.min.js` equals a fresh minification of that assembly.
+- `npm test` (build-match) and CI (`npm run build`, then `git diff --exit-code`) both enforce this.
 
-## 7. Validation and KPI Gates
+## 7. The Test Gate (`npm test`)
 
-### 7.1 Browser Validation (Source Artifact)
+`node _tools/run-tests.js` runs, in order:
 
-```bash
-npm run validate:browser
-```
+1. **Static checks** (`_tools/check-repo.js`, also `npm run test:static`):
+   - version-literal: the `package.json` version string appears nowhere else (the generated bundles and npm's lock-file root fields are excepted, and checked);
+   - local-path: no absolute local path (drive letters, home directories, file URLs) in any file;
+   - missing-reference: every file a doc or page points to exists, and every `npm run` script mentioned exists;
+   - build-match: see 6.4.
+2. **Browser suites**: every page in `tests/suites.js`, in headless Chromium, served over a local HTTP server.
+   Each page's `stitch.js` request is answered with the build under test: first `stitch.js`, then `stitch.min.js`.
+3. **Gate self-tests**: each fixture in `tests/gate-fixtures/fixtures.js` re-runs the gate on a deliberately broken
+   input and requires a non-zero exit with the stated reason (controls must pass).
 
-Runs Playwright suites against `stitch.js` and emits JSON report to stdout (typically redirected in scripted pipelines).
+A page fails the gate when it: never loads the build under test; logs an uncaught error or a console error; has a
+failed request; never finishes; plans zero tests; reports a test twice, late, unplanned or skipped; or leaves a
+planned test unreported. `window.Stitch` must expose exactly the public surface and the `package.json` version.
 
-### 7.2 Assembly Validation + KPI Gate
+Per test, against `tests/known-failing.json`:
+- failed and listed: counted as known-failing (not fatal);
+- passed and listed: FATAL, remove the entry (each fix removes its own marker);
+- failed and not listed: FATAL;
+- a listed entry that matches no test: FATAL.
 
-```bash
-npm run validate:assembly
-```
+The summary prints `passed / known-failing / failed / skipped` per build. The full report is `_scratch/test-report.json`.
 
-Pipeline:
-1. build assembly,
-2. run browser validation report to `_scratch/browser-validation-report-assembly.json`,
-3. run KPI checks in `_tools/check-kpi-gate.js`.
-
-Current KPI source config: `_tools/phase2_kpi_gate.json`.
-
-### 7.3 Source vs Assembled Parity
-
-```bash
-npm run pipeline:build-compare
-```
-
-This orchestrator:
-1. builds artifact,
-2. validates source artifact,
-3. validates assembled artifact,
-4. compares suites/targeted checks/export surface.
-
-Primary delta output:
-- `_scratch/build-output-delta.json`
-
-Expected pass condition:
-- `suiteDiffs = 0`
-- `targetedDiffs = 0`
-- `export mismatches = none`
+CI (`.github/workflows/test.yml`) runs `npm run build`, `git diff --exit-code`, then `npm test`.
 
 ## 8. Common Change Workflows
 
@@ -291,32 +243,41 @@ Expected pass condition:
 1. Edit module under `packages/*/src/*`.
 2. Run:
 ```bash
-npm run build:assembly
-npm run validate:assembly
-npm run pipeline:build-compare
+npm run build
+npm test
 ```
-3. If all pass, update docs/changelog as needed.
+3. Commit the sources and the regenerated `stitch.js`, `dist/stitch.assembled.js` and `stitch.min.js` together.
 
 ### 8.2 Add New Binding Type
 
 1. Extend `packages/browser/src/binding-runtime.js` handler registry.
 2. If helper logic is generic, place it in `packages/utils/src/*`.
 3. Ensure `DataBinder.registerBinding` contract remains stable.
-4. Add/adjust test HTML suite.
-5. Run full validation pipeline.
+4. Add tests to a suite page (or a new page, added to `tests/suites.js`).
+5. Run `npm run build` and `npm test`.
 
 ### 8.3 Extend Reactivity Core
 
 1. Prefer changes in `packages/core/src/*` + `packages/api/src/reactive-factory.js`.
 2. Preserve computed invalidation semantics (sync dirty marking).
 3. Preserve batching semantics for DOM effects.
-4. Re-run browser + parity pipeline.
+4. Run `npm run build` and `npm test`.
+
+### 8.4 Fix a Known Defect
+
+1. Make the test listed in `tests/known-failing.json` pass.
+2. Remove its entry; `npm test` fails until you do.
+3. Update `KNOWN-ISSUES.md`.
+
+### 8.5 Release a New Version
+
+Change `version` in the root `package.json` only, run `npm install` (for the lock file) and `npm run build`, then `npm test`.
 
 ## 9. Constraints and Invariants
 
 - Keep public Stitch surface stable unless explicitly versioning a break.
 - Keep `<script src="stitch.js">` usage working.
-- Treat `stitch.js` as generated output, not primary authoring target.
+- Treat `stitch.js` and `stitch.min.js` as generated output, not primary authoring targets.
 - Keep module dependency direction clean:
   - core/api/browser depend on utils where needed,
   - browser composes API/core behavior but should avoid cyclic package coupling.
@@ -328,18 +289,12 @@ npm run pipeline:build-compare
 3. `packages/*/index.js`
 4. target `packages/*/src/*.js` area you intend to change
 5. `_tools/build-stitch-assembly.js`
-6. `_scratch/run-browser-validation.js`
-7. `_tools/check-kpi-gate.js` + `_tools/compare-build-output.js`
-8. `MODULARIZATION_PHASE2.md` for historical rationale
+6. `_tools/run-tests.js` and `tests/harness.js`
+7. `KNOWN-ISSUES.md`
 
 ## 11. Related Docs
 
 - User-facing API and usage guide: `stitch_documentation.md`
+- API reference: `STITCH_API.md`
 - Migration details: `MIGRATION.md`
-- Ongoing modularization log: `MODULARIZATION_PHASE2.md`
-- Findings history: `CODE_REVIEW_FINDINGS.md`
-
----
-
-**Last Updated:** 2026-02-26
-**Maintainers:** Stitch.js modularization contributors
+- Known defects and their tests: `KNOWN-ISSUES.md`
