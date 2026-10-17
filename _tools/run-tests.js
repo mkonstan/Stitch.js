@@ -533,8 +533,15 @@ async function main() {
                     // Retry ONCE, only for a connect-phase failure (the request never reached
                     // this server; see connectionFailure). The second run is judged on its own;
                     // anything it gets wrong, including the same failure, is fatal.
-                    console.log(`RETRY   ${page} [${build}]: ${connectFailure}. Re-running the page once.`);
-                    report.retries.push({ page, build, reason: connectFailure });
+                    // Say what the discarded run got wrong, so a retry never hides a real failure
+                    // that happened to coincide with the connect failure.
+                    const discarded = analysePage(raw, config.pageTimeoutMs);
+                    const discardedFailures = discarded.tests.filter((t) => t.status !== "pass")
+                        .map((t) => `${t.status} ${t.id}: ${String(t.detail).split("\n")[0]}`);
+                    console.log(`RETRY   ${page} [${build}]: ${connectFailure}. Re-running the page once. ` +
+                        `The discarded run had ${discarded.problems.length} page problem(s) and ${discardedFailures.length} non-passing test(s):`);
+                    for (const line of discarded.problems.concat(discardedFailures)) console.log(`        discarded: ${line}`);
+                    report.retries.push({ page, build, reason: connectFailure, discardedProblems: discarded.problems, discardedFailures });
                     raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
                 }
                 const analysed = analysePage(raw, config.pageTimeoutMs);
