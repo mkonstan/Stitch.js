@@ -105,23 +105,79 @@ function rootOf(scope) {
     return isRowContext(scope) ? scope.$root : scope;
 }
 
-function propertyNames(holder, isRowScope) {
-    let names;
-    if (isRowScope) {
+/**
+ * Whether `key` is something a binding can follow on `holder` (B5, S6):
+ * - "bindable": a reactive property (own accessor) of a model object; an own property of a
+ *   plain object (e.g. a computed's value); an index or length of an array; size of a Map /
+ *   Set; an own property of a string; on a row context, $data / $index / $parent / $root
+ *   or a bindable property of the row item;
+ * - "not-reactive": an own enumerable data property of a model object: a name starting with
+ *   _ (never made reactive) or a property added after Observable.create();
+ * - "missing": anything else, including inherited names (toString, constructor) and
+ *   Stitch's hidden helpers (on, toJSON, $watch, ...).
+ */
+function memberStatus(holder, key) {
+    if (isRowContext(holder)) {
+        if (ROW_NAMES.indexOf(key) !== -1) return "bindable";
         const item = holder.$data;
-        names = item !== null && typeof item === "object" ? Object.keys(item) : [];
-        names = names.concat(ROW_NAMES);
-    } else if (Array.isArray(holder)) {
-        return "an array: an index (0, 1, ...) or length";
-    } else {
-        names = Object.keys(holder);
+        return item !== null && typeof item === "object" ? memberStatus(item, key) : "missing";
     }
-    names = names.filter(name => name[0] !== "_");
-    if (names.length === 0) {
-        return "no properties";
+    if (holder === null || holder === undefined) {
+        return "missing";
     }
+    if (typeof holder !== "object" && typeof holder !== "function") {
+        return Object.prototype.hasOwnProperty.call(Object(holder), key) ? "bindable" : "missing";
+    }
+    if (Array.isArray(holder)) {
+        return key === "length" || (INDEX.test(key) && Object.prototype.hasOwnProperty.call(holder, key)) ? "bindable" : "missing";
+    }
+    if (holder instanceof Map || holder instanceof Set) {
+        return key === "size" ? "bindable" : "missing";
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+    if (!descriptor) {
+        return "missing";
+    }
+    if (holder.__isReactive === true) {
+        if (descriptor.get) return "bindable";
+        return descriptor.enumerable ? "not-reactive" : "missing";
+    }
+    return "bindable";
+}
+
+/** The names a binding can follow on holder, and the declared names it cannot. */
+function memberLists(holder, isRowScope) {
+    const target = isRowScope ? holder.$data : holder;
+    const bindable = [];
+    const notBindable = [];
+    if (target !== null && typeof target === "object" && !Array.isArray(target)
+        && !(target instanceof Map) && !(target instanceof Set)) {
+        for (const name of Object.keys(target)) {
+            const status = memberStatus(target, name);
+            if (status === "bindable") bindable.push(name);
+            else if (status === "not-reactive") notBindable.push(name);
+        }
+    }
+    if (isRowScope) bindable.push(...ROW_NAMES);
+    return { bindable, notBindable };
+}
+
+function listNames(names) {
+    if (names.length === 0) return "no properties";
     const shown = names.slice(0, MAX_LISTED).join(", ");
     return names.length > MAX_LISTED ? `${shown}, ... (${names.length - MAX_LISTED} more)` : shown;
+}
+
+function describeMembers(holder, isRowScope) {
+    if (Array.isArray(holder)) return { text: "an array: an index (0, 1, ...) or length", bindable: [], notBindable: [] };
+    if (holder instanceof Map || holder instanceof Set) return { text: "size (it is a Map / Set)", bindable: [], notBindable: [] };
+    const lists = memberLists(holder, isRowScope);
+    let text = listNames(lists.bindable);
+    if (lists.notBindable.length) {
+        text += `. Not bindable: ${listNames(lists.notBindable)} (not reactive: names starting with _ are never made ` +
+            "reactive, and properties added after Observable.create() are not either)";
+    }
+    return Object.assign({ text }, lists);
 }
 
 function editDistance(a, b) {
@@ -138,21 +194,12 @@ function editDistance(a, b) {
     return row[b.length];
 }
 
-/** A close name among holder's own names (for the error message only), or null. */
-function closeName(holder, isRowScope, wanted) {
-    let names;
-    try {
-        names = isRowScope
-            ? Object.keys(holder.$data !== null && typeof holder.$data === "object" ? holder.$data : {}).concat(ROW_NAMES)
-            : Object.keys(holder);
-    } catch (_error) {
-        return null;
-    }
+/** A close bindable name (for the error message only), or null. */
+function closeName(names, wanted) {
     const lower = wanted.toLowerCase();
     let best = null;
     let bestDistance = 3;
     for (const name of names) {
-        if (name[0] === "_") continue;
         const distance = name.toLowerCase() === lower ? 0 : editDistance(name.toLowerCase(), lower);
         if (distance < bestDistance) {
             best = name;
@@ -178,18 +225,29 @@ function missingPropertyError(where, segments, index, holder) {
             `"${name}" is not a property of ${owner}, which is ${typeof holder} ${JSON.stringify(holder)}. ` +
             "Fix the path, or make that value an object.");
     }
-    const close = closeName(holder, isRowScope, name);
+    const members = describeMembers(holder, isRowScope);
+    const close = closeName(members.bindable, name);
     const suggestion = close ? `Did you mean "${segments.slice(0, index).concat(close).join(".")}"? ` : "";
     return bindingError(where,
         `"${name}" is not a property of ${owner}. ${owner[0].toUpperCase() + owner.slice(1)} has: ` +
-        `${propertyNames(holder, isRowScope)}. ${suggestion}` +
+        `${members.text}. ${suggestion}` +
         "Declare every bound property in Observable.create() with a starting value (null is fine): a property " +
         "added later is not reactive. Or fix the binding.");
 }
 
+function notReactiveError(where, segments, index) {
+    const name = segments[index];
+    const why = name[0] === "_"
+        ? "Stitch never makes properties whose names start with _ reactive, so a binding could not follow it. " +
+          `Rename it without the _ (e.g. "${name.replace(/^_+/, "") || "value"}"), or keep it out of bindings.`
+        : "it was added after Observable.create(), so it has no reactive accessor and a binding could not follow it. " +
+          "Declare it in Observable.create() with a starting value (null is fine).";
+    return bindingError(where, `"${segments.slice(0, index + 1).join(".")}" is not reactive: ${why}`);
+}
+
 /**
- * Reads a property path strictly: a name that does not exist throws (D25); a null or
- * undefined step ends the read with undefined.
+ * Reads a property path strictly: a name that is not a bindable property throws (D25, B5);
+ * a null or undefined step ends the read with undefined.
  * @param {Object} scope - the model or a row context
  * @param {string} path - a valid path (see checkPathSyntax)
  * @param {Function} describe - () => the element/binding description, used only on error
@@ -202,8 +260,12 @@ function readPath(scope, path, describe) {
             return undefined;
         }
         const key = segments[i];
-        if (!(key in Object(current))) {
+        const status = memberStatus(current, key);
+        if (status === "missing") {
             throw missingPropertyError(describe(), segments, i, current);
+        }
+        if (status === "not-reactive") {
+            throw notReactiveError(describe(), segments, i);
         }
         current = current[key];
     }
@@ -254,7 +316,9 @@ function parseHandlerRef(where, rawValue) {
 function lookUp(data, segments) {
     let owner = data;
     for (let i = 0; i < segments.length; i++) {
-        if (owner === null || owner === undefined || !(segments[i] in Object(owner))) {
+        // Own model members only (no inherited or hidden names); a handler need not be
+        // reactive, so a _name method or one added later still counts.
+        if (owner === null || owner === undefined || memberStatus(owner, segments[i]) === "missing") {
             return { found: false };
         }
         if (i === segments.length - 1) {
@@ -335,6 +399,8 @@ function resolveHandler(scope, ref, where) {
 }
 
 module.exports = {
+    memberStatus,
+    lookUp,
     describeBinding,
     checkPathSyntax,
     pathSyntaxProblem,

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js API argument tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>API arguments</h1>
+    <p>
+        Every public entry point that takes a selector, element, handler, handle or event name
+        throws when the argument is invalid or matches nothing, instead of doing nothing (D3).
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'binder-arguments',
+            'model-change-handler-arguments',
+            'model-event-arguments',
+            'model-path-arguments',
+            'message-bus-arguments'
+        ]);
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+        const thrown = fn => { try { fn(); return ''; } catch (error) { return String(error && error.message); } };
+
+        (async () => {
+            await StitchTest.test('binder-arguments', async (t) => {
+                const binder = new Stitch.DataBinder();
+                t.match(thrown(() => binder.unbind('#no-such-element')), /unbind\("#no-such-element"\): no element matches/, 'unbind() of a selector that matches nothing throws');
+                t.match(thrown(() => binder.unbind(42)), /must be a DOM element or a selector/, 'unbind() of a non-element throws');
+                t.match(thrown(() => binder.unbind(mount('<span></span>'))), /nothing is bound/, 'unbind() of an element this binder never bound throws');
+                const host = mount('<span data-text="a"></span>');
+                binder.bind(host, Stitch.Observable.create({ a: 1 }));
+                t.equal(thrown(() => binder.unbind(host)), '', 'control: unbind() of a bound root works');
+                t.match(thrown(() => new Stitch.DataBinder({ onbind() {} })), /unknown hook "onbind".*onBind/, 'a misspelled hook name throws');
+                t.match(thrown(() => new Stitch.DataBinder({ onChange: 42 })), /onChange must be a function/, 'a hook that is not a function throws');
+                binder.dispose();
+                t.match(thrown(() => binder.bind(mount('<i data-text="a"></i>'), Stitch.Observable.create({ a: 1 }))), /disposed/, 'bind() on a disposed binder throws');
+            });
+
+            await StitchTest.test('model-change-handler-arguments', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 });
+                const seen = [];
+                const handler = change => seen.push(change.field);
+                t.match(thrown(() => model.on(42)), /on\(handler\): handler must be a function/, 'model.on() of a non-function throws');
+                model.on(handler);
+                t.match(thrown(() => model.off(undefined)), /off\(handler\).*undefined/, 'model.off(undefined) throws instead of removing every handler');
+                t.match(thrown(() => model.off(() => {})), /not a change handler of this object/, 'model.off() of a handler that was never added throws');
+                model.n = 2;
+                t.deepEqual(seen, ['n'], 'the real handler is still installed after those mistakes');
+                t.equal(thrown(() => model.off(handler)), '', 'control: model.off(handler) removes it');
+                t.equal(thrown(() => model.off()), '', 'control: model.off() with no argument removes every handler (explicit)');
+            });
+
+            await StitchTest.test('model-event-arguments', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 });
+                t.match(thrown(() => model.$on('', () => {})), /event name must be a non-empty string/, '$on with an empty event name throws');
+                t.match(thrown(() => model.$on('saved', 'handler')), /callback must be a function/, '$on with a non-function callback throws');
+                t.match(thrown(() => model.$once('saved')), /callback must be a function/, '$once without a callback throws');
+                t.match(thrown(() => model.$off('saved', () => {})), /is not subscribed to "saved"/, '$off of a callback that was never subscribed throws');
+                t.match(thrown(() => model.$emit(42)), /event name must be a non-empty string/, '$emit with a non-string event throws');
+                t.match(thrown(() => model.$use('x')), /middleware must be a function/, '$use with a non-function throws');
+                const cb = () => {};
+                model.$on('saved', cb);
+                t.equal(thrown(() => model.$off('saved', cb)), '', 'control: $off of a subscribed callback works');
+            });
+
+            await StitchTest.test('model-path-arguments', async (t) => {
+                const model = Stitch.Observable.create({ name: 'Ann', user: { email: 'a@x' } });
+                t.match(thrown(() => model.get('nmae')), /"nmae" is not a property of the model/, 'model.get() of a missing property throws');
+                t.match(thrown(() => model.set('nmae', 1)), /"nmae" is not a property of the model/, 'model.set() of a missing property throws (it would add a non-reactive property)');
+                t.equal(model.get('user.email'), 'a@x', 'control: model.get() of a real path works');
+                t.match(thrown(() => model.$set(42, 1)), /\$set\(key, value\): key must be a non-empty string/, '$set with a non-string key throws');
+                t.match(thrown(() => Stitch.Observable.create({ on: true })), /"on" is reserved/, 'a model property named like a built-in helper (on) throws');
+                t.match(thrown(() => Stitch.Observable.create({ toJSON: 1 })), /"toJSON" is reserved/, 'a model property named toJSON throws');
+            });
+
+            await StitchTest.test('message-bus-arguments', async (t) => {
+                const bus = new Stitch.MessageBus();
+                t.match(thrown(() => bus.subscribe('', () => {})), /event name must be a non-empty string/, 'subscribe with an empty event throws');
+                t.match(thrown(() => bus.subscribe('x', null)), /callback must be a function/, 'subscribe with a non-function throws');
+                t.match(thrown(() => bus.unsubscribe('x', () => {})), /is not subscribed to "x"/, 'unsubscribe of an unknown callback throws');
+                t.match(thrown(() => bus.publish(undefined)), /event name must be a non-empty string/, 'publish without an event name throws');
+                t.match(thrown(() => bus.publishSync(7)), /event name must be a non-empty string/, 'publishSync with a non-string event throws');
+                t.match(thrown(() => bus.use({})), /middleware must be a function/, 'use with a non-function throws');
+                const off = bus.subscribe('x', () => {});
+                t.equal(thrown(() => off()), '', 'control: the returned unsubscribe works');
+                t.equal(thrown(() => off()), '', 'control: and calling it again is harmless (it is the handle, not a lookup)');
+            });
+        })();
+    </script>
+</body>
+</html>

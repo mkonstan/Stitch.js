@@ -44,6 +44,8 @@ function createReactiveFactory(options = {}) {
     const isArrowFunction = options.isArrowFunction || runtimeHelpers.isArrowFunction;
     const setProperty = options.setProperty || runtimeHelpers.setProperty;
     const getProperty = options.getProperty || runtimeHelpers.getProperty;
+    const assertPathExists = runtimeHelpers.assertPathExists;
+    const RESERVED_NAMES = ["on", "off", "get", "set", "toJSON", "$set", "$watch", "$on", "$off", "$emit", "$once", "$use"];
     const addChangeHandler = options.addChangeHandler || objectHelpers.addChangeHandler;
     const removeChangeHandler = options.removeChangeHandler || objectHelpers.removeChangeHandler;
     const toJSON = options.toJSON || objectHelpers.toJSON;
@@ -320,6 +322,16 @@ function createReactiveFactory(options = {}) {
      * @returns {Object} Reactive object with descriptors
      */
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
+        // Names Stitch defines on every model object: a property with one of them would be
+        // overwritten by the helper, silently.
+        for (const name of Object.keys(target).concat(Array.from(computedProps.keys()))) {
+            if (RESERVED_NAMES.indexOf(name) !== -1) {
+                throw new Error(
+                    `[Stitch.js ${Version}] "${name}" is reserved: Stitch defines ${name}() on every model object, so a property ` +
+                    `with that name would be overwritten. Rename the property (e.g. "${name}Value"). Reserved: ${RESERVED_NAMES.join(", ")}.`
+                );
+            }
+        }
         // Add metadata
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
@@ -364,10 +376,19 @@ function createReactiveFactory(options = {}) {
         // Add helper methods
         defineHidden(target, "on", addChangeHandler.bind(target));
         defineHidden(target, "off", removeChangeHandler.bind(target));
-        defineHidden(target, "set", setProperty.bind(null, target));
-        defineHidden(target, "get", getProperty.bind(null, target));
+        defineHidden(target, "set", function (path, value) {
+            assertPathExists(target, path, `set("${path}")`);
+            setProperty(target, path, value);
+        });
+        defineHidden(target, "get", function (path) {
+            assertPathExists(target, path, `get("${path}")`);
+            return getProperty(target, path);
+        });
         defineHidden(target, "toJSON", toJSON.bind(target));
         defineHidden(target, "$set", function (key, value) {
+            if (typeof key !== "string" || key === "") {
+                throw new TypeError(`[Stitch.js ${Version}] $set(key, value): key must be a non-empty string, got ${typeof key}.`);
+            }
             if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
                 this[key] = value;
             } else {

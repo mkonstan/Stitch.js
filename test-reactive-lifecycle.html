@@ -192,7 +192,7 @@
                     '<ol data-foreach="tags"><li data-text="$data"></li></ol></li></ul>');
                 const model = isolated({
                     query: '',
-                    items: [{ id: 1, name: 'a', cls: { on: true }, tags: ['x', 'y'] }, { id: 2, name: 'b', cls: { on: false }, tags: [] }]
+                    items: [{ id: 1, name: 'a', cls: { active: true }, tags: ['x', 'y'] }, { id: 2, name: 'b', cls: { active: false }, tags: [] }]
                 });
                 const base = stats();
                 const binder = new Stitch.DataBinder();

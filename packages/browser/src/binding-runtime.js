@@ -2,6 +2,7 @@
 
 const { VERSION } = require("../../utils/src/version");
 const paths = require("./binding-paths");
+const { reportError, hasErrorHandler } = require("../../utils/src/error-hook");
 
 function createBindingRuntime(deps = {}) {
     const setProperty = deps.setProperty;
@@ -9,6 +10,22 @@ function createBindingRuntime(deps = {}) {
     const getValueValidator = deps.getValueValidator;
     const getAttrHandler = deps.getAttrHandler;
     const bindForeach = deps.bindForeach;
+
+/**
+ * Runs an event handler. An error in it (or in looking it up again) goes to Stitch.onError
+ * when a handler is installed, like every other error Stitch catches; with none it stays
+ * an ordinary uncaught error of the event listener.
+ */
+function runHandler(element, type, path, run) {
+    try {
+        run();
+    } catch (error) {
+        if (!hasErrorHandler()) {
+            throw error;
+        }
+        reportError(error, { source: "handler", element, binding: `data-${type}="${path}"` });
+    }
+}
 
 /** What onError is told when a binding's update throws: the element and the binding. */
 function bindingErrorContext(element, type, path) {
@@ -143,9 +160,11 @@ const BINDING_HANDLERS = {
             const ref = paths.parseHandlerRef(where, path);
             paths.resolveHandler(viewModel, ref, where);
             const clickHandler = e => {
-                // Looked up again on every click: the model may have replaced the method.
-                const target = paths.resolveHandler(viewModel, ref, where);
-                target.fn.call(target.owner, target.item, e);
+                runHandler(element, "click", path, () => {
+                    // Looked up again on every click: the model may have replaced the method.
+                    const target = paths.resolveHandler(viewModel, ref, where);
+                    target.fn.call(target.owner, target.item, e);
+                });
             };
             element.addEventListener("click", clickHandler);
             context.binder._trackCleanup(element, () => element.removeEventListener("click", clickHandler));
@@ -183,7 +202,7 @@ const BINDING_HANDLERS = {
                     const entryWhere = `${where} (event "${eventName}")`;
                     if (typeof entry === "function") {
                         const item = paths.rowItemOf(viewModel);
-                        return { eventName, listener: e => entry.call(item, item, e) };
+                        return { eventName, listener: e => runHandler(element, "event", path, () => entry.call(item, item, e)) };
                     }
                     if (typeof entry !== "string") {
                         throw new Error(`[Stitch.js v${VERSION}] ${entryWhere}: the handler must be a handler name ` +
@@ -193,10 +212,10 @@ const BINDING_HANDLERS = {
                     paths.resolveHandler(viewModel, ref, entryWhere);
                     return {
                         eventName,
-                        listener: e => {
+                        listener: e => runHandler(element, "event", path, () => {
                             const target = paths.resolveHandler(viewModel, ref, entryWhere);
                             target.fn.call(target.owner, target.item, e);
-                        }
+                        })
                     };
                 });
                 removeEventListeners();

@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":25,"moduleCount":25,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-paths.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-paths.js","5":"packages/browser/src/binding-runtime.js","6":"packages/browser/src/binding-scan-helpers.js","7":"packages/browser/src/data-binder.js","8":"packages/browser/src/foreach-binding-orchestrator.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/error-hook.js","17":"packages/utils/src/foreach-keys.js","18":"packages/utils/src/foreach-row-context.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/reactive-stats.js","21":"packages/utils/src/runtime-helpers.js","22":"packages/utils/src/type-converters.js","23":"packages/utils/src/value-binding-helpers.js","24":"packages/utils/src/version.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":26,"moduleCount":26,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-paths.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/hook-slot.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-paths.js","5":"packages/browser/src/binding-runtime.js","6":"packages/browser/src/binding-scan-helpers.js","7":"packages/browser/src/data-binder.js","8":"packages/browser/src/foreach-binding-orchestrator.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/error-hook.js","17":"packages/utils/src/foreach-keys.js","18":"packages/utils/src/foreach-row-context.js","19":"packages/utils/src/hook-slot.js","20":"packages/utils/src/reactive-object-helpers.js","21":"packages/utils/src/reactive-stats.js","22":"packages/utils/src/runtime-helpers.js","23":"packages/utils/src/type-converters.js","24":"packages/utils/src/value-binding-helpers.js","25":"packages/utils/src/version.js"}} */
 
 (function(){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -26,10 +26,10 @@ module.exports = {
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
 const { MessageBus } = __stitchRequire(12);
-const runtimeHelpers = __stitchRequire(21);
-const { defineHidden } = __stitchRequire(19);
+const runtimeHelpers = __stitchRequire(22);
+const { defineHidden } = __stitchRequire(20);
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
@@ -136,9 +136,13 @@ class Observable {
                 modelBus.publish(event, payload);
             },
             $once: function (event, callback) {
+                if (typeof callback !== "function") {
+                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
+                }
                 const unsubscribe = modelBus.subscribe(event, payload => {
-                    callback(payload);
+                    // Unsubscribe first: "once" holds even when the callback throws.
                     unsubscribe();
+                    callback(payload);
                 });
                 return unsubscribe;
             }
@@ -315,9 +319,9 @@ module.exports = {
 
 const { ReactiveSystem } = __stitchRequire(13);
 const { ComputedRef } = __stitchRequire(11);
-const runtimeHelpers = __stitchRequire(21);
-const objectHelpers = __stitchRequire(19);
-const { VERSION } = __stitchRequire(24);
+const runtimeHelpers = __stitchRequire(22);
+const objectHelpers = __stitchRequire(20);
+const { VERSION } = __stitchRequire(25);
 const defineHidden = objectHelpers.defineHidden;
 
 /**
@@ -357,6 +361,8 @@ function createReactiveFactory(options = {}) {
     const isArrowFunction = options.isArrowFunction || runtimeHelpers.isArrowFunction;
     const setProperty = options.setProperty || runtimeHelpers.setProperty;
     const getProperty = options.getProperty || runtimeHelpers.getProperty;
+    const assertPathExists = runtimeHelpers.assertPathExists;
+    const RESERVED_NAMES = ["on", "off", "get", "set", "toJSON", "$set", "$watch", "$on", "$off", "$emit", "$once", "$use"];
     const addChangeHandler = options.addChangeHandler || objectHelpers.addChangeHandler;
     const removeChangeHandler = options.removeChangeHandler || objectHelpers.removeChangeHandler;
     const toJSON = options.toJSON || objectHelpers.toJSON;
@@ -633,6 +639,16 @@ function createReactiveFactory(options = {}) {
      * @returns {Object} Reactive object with descriptors
      */
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
+        // Names Stitch defines on every model object: a property with one of them would be
+        // overwritten by the helper, silently.
+        for (const name of Object.keys(target).concat(Array.from(computedProps.keys()))) {
+            if (RESERVED_NAMES.indexOf(name) !== -1) {
+                throw new Error(
+                    `[Stitch.js ${Version}] "${name}" is reserved: Stitch defines ${name}() on every model object, so a property ` +
+                    `with that name would be overwritten. Rename the property (e.g. "${name}Value"). Reserved: ${RESERVED_NAMES.join(", ")}.`
+                );
+            }
+        }
         // Add metadata
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
@@ -677,10 +693,19 @@ function createReactiveFactory(options = {}) {
         // Add helper methods
         defineHidden(target, "on", addChangeHandler.bind(target));
         defineHidden(target, "off", removeChangeHandler.bind(target));
-        defineHidden(target, "set", setProperty.bind(null, target));
-        defineHidden(target, "get", getProperty.bind(null, target));
+        defineHidden(target, "set", function (path, value) {
+            assertPathExists(target, path, `set("${path}")`);
+            setProperty(target, path, value);
+        });
+        defineHidden(target, "get", function (path) {
+            assertPathExists(target, path, `get("${path}")`);
+            return getProperty(target, path);
+        });
         defineHidden(target, "toJSON", toJSON.bind(target));
         defineHidden(target, "$set", function (key, value) {
+            if (typeof key !== "string" || key === "") {
+                throw new TypeError(`[Stitch.js ${Version}] $set(key, value): key must be a non-empty string, got ${typeof key}.`);
+            }
             if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
                 this[key] = value;
             } else {
@@ -1075,15 +1100,15 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const foreachBindingOrchestrator = __stitchRequire(8);
 const bindingScanHelpers = __stitchRequire(6);
 const bindingRuntime = __stitchRequire(5);
 const dataBinderFactory = __stitchRequire(7);
-const runtimeHelpers = __stitchRequire(21);
+const runtimeHelpers = __stitchRequire(22);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(23);
-const typeConverters = __stitchRequire(22);
+const valueBindingHelpers = __stitchRequire(24);
+const typeConverters = __stitchRequire(23);
 const foreachKeys = __stitchRequire(17);
 const foreachRowContext = __stitchRequire(18);
 const bindingPaths = __stitchRequire(4);
@@ -1170,7 +1195,7 @@ module.exports = {
  * name was looked up and where it does exist.
  */
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { isRowContext } = __stitchRequire(18);
 
 const PREFIX = `[Stitch.js v${VERSION}]`;
@@ -1255,23 +1280,79 @@ function rootOf(scope) {
     return isRowContext(scope) ? scope.$root : scope;
 }
 
-function propertyNames(holder, isRowScope) {
-    let names;
-    if (isRowScope) {
+/**
+ * Whether `key` is something a binding can follow on `holder` (B5, S6):
+ * - "bindable": a reactive property (own accessor) of a model object; an own property of a
+ *   plain object (e.g. a computed's value); an index or length of an array; size of a Map /
+ *   Set; an own property of a string; on a row context, $data / $index / $parent / $root
+ *   or a bindable property of the row item;
+ * - "not-reactive": an own enumerable data property of a model object: a name starting with
+ *   _ (never made reactive) or a property added after Observable.create();
+ * - "missing": anything else, including inherited names (toString, constructor) and
+ *   Stitch's hidden helpers (on, toJSON, $watch, ...).
+ */
+function memberStatus(holder, key) {
+    if (isRowContext(holder)) {
+        if (ROW_NAMES.indexOf(key) !== -1) return "bindable";
         const item = holder.$data;
-        names = item !== null && typeof item === "object" ? Object.keys(item) : [];
-        names = names.concat(ROW_NAMES);
-    } else if (Array.isArray(holder)) {
-        return "an array: an index (0, 1, ...) or length";
-    } else {
-        names = Object.keys(holder);
+        return item !== null && typeof item === "object" ? memberStatus(item, key) : "missing";
     }
-    names = names.filter(name => name[0] !== "_");
-    if (names.length === 0) {
-        return "no properties";
+    if (holder === null || holder === undefined) {
+        return "missing";
     }
+    if (typeof holder !== "object" && typeof holder !== "function") {
+        return Object.prototype.hasOwnProperty.call(Object(holder), key) ? "bindable" : "missing";
+    }
+    if (Array.isArray(holder)) {
+        return key === "length" || (INDEX.test(key) && Object.prototype.hasOwnProperty.call(holder, key)) ? "bindable" : "missing";
+    }
+    if (holder instanceof Map || holder instanceof Set) {
+        return key === "size" ? "bindable" : "missing";
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(holder, key);
+    if (!descriptor) {
+        return "missing";
+    }
+    if (holder.__isReactive === true) {
+        if (descriptor.get) return "bindable";
+        return descriptor.enumerable ? "not-reactive" : "missing";
+    }
+    return "bindable";
+}
+
+/** The names a binding can follow on holder, and the declared names it cannot. */
+function memberLists(holder, isRowScope) {
+    const target = isRowScope ? holder.$data : holder;
+    const bindable = [];
+    const notBindable = [];
+    if (target !== null && typeof target === "object" && !Array.isArray(target)
+        && !(target instanceof Map) && !(target instanceof Set)) {
+        for (const name of Object.keys(target)) {
+            const status = memberStatus(target, name);
+            if (status === "bindable") bindable.push(name);
+            else if (status === "not-reactive") notBindable.push(name);
+        }
+    }
+    if (isRowScope) bindable.push(...ROW_NAMES);
+    return { bindable, notBindable };
+}
+
+function listNames(names) {
+    if (names.length === 0) return "no properties";
     const shown = names.slice(0, MAX_LISTED).join(", ");
     return names.length > MAX_LISTED ? `${shown}, ... (${names.length - MAX_LISTED} more)` : shown;
+}
+
+function describeMembers(holder, isRowScope) {
+    if (Array.isArray(holder)) return { text: "an array: an index (0, 1, ...) or length", bindable: [], notBindable: [] };
+    if (holder instanceof Map || holder instanceof Set) return { text: "size (it is a Map / Set)", bindable: [], notBindable: [] };
+    const lists = memberLists(holder, isRowScope);
+    let text = listNames(lists.bindable);
+    if (lists.notBindable.length) {
+        text += `. Not bindable: ${listNames(lists.notBindable)} (not reactive: names starting with _ are never made ` +
+            "reactive, and properties added after Observable.create() are not either)";
+    }
+    return Object.assign({ text }, lists);
 }
 
 function editDistance(a, b) {
@@ -1288,21 +1369,12 @@ function editDistance(a, b) {
     return row[b.length];
 }
 
-/** A close name among holder's own names (for the error message only), or null. */
-function closeName(holder, isRowScope, wanted) {
-    let names;
-    try {
-        names = isRowScope
-            ? Object.keys(holder.$data !== null && typeof holder.$data === "object" ? holder.$data : {}).concat(ROW_NAMES)
-            : Object.keys(holder);
-    } catch (_error) {
-        return null;
-    }
+/** A close bindable name (for the error message only), or null. */
+function closeName(names, wanted) {
     const lower = wanted.toLowerCase();
     let best = null;
     let bestDistance = 3;
     for (const name of names) {
-        if (name[0] === "_") continue;
         const distance = name.toLowerCase() === lower ? 0 : editDistance(name.toLowerCase(), lower);
         if (distance < bestDistance) {
             best = name;
@@ -1328,18 +1400,29 @@ function missingPropertyError(where, segments, index, holder) {
             `"${name}" is not a property of ${owner}, which is ${typeof holder} ${JSON.stringify(holder)}. ` +
             "Fix the path, or make that value an object.");
     }
-    const close = closeName(holder, isRowScope, name);
+    const members = describeMembers(holder, isRowScope);
+    const close = closeName(members.bindable, name);
     const suggestion = close ? `Did you mean "${segments.slice(0, index).concat(close).join(".")}"? ` : "";
     return bindingError(where,
         `"${name}" is not a property of ${owner}. ${owner[0].toUpperCase() + owner.slice(1)} has: ` +
-        `${propertyNames(holder, isRowScope)}. ${suggestion}` +
+        `${members.text}. ${suggestion}` +
         "Declare every bound property in Observable.create() with a starting value (null is fine): a property " +
         "added later is not reactive. Or fix the binding.");
 }
 
+function notReactiveError(where, segments, index) {
+    const name = segments[index];
+    const why = name[0] === "_"
+        ? "Stitch never makes properties whose names start with _ reactive, so a binding could not follow it. " +
+          `Rename it without the _ (e.g. "${name.replace(/^_+/, "") || "value"}"), or keep it out of bindings.`
+        : "it was added after Observable.create(), so it has no reactive accessor and a binding could not follow it. " +
+          "Declare it in Observable.create() with a starting value (null is fine).";
+    return bindingError(where, `"${segments.slice(0, index + 1).join(".")}" is not reactive: ${why}`);
+}
+
 /**
- * Reads a property path strictly: a name that does not exist throws (D25); a null or
- * undefined step ends the read with undefined.
+ * Reads a property path strictly: a name that is not a bindable property throws (D25, B5);
+ * a null or undefined step ends the read with undefined.
  * @param {Object} scope - the model or a row context
  * @param {string} path - a valid path (see checkPathSyntax)
  * @param {Function} describe - () => the element/binding description, used only on error
@@ -1352,8 +1435,12 @@ function readPath(scope, path, describe) {
             return undefined;
         }
         const key = segments[i];
-        if (!(key in Object(current))) {
+        const status = memberStatus(current, key);
+        if (status === "missing") {
             throw missingPropertyError(describe(), segments, i, current);
+        }
+        if (status === "not-reactive") {
+            throw notReactiveError(describe(), segments, i);
         }
         current = current[key];
     }
@@ -1404,7 +1491,9 @@ function parseHandlerRef(where, rawValue) {
 function lookUp(data, segments) {
     let owner = data;
     for (let i = 0; i < segments.length; i++) {
-        if (owner === null || owner === undefined || !(segments[i] in Object(owner))) {
+        // Own model members only (no inherited or hidden names); a handler need not be
+        // reactive, so a _name method or one added later still counts.
+        if (owner === null || owner === undefined || memberStatus(owner, segments[i]) === "missing") {
             return { found: false };
         }
         if (i === segments.length - 1) {
@@ -1485,6 +1574,8 @@ function resolveHandler(scope, ref, where) {
 }
 
 module.exports = {
+    memberStatus,
+    lookUp,
     describeBinding,
     checkPathSyntax,
     pathSyntaxProblem,
@@ -1500,8 +1591,9 @@ module.exports = {
   __stitchModuleFactories[5] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const paths = __stitchRequire(4);
+const { reportError, hasErrorHandler } = __stitchRequire(16);
 
 function createBindingRuntime(deps = {}) {
     const setProperty = deps.setProperty;
@@ -1509,6 +1601,22 @@ function createBindingRuntime(deps = {}) {
     const getValueValidator = deps.getValueValidator;
     const getAttrHandler = deps.getAttrHandler;
     const bindForeach = deps.bindForeach;
+
+/**
+ * Runs an event handler. An error in it (or in looking it up again) goes to Stitch.onError
+ * when a handler is installed, like every other error Stitch catches; with none it stays
+ * an ordinary uncaught error of the event listener.
+ */
+function runHandler(element, type, path, run) {
+    try {
+        run();
+    } catch (error) {
+        if (!hasErrorHandler()) {
+            throw error;
+        }
+        reportError(error, { source: "handler", element, binding: `data-${type}="${path}"` });
+    }
+}
 
 /** What onError is told when a binding's update throws: the element and the binding. */
 function bindingErrorContext(element, type, path) {
@@ -1643,9 +1751,11 @@ const BINDING_HANDLERS = {
             const ref = paths.parseHandlerRef(where, path);
             paths.resolveHandler(viewModel, ref, where);
             const clickHandler = e => {
-                // Looked up again on every click: the model may have replaced the method.
-                const target = paths.resolveHandler(viewModel, ref, where);
-                target.fn.call(target.owner, target.item, e);
+                runHandler(element, "click", path, () => {
+                    // Looked up again on every click: the model may have replaced the method.
+                    const target = paths.resolveHandler(viewModel, ref, where);
+                    target.fn.call(target.owner, target.item, e);
+                });
             };
             element.addEventListener("click", clickHandler);
             context.binder._trackCleanup(element, () => element.removeEventListener("click", clickHandler));
@@ -1683,7 +1793,7 @@ const BINDING_HANDLERS = {
                     const entryWhere = `${where} (event "${eventName}")`;
                     if (typeof entry === "function") {
                         const item = paths.rowItemOf(viewModel);
-                        return { eventName, listener: e => entry.call(item, item, e) };
+                        return { eventName, listener: e => runHandler(element, "event", path, () => entry.call(item, item, e)) };
                     }
                     if (typeof entry !== "string") {
                         throw new Error(`[Stitch.js v${VERSION}] ${entryWhere}: the handler must be a handler name ` +
@@ -1693,10 +1803,10 @@ const BINDING_HANDLERS = {
                     paths.resolveHandler(viewModel, ref, entryWhere);
                     return {
                         eventName,
-                        listener: e => {
+                        listener: e => runHandler(element, "event", path, () => {
                             const target = paths.resolveHandler(viewModel, ref, entryWhere);
                             target.fn.call(target.owner, target.item, e);
-                        }
+                        })
                     };
                 });
                 removeEventListeners();
@@ -1907,28 +2017,43 @@ module.exports = {
   __stitchModuleFactories[7] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { runAllThenThrow, reportError } = __stitchRequire(16);
 const paths = __stitchRequire(4);
 const discovery = __stitchRequire(6);
+const { createHookSlot } = __stitchRequire(19);
 
-// The report function installed with Stitch.onBindReport(fn), or null (the default:
+// The report function installed with Stitch.onBindReport(fn), or none (the default:
 // then bind() never looks at data-* attributes that are not Stitch's).
-let bindReporter = null;
+const reportSlot = createHookSlot("Stitch.onBindReport");
 
 /**
  * Installs (or, with null, removes) the page-wide bind report. When installed, every
  * bind() that succeeds calls fn({ bound, ignored }): each data-* attribute in the bound
  * element, as { element, attribute, value }, split into Stitch's own (bound) and the
- * others (ignored, e.g. a misspelled data-txt, data-testid, data-bs-*).
+ * others (ignored, e.g. a misspelled data-txt, data-testid, data-bs-*). Returns a function
+ * that removes it; installing while another one is installed throws.
  * @param {Function|null} fn
+ * @returns {Function} remove
  */
 function onBindReport(fn) {
-    if (fn !== null && typeof fn !== "function") {
-        throw new TypeError(`[Stitch.js v${VERSION}] Stitch.onBindReport(fn): fn must be a function (or null to remove it), got ${typeof fn}.`);
-    }
-    bindReporter = fn;
+    return reportSlot.install(fn);
 }
+
+// Page-wide ownership, across every DataBinder: an element carrying bindings belongs to
+// the binder that bound it, and a bound root to the binder that bound it. A second bind of
+// either throws instead of silently doing nothing or binding twice (B1, S2).
+const BOUND_BY = new WeakMap();
+const ROOT_OF = new WeakMap();
+
+// Bindings that replace their element's whole content: a bound element inside would be
+// destroyed by the first render (B2).
+const CONTENT_REPLACING = ["text"];
+
+// Row-context values a two-way binding cannot write back to (B4).
+const ROW_NAMES = ["$data", "$index", "$parent", "$root"];
+
+const KNOWN_HOOKS = ["onBind", "onChange", "properties"];
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1957,6 +2082,25 @@ function createDataBinderClass(deps = {}) {
     function describeElement(element) {
         const id = element.id ? ` id="${element.id}"` : "";
         return `<${element.tagName.toLowerCase()}${id}>`;
+    }
+
+    /** `<b id="x" data-text="name">`: an element with its first Stitch attribute. */
+    function describeOurs(element) {
+        const bindings = discovery.readElementBindings(element, bindingNames());
+        if (bindings.length) {
+            return paths.describeBinding(element, bindings[0].attributeName, bindings[0].path);
+        }
+        const internal = discovery.INTERNAL_ATTRIBUTES.find(attribute => element.hasAttribute(attribute));
+        return internal ? paths.describeBinding(element, internal, element.getAttribute(internal)) : describeElement(element);
+    }
+
+    function isHandlerBinding(type) {
+        const handler = getBindingHandler(type);
+        return handler.kind === "handler" && BUILT_IN_NAMES.has(type);
+    }
+
+    function isLiteralBinding(type) {
+        return getBindingHandler(type).value === "literal";
     }
 
     /**
@@ -1991,10 +2135,21 @@ function createDataBinderClass(deps = {}) {
                 `Add data-default-text="Choose..." or remove data-default-value.`
             );
         }
+        if (isList && element.hasAttribute("data-template") && element.firstElementChild) {
+            throw new Error(
+                `[Stitch.js ${Version}] ${paths.describeBinding(element, "data-template", element.getAttribute("data-template"))}: ` +
+                `the list takes its rows from the <template>, so the elements written inside it (${describeOurs(element.firstElementChild)}) ` +
+                `would be discarded. Remove them, or remove data-template to use them as the row template.`
+            );
+        }
     }
 
-    /** Bindings that cannot work together on one element throw. */
-    function checkCombination(element, bindings) {
+    /**
+     * The checks that need no model: internal attributes, combinations, content-replacing
+     * bindings over bound elements (B2), and the syntax of every value (D24, B4).
+     */
+    function checkStatically(element, bindings) {
+        checkInternalAttributes(element);
         const types = bindings.map(binding => binding.type);
         if (types.indexOf("foreach") !== -1 && types.indexOf("text") !== -1) {
             throw new Error(
@@ -2003,6 +2158,46 @@ function createDataBinderClass(deps = {}) {
                 `Put the text on another element (e.g. a heading before the list).`
             );
         }
+        for (const binding of bindings) {
+            if (CONTENT_REPLACING.indexOf(binding.type) !== -1) {
+                const inner = element.querySelector(selector());
+                if (inner) {
+                    throw new Error(
+                        `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)} contains ` +
+                        `${describeOurs(inner)}: ${binding.attributeName} would replace the element's content, destroying the ` +
+                        "binding inside it. Put the text in its own element (e.g. a <span>) next to the bound elements."
+                    );
+                }
+            }
+            if (isLiteralBinding(binding.type)) {
+                continue;
+            }
+            if (isHandlerBinding(binding.type)) {
+                paths.parseHandlerRef(paths.describeBinding(element, binding.attributeName, binding.path), binding.path);
+                continue;
+            }
+            const path = paths.checkPathSyntax(element, binding.attributeName, binding.path);
+            if (binding.type === "value") {
+                const segments = path.split(".");
+                if ((segments.length === 1 && ROW_NAMES.indexOf(path) !== -1) || segments[0] === "$index") {
+                    throw new Error(
+                        `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)}: ` +
+                        `a two-way binding cannot write to ${path} (it is the row's own context value, so writing it ` +
+                        "would not change the list); bind a property instead, e.g. data-value=\"$data.name\" with a list " +
+                        "of objects, or data-value=\"$root.selected\"."
+                    );
+                }
+            }
+        }
+    }
+
+    /** Throws if element (or root) is already bound, by this binder or another one. */
+    function alreadyBoundError(element, owner, self, asRoot) {
+        return new Error(
+            `[Stitch.js ${Version}] ${describeOurs(element)}${asRoot ? " (a bind() root)" : ""} is already bound by ` +
+            `${owner === self ? "this DataBinder" : "another DataBinder"}. Binding it again would leave it on the first ` +
+            "model or bind it twice. Call unbind() on the root that bound it first (or dispose() that binder), then bind again."
+        );
     }
 
 class DataBinder {
@@ -2017,12 +2212,34 @@ class DataBinder {
     constructor(hooks = {}) {
         /** @type {Set<HTMLElement>} Bound elements tracking */
         this.boundElements = new Set;
+        /** @type {Set<HTMLElement>} Roots this binder bound with bind() */
+        this._roots = new Set;
         /** @type {Object} Lifecycle hooks */
         this.hooks = this.createHooks(hooks);
         /** @type {Map<HTMLElement, Set<Function>>} Cleanup functions per element for unbind */
         this._elementCleanups = new Map();
         /** @type {boolean} Whether binder has been disposed */
         this._disposed = false;
+        /** What the bind() in progress created, so a failure releases exactly that. */
+        this._bindLog = null;
+    }
+
+    /**
+     * Resolves a selector or element argument of a public method, or throws.
+     * @private
+     */
+    _resolveElement(element, method) {
+        if (typeof element === "string") {
+            const selectorText = element;
+            element = typeof document !== "undefined" ? document.querySelector(selectorText) : null;
+            if (!element) {
+                throw new Error(`[Stitch.js ${Version}] ${method}("${selectorText}"): no element matches that selector.`);
+            }
+        }
+        if (!element || typeof element.querySelectorAll !== "function" || typeof element.matches !== "function") {
+            throw new Error(`[Stitch.js ${Version}] ${method}(element): element must be a DOM element or a selector, got ${element === null ? "null" : typeof element}.`);
+        }
+        return element;
     }
 
     /**
@@ -2030,64 +2247,111 @@ class DataBinder {
      *
      * Every binding is checked first: valid syntax, a property the model has (or, for
      * data-click, a handler that exists). A mistake throws, naming the element, the binding
-     * and the fix, and leaves nothing bound.
+     * and the fix, and leaves nothing of this bind() behind. A root (or element) that is
+     * already bound throws: unbind() it first.
      *
      * @param {string|HTMLElement} element - CSS selector or HTMLElement
      * @param {Object} viewModel - Reactive view model (must be from Observable.create())
-     * @throws {Error} If viewModel not reactive, element invalid, or a binding is wrong
+     * @throws {Error} If viewModel not reactive, element invalid or bound, or a binding is wrong
      * @example
      * const model = Stitch.Observable.create({ count: 0 });
      * binder.bind('#app', model);
      */
     bind(element, viewModel) {
-        if (typeof element === "string") {
-            const selectorText = element;
-            element = document.querySelector(selectorText);
-            if (!element) {
-                throw new Error(`[Stitch.js ${Version}] bind("${selectorText}"): no element matches that selector.`);
-            }
+        if (this._disposed) {
+            throw new Error(`[Stitch.js ${Version}] bind(): this DataBinder was disposed. Create a new DataBinder to bind again.`);
         }
-        if (!element || typeof element.querySelectorAll !== "function" || typeof element.matches !== "function") {
-            throw new Error(`[Stitch.js ${Version}] bind(element, model): element must be a DOM element or a selector, got ${element === null ? "null" : typeof element}.`);
-        }
+        element = this._resolveElement(element, "bind");
         if (!viewModel || !viewModel._factory || !viewModel._factory.reactiveSystem) {
             throw new Error(`[Stitch.js ${Version}] bind(element, model): model must be created with Stitch.Observable.create().`);
+        }
+        const rootOwner = ROOT_OF.get(element);
+        if (rootOwner) {
+            throw alreadyBoundError(element, rootOwner, this, true);
         }
         bindStarted = true;
         this.reactiveSystem = viewModel._factory.reactiveSystem;
 
-        // Global onChange hook: subscribe once per root bind and route model change events.
-        // It runs as a model change handler, so an error in it goes to Stitch.onError.
-        if (typeof this.hooks.onChange === "function") {
-            const onChangeHandler = change => {
-                this.hooks.onChange.call(this, change, viewModel, element);
-            };
-            viewModel.on(onChangeHandler);
-            this._trackCleanup(element, () => viewModel.off(onChangeHandler));
-        }
-
+        const outer = this._bindLog;
+        const log = { cleanups: [], elements: [] };
+        this._bindLog = log;
         try {
+            // Global onChange hook: subscribe once per root bind and route model change events.
+            // It runs as a model change handler, so an error in it goes to Stitch.onError.
+            if (typeof this.hooks.onChange === "function") {
+                const onChangeHandler = change => {
+                    this.hooks.onChange.call(this, change, viewModel, element);
+                };
+                viewModel.on(onChangeHandler);
+                this._trackCleanup(element, () => viewModel.off(onChangeHandler));
+            }
             this._bindElement(element, viewModel, []);
         } catch (error) {
-            // A wrong binding leaves nothing of this bind() behind.
-            try {
-                this._unbindTree(element);
-            } catch (cleanupError) {
-                reportError(cleanupError, { source: "unbind", element });
-            }
+            this._bindLog = outer;
+            this._rollback(log);
             throw error;
         }
+        this._bindLog = outer;
+        ROOT_OF.set(element, this);
+        this._roots.add(element);
 
-        if (bindReporter) {
-            bindReporter(discovery.collectBindReport(element, bindingNames()));
+        const reporter = reportSlot.get();
+        if (reporter) {
+            reporter(discovery.collectBindReport(element, bindingNames()));
         }
     }
 
     /**
-     * Creates hooks object with defaults.
+     * Releases exactly what a failed bind() created (its cleanups, its element marks),
+     * newest first; nothing an earlier bind() made is touched.
+     * @private
+     */
+    _rollback(log) {
+        const runs = [];
+        for (let i = log.cleanups.length - 1; i >= 0; i--) {
+            const [element, fn] = log.cleanups[i];
+            runs.push(() => {
+                const set = this._elementCleanups.get(element);
+                if (set && set.has(fn)) {
+                    set.delete(fn);
+                    if (set.size === 0) this._elementCleanups.delete(element);
+                    fn();
+                }
+            });
+        }
+        for (const element of log.elements) {
+            this.boundElements.delete(element);
+            if (BOUND_BY.get(element) === this) BOUND_BY.delete(element);
+        }
+        try {
+            runAllThenThrow(runs, { source: "unbind" });
+        } catch (cleanupError) {
+            // The bind() error is the one thrown; a cleanup error on the way is not lost.
+            reportError(cleanupError, { source: "unbind" });
+        }
+    }
+
+    /**
+     * Creates hooks object with defaults. Unknown hook names and non-function hooks throw.
      * @private
      */
     createHooks(userHooks = {}) {
+        if (userHooks === null || typeof userHooks !== "object") {
+            throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): hooks must be an object, got ${userHooks === null ? "null" : typeof userHooks}.`);
+        }
+        for (const name of Object.keys(userHooks)) {
+            if (KNOWN_HOOKS.indexOf(name) === -1) {
+                throw new Error(`[Stitch.js ${Version}] new DataBinder(hooks): unknown hook "${name}". Known hooks: ${KNOWN_HOOKS.join(", ")}.`);
+            }
+        }
+        for (const name of ["onBind", "onChange"]) {
+            if (userHooks[name] !== undefined && userHooks[name] !== null && typeof userHooks[name] !== "function") {
+                throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): ${name} must be a function, got ${typeof userHooks[name]}.`);
+            }
+        }
+        if (userHooks.properties !== undefined && (userHooks.properties === null || typeof userHooks.properties !== "object")) {
+            throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`);
+        }
         return {
             onBind: userHooks.onBind || null,
             onChange: userHooks.onChange || null,
@@ -2098,7 +2362,8 @@ class DataBinder {
     /**
      * Binds root and the elements inside it that carry Stitch's attributes, found by
      * selector (D24), in document order. A foreach element is a boundary: its rows are
-     * bound by the list itself, so nothing inside it is bound here.
+     * bound by the list itself, so nothing inside it is bound here. Every element is
+     * checked (static rules, not already bound) before any is bound.
      *
      * @private
      * @param {HTMLElement} root - Element to bind
@@ -2121,13 +2386,61 @@ class DataBinder {
                 boundary = this._isBindingBoundary(element) ? element : null;
             }
         }
-        for (const element of targets) {
-            // An earlier binding may have replaced this element's ancestor's content
-            // (data-text): what is no longer inside root is not bound.
-            if (element !== root && !root.contains(element)) {
-                continue;
+        const names = bindingNames();
+        const planned = targets.map(element => {
+            const owner = BOUND_BY.get(element);
+            if (owner) {
+                throw alreadyBoundError(element, owner, this, false);
             }
-            this._processBindings(element, context, contextPath);
+            const bindings = discovery.readElementBindings(element, names);
+            checkStatically(element, bindings);
+            return { element, bindings };
+        });
+        for (const { element, bindings } of planned) {
+            this._processBindings(element, context, contextPath, bindings);
+        }
+    }
+
+    /**
+     * Checks a foreach row template at bind(), before (and whether or not) any row exists
+     * (B3): every rule that does not depend on a row's data, plus $root. paths and
+     * handlers, which the root model can answer. Row property names are checked when a row
+     * is rendered.
+     * @private
+     * @param {HTMLElement} template - a detached copy of the row template
+     * @param {Object} listScope - the scope the list is bound in (model or row context)
+     */
+    _checkTemplate(template, listScope) {
+        const root = paths.rootOf(listScope);
+        const names = bindingNames();
+        const elements = (template.matches(selector()) ? [template] : []).concat(Array.from(template.querySelectorAll(selector())));
+        for (const element of elements) {
+            const bindings = discovery.readElementBindings(element, names);
+            checkStatically(element, bindings);
+            for (const binding of bindings) {
+                if (isLiteralBinding(binding.type)) continue;
+                const where = paths.describeBinding(element, binding.attributeName, binding.path);
+                if (isHandlerBinding(binding.type)) {
+                    const ref = paths.parseHandlerRef(where, binding.path);
+                    if (ref.level === "root") {
+                        // No row exists yet, so only the root model can be asked.
+                        const hit = paths.lookUp(root, ref.segments);
+                        if (!hit.found) {
+                            throw new Error(`[Stitch.js ${Version}] ${where}: handler "${ref.text}" was not found on the root model. ` +
+                                "If it is a method of each row, use the bare name; if it is on the enclosing row, use $parent.name.");
+                        }
+                        if (typeof hit.value !== "function") {
+                            throw new Error(`[Stitch.js ${Version}] ${where}: "${ref.text}" on the root model is ` +
+                                `${hit.value === null ? "null" : typeof hit.value}, not a function.`);
+                        }
+                    }
+                    continue;
+                }
+                const path = binding.path.trim();
+                if (path.indexOf("$root.") === 0) {
+                    paths.readPath(root, path.slice("$root.".length), () => where);
+                }
+            }
         }
     }
 
@@ -2147,20 +2460,18 @@ class DataBinder {
      * Applies the bindings of a single element (once).
      * @private
      */
-    _processBindings(element, context, contextPath) {
-        if (this.boundElements.has(element)) {
-            return;
-        }
-        checkInternalAttributes(element);
-        const bindings = discovery.readElementBindings(element, bindingNames());
+    _processBindings(element, context, contextPath, bindings) {
         if (bindings.length === 0) {
             return;
         }
-        checkCombination(element, bindings);
+        BOUND_BY.set(element, this);
+        this.boundElements.add(element);
+        if (this._bindLog) {
+            this._bindLog.elements.push(element);
+        }
         bindings.forEach(binding => {
             this._applyTypedBinding(element, context, binding.type, binding.path, contextPath);
         });
-        this.boundElements.add(element);
 
         // On the bind() stack an error here throws to the caller; for a row rendered
         // later it is part of the list's re-render and goes to Stitch.onError.
@@ -2171,7 +2482,8 @@ class DataBinder {
 
     /**
      * Checks one binding (syntax, and that its path exists: D24/D25), then delegates to its
-     * handler. Property-specific hooks (onBind) replace the handler.
+     * handler. Property-specific hooks (onBind) replace the handler. A custom binding
+     * registered with value: "literal" gets the raw attribute text and no lookup (D27).
      * @private
      */
     _applyTypedBinding(element, viewModel, type, rawPath, contextPath = []) {
@@ -2179,7 +2491,10 @@ class DataBinder {
         const attribute = `data-${type}`;
         let path;
         let value;
-        if (handler.kind === "handler" && BUILT_IN_NAMES.has(type)) {
+        if (isLiteralBinding(type)) {
+            path = rawPath;
+            value = rawPath;
+        } else if (isHandlerBinding(type)) {
             // A handler reference: the binding parses and looks it up itself (D12).
             path = String(rawPath).trim();
         } else {
@@ -2208,7 +2523,7 @@ class DataBinder {
         }
 
         // Set up onChange hook if it exists (always, even if onBind exists)
-        if (propertyHooks && propertyHooks.onChange) {
+        if (propertyHooks && propertyHooks.onChange && !isLiteralBinding(type)) {
             const binding = { type, path, attributeName: attribute };
             const read = paths.pathReader(element, attribute, path);
             let oldValue = value;
@@ -2226,16 +2541,30 @@ class DataBinder {
      * Unbinds an element AND every element inside it: runs all their cleanups (effects
      * released, listeners removed) and forgets them. The DOM is left as it is.
      * Every cleanup runs; if one threw, the first error is thrown afterwards.
+     * A selector that matches nothing, or an element with nothing bound by this binder in
+     * it, throws.
      *
      * @param {string|HTMLElement} element - CSS selector or HTMLElement
      */
     unbind(element) {
-        if (typeof element === "string") {
-            element = document.querySelector(element);
+        if (this._disposed) {
+            throw new Error(`[Stitch.js ${Version}] unbind(): this DataBinder was disposed; everything it bound is already released.`);
         }
-        if (element) {
-            this._unbindTree(element);
+        element = this._resolveElement(element, "unbind");
+        const roots = Array.from(this._roots).filter(root => root === element || element.contains(root));
+        const hasBound = this._elementCleanups.has(element) || this.boundElements.has(element) ||
+            Array.from(element.querySelectorAll("*")).some(el => this._elementCleanups.has(el) || this.boundElements.has(el));
+        if (!hasBound && roots.length === 0) {
+            throw new Error(
+                `[Stitch.js ${Version}] unbind(${describeElement(element)}): nothing is bound by this DataBinder in that element. ` +
+                "Pass the element (or an ancestor of the elements) given to bind(), with the binder that bound it."
+            );
         }
+        for (const root of roots) {
+            this._roots.delete(root);
+            if (ROOT_OF.get(root) === this) ROOT_OF.delete(root);
+        }
+        this._unbindTree(element);
     }
 
     /**
@@ -2258,6 +2587,9 @@ class DataBinder {
      */
     _releaseElement(element) {
         this.boundElements.delete(element);
+        if (BOUND_BY.get(element) === this) {
+            BOUND_BY.delete(element);
+        }
         const cleanups = this._elementCleanups.get(element);
         if (cleanups) {
             this._elementCleanups.delete(element);
@@ -2277,6 +2609,9 @@ class DataBinder {
                 this._elementCleanups.set(element, new Set());
             }
             this._elementCleanups.get(element).add(cleanupFn);
+            if (this._bindLog) {
+                this._bindLog.cleanups.push([element, cleanupFn]);
+            }
         }
     }
 
@@ -2297,7 +2632,14 @@ class DataBinder {
         const cleanups = [];
         this._elementCleanups.forEach(set => set.forEach(fn => cleanups.push(fn)));
         this._elementCleanups.clear();
+        this.boundElements.forEach(element => {
+            if (BOUND_BY.get(element) === this) BOUND_BY.delete(element);
+        });
         this.boundElements.clear();
+        this._roots.forEach(root => {
+            if (ROOT_OF.get(root) === this) ROOT_OF.delete(root);
+        });
+        this._roots.clear();
         this.reactiveSystem = null;
         runAllThenThrow(cleanups, { source: "dispose" });
     }
@@ -2312,15 +2654,18 @@ class DataBinder {
  *   and HTML lowercases attribute names), not an existing binding, not one of Stitch's
  *   internal attributes (key, template, default-text, default-value);
  * - handler has a bind() method;
+ * - handler.value, if set, is "path" (the default: the attribute names a model property,
+ *   checked like any other binding) or "literal" (the raw attribute text is passed to
+ *   bind() and nothing is looked up) (D27);
  * - it is registered BEFORE the first bind() on the page: elements bound earlier would
  *   silently miss it.
- * The binding's value is checked like any other: a property path the model has.
  *
  * @static
  * @param {string} name - Binding name (e.g., 'tooltip' for data-tooltip)
  * @param {BindingHandler} handler - Handler object with bind() method
  * @throws {Error} If a rule above is broken
  * @example
+ * // A path binding (the default): data-tooltip="helpText" follows model.helpText.
  * Stitch.DataBinder.registerBinding('tooltip', {
  *     bind(element, viewModel, path, context) {
  *         const effect = context.reactiveSystem.effect(() => {
@@ -2329,7 +2674,11 @@ class DataBinder {
  *         context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
  *     }
  * });
- * // Usage: <button data-tooltip="helpText">Help</button>
+ * // A literal binding: data-hint="Shown as is" passes the text itself.
+ * Stitch.DataBinder.registerBinding('hint', {
+ *     value: 'literal',
+ *     bind(element, viewModel, text) { element.setAttribute('title', text); }
+ * });
  */
 DataBinder.registerBinding = function (name, handler) {
     if (typeof name !== "string") {
@@ -2346,6 +2695,12 @@ DataBinder.registerBinding = function (name, handler) {
     }
     if (!handler || typeof handler.bind !== "function") {
         throw new Error(`[Stitch.js ${Version}] registerBinding: handler must have a bind() method`);
+    }
+    if (handler.value !== undefined && handler.value !== "path" && handler.value !== "literal") {
+        throw new Error(
+            `[Stitch.js ${Version}] registerBinding("${name}"): value must be "path" or "literal": "path" (the default) when the ` +
+            `attribute names a model property, "literal" when the attribute text is passed as is. Got ${JSON.stringify(handler.value)}.`
+        );
     }
     if (Object.prototype.hasOwnProperty.call(BINDING_HANDLERS, name)) {
         throw new Error(
@@ -2530,6 +2885,25 @@ function bindForeach(element, viewModel, path, context, deps) {
         tagName: element.tagName
     };
     const rowTemplate = readRowTemplate(element, path, version, doc);
+
+    // B3: check the row template now, even if the list is empty: syntax, placement and
+    // $root. names (binder._checkTemplate), and the one-root rule of every nested list
+    // (data-template ones followed once each, so a recursive tree template terminates).
+    // A row's own property names can only be checked when a row is rendered.
+    const seenTemplates = new Set(element.getAttribute("data-template") ? [element.getAttribute("data-template")] : []);
+    (function checkTemplate(template) {
+        binder._checkTemplate(template, viewModel);
+        const lists = (template.hasAttribute("data-foreach") ? [template] : [])
+            .concat(Array.from(template.querySelectorAll("[data-foreach]")));
+        for (const nested of lists) {
+            const nestedTemplate = readRowTemplate(nested, nested.getAttribute("data-foreach"), version, doc);
+            const nestedId = nested.getAttribute("data-template");
+            if (nestedId && !seenTemplates.has(nestedId)) {
+                seenTemplates.add(nestedId);
+                checkTemplate(nestedTemplate);
+            }
+        }
+    })(rowTemplate);
 
     // The list element's original children (inline template, whitespace). They were never
     // bound (foreach is a binding boundary), so they are simply taken out; if the first
@@ -2739,7 +3113,7 @@ module.exports = {
   __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
 const { ComputedRef } = __stitchRequire(11);
@@ -2758,7 +3132,7 @@ module.exports = {
   __stitchModuleFactories[10] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { reportError } = __stitchRequire(16);
 
 /** Runs a queued effect; an error goes to Stitch.onError (a flush is on no caller's stack). */
@@ -2972,8 +3346,20 @@ module.exports = {
   __stitchModuleFactories[12] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 const { reportError } = __stitchRequire(16);
+
+function checkEvent(version, method, event) {
+    if (typeof event !== "string" || event === "") {
+        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, ...): the event name must be a non-empty string, got ${event === "" ? "an empty string" : typeof event}.`);
+    }
+}
+
+function checkCallback(version, method, callback) {
+    if (typeof callback !== "function") {
+        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, callback): callback must be a function, got ${callback === null ? "null" : typeof callback}.`);
+    }
+}
 
 class MessageBus {
     constructor(options = {}) {
@@ -2986,22 +3372,40 @@ class MessageBus {
         this.MAX_FLUSH_DEPTH = 100;
     }
 
+    /**
+     * Subscribes callback to event ("*" receives every event). Returns a function that
+     * unsubscribes it (safe to call more than once).
+     */
     subscribe(event, callback) {
+        checkEvent(this.version, "subscribe", event);
+        checkCallback(this.version, "subscribe", callback);
         if (!this.subscribers.has(event)) {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        return () => this.unsubscribe(event, callback);
+        return () => this._remove(event, callback);
     }
 
+    /** Unsubscribes callback from event; a callback that is not subscribed throws. */
     unsubscribe(event, callback) {
-        const subscribers = this.subscribers.get(event);
-        if (subscribers) {
-            subscribers.delete(callback);
+        checkEvent(this.version, "unsubscribe", event);
+        checkCallback(this.version, "unsubscribe", callback);
+        if (!this._remove(event, callback)) {
+            throw new Error(
+                `[Stitch.js ${this.version}] MessageBus.unsubscribe("${event}", callback): that callback is not subscribed to "${event}". ` +
+                "Pass the same function that was subscribed (or call the function subscribe() returned)."
+            );
         }
     }
 
+    /** @private */
+    _remove(event, callback) {
+        const subscribers = this.subscribers.get(event);
+        return !!subscribers && subscribers.delete(callback);
+    }
+
     publish(event, payload) {
+        checkEvent(this.version, "publish", event);
         this.queue.push({
             event,
             payload,
@@ -3013,6 +3417,7 @@ class MessageBus {
     }
 
     publishSync(event, payload) {
+        checkEvent(this.version, "publishSync", event);
         this._executeEvent({
             event,
             payload,
@@ -3092,6 +3497,9 @@ class MessageBus {
     }
 
     use(middlewareFn) {
+        if (typeof middlewareFn !== "function") {
+            throw new TypeError(`[Stitch.js ${this.version}] MessageBus.use(middleware): middleware must be a function, got ${typeof middlewareFn}.`);
+        }
         this.middleware.push(middlewareFn);
     }
 
@@ -3110,8 +3518,8 @@ module.exports = {
 
 const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
-const { VERSION } = __stitchRequire(24);
-const { REACTIVE_TOTALS } = __stitchRequire(20);
+const { VERSION } = __stitchRequire(25);
+const { REACTIVE_TOTALS } = __stitchRequire(21);
 const { reportError } = __stitchRequire(16);
 
 // Effect ids: a counter (an id is only a label; it needs no randomness).
@@ -3444,15 +3852,15 @@ module.exports = {
   __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
-const helpers = __stitchRequire(21);
+const { VERSION } = __stitchRequire(25);
+const helpers = __stitchRequire(22);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(23);
-const typeConverters = __stitchRequire(22);
+const valueBindingHelpers = __stitchRequire(24);
+const typeConverters = __stitchRequire(23);
 const foreachKeys = __stitchRequire(17);
 const foreachRowContext = __stitchRequire(18);
-const reactiveObjectHelpers = __stitchRequire(19);
-const { readReactiveStats } = __stitchRequire(20);
+const reactiveObjectHelpers = __stitchRequire(20);
+const { readReactiveStats } = __stitchRequire(21);
 const errorHook = __stitchRequire(16);
 
 /**
@@ -3572,7 +3980,7 @@ module.exports = {
   __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { createHookSlot } = __stitchRequire(19);
 
 /**
  * Where errors raised inside reactive updates go (D23).
@@ -3584,20 +3992,22 @@ const { VERSION } = __stitchRequire(24);
  * like any other uncaught error. A handler that throws has its own error re-thrown the
  * same way. Errors on the synchronous bind() stack are thrown to the caller instead.
  */
-let errorHandler = null;
+const slot = createHookSlot("Stitch.onError");
 
 /**
- * Installs the one page-wide handler for errors raised inside reactive updates;
- * null removes it.
+ * Installs the one page-wide handler for errors raised inside reactive updates and
+ * returns a function that removes it; null removes the installed one. Installing while
+ * another handler is installed throws.
  * @param {Function|null} fn - called as fn(error, context)
+ * @returns {Function} remove
  */
 function onError(fn) {
-    if (fn !== null && typeof fn !== "function") {
-        throw new TypeError(
-            `[Stitch.js v${VERSION}] Stitch.onError(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`
-        );
-    }
-    errorHandler = fn;
+    return slot.install(fn);
+}
+
+/** True while a Stitch.onError handler is installed. */
+function hasErrorHandler() {
+    return slot.get() !== null;
 }
 
 function rethrowUncaught(error) {
@@ -3613,7 +4023,7 @@ function rethrowUncaught(error) {
  * @param {Object} [context] - what was running: { source, element?, binding?, event?, field? }
  */
 function reportError(error, context) {
-    const handler = errorHandler;
+    const handler = slot.get();
     if (!handler) {
         rethrowUncaught(error);
         return;
@@ -3652,6 +4062,7 @@ function runAllThenThrow(fns, context) {
 
 module.exports = {
     onError,
+    hasErrorHandler,
     reportError,
     runAllThenThrow
 };
@@ -3840,6 +4251,53 @@ module.exports = {
   __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
+const { VERSION } = __stitchRequire(25);
+
+/**
+ * A page-wide slot for one handler (Stitch.onError, Stitch.onBindReport).
+ * install(fn) puts fn in the slot and returns a function that removes it. Installing while
+ * another handler is in the slot throws: replacing it silently would re-route the first
+ * handler's calls to the second without anyone knowing. install(null) empties the slot.
+ */
+function createHookSlot(apiName) {
+    let current = null;
+    function install(fn) {
+        if (fn === null) {
+            current = null;
+            return () => {};
+        }
+        if (typeof fn !== "function") {
+            throw new TypeError(`[Stitch.js v${VERSION}] ${apiName}(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`);
+        }
+        if (current !== null && current !== fn) {
+            throw new Error(
+                `[Stitch.js v${VERSION}] ${apiName}(fn): a handler is already installed. Remove it first with ` +
+                `${apiName}(null) or the function the first ${apiName}() call returned, then install the new one.`
+            );
+        }
+        current = fn;
+        return function remove() {
+            if (current === fn) {
+                current = null;
+            }
+        };
+    }
+    return {
+        install,
+        get() {
+            return current;
+        }
+    };
+}
+
+module.exports = {
+    createHookSlot
+};
+
+  };
+  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
+"use strict";
+
 function defineHidden(target, name, value) {
     Object.defineProperty(target, name, {
         value: value,
@@ -3849,15 +4307,33 @@ function defineHidden(target, name, value) {
     });
 }
 
+const { VERSION } = __stitchRequire(25);
+
 function addChangeHandler(handler) {
+    if (typeof handler !== "function") {
+        throw new TypeError(`[Stitch.js v${VERSION}] on(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
+    }
     this._changeHandlers.add(handler);
 }
 
+/**
+ * off(handler) removes one change handler; a handler that is not installed (or a value
+ * that is not a function, e.g. an undefined variable) throws. off() with no argument at
+ * all removes every handler.
+ */
 function removeChangeHandler(handler) {
-    if (handler) {
-        this._changeHandlers.delete(handler);
-    } else {
+    if (arguments.length === 0) {
         this._changeHandlers.clear();
+        return;
+    }
+    if (typeof handler !== "function") {
+        throw new TypeError(
+            `[Stitch.js v${VERSION}] off(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
+            "Pass the handler given to on(); to remove every handler, call off() with no argument."
+        );
+    }
+    if (!this._changeHandlers.delete(handler)) {
+        throw new Error(`[Stitch.js v${VERSION}] off(handler): that function is not a change handler of this object. Pass the function given to on().`);
     }
 }
 
@@ -3884,7 +4360,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3914,10 +4390,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(24);
+const { VERSION } = __stitchRequire(25);
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -3999,13 +4475,16 @@ function getProperty(target, path) {
  * @param {string} where - e.g. '$watch("nmae")'
  */
 function assertPathExists(target, path, where) {
+    getProperty(undefined, path); // throws first for a value that is not a path at all
     const keys = String(path).split(".");
     let current = target;
     for (let i = 0; i < keys.length; i++) {
         if (current == null) {
             return;
         }
-        if (!(keys[i] in Object(current))) {
+        const own = Object.prototype.hasOwnProperty.call(Object(current), keys[i]) ||
+            (keys[i] === "size" && (current instanceof Map || current instanceof Set));
+        if (!own) {
             const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
             const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;
             throw new Error(
@@ -4025,10 +4504,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION: DEFAULT_VERSION } = __stitchRequire(24);
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(25);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -4238,7 +4717,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4465,7 +4944,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[25] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
 module.exports = { VERSION: "2.1.0" };

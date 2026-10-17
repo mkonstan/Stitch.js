@@ -112,9 +112,13 @@ class Observable {
                 modelBus.publish(event, payload);
             },
             $once: function (event, callback) {
+                if (typeof callback !== "function") {
+                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
+                }
                 const unsubscribe = modelBus.subscribe(event, payload => {
-                    callback(payload);
+                    // Unsubscribe first: "once" holds even when the callback throws.
                     unsubscribe();
+                    callback(payload);
                 });
                 return unsubscribe;
             }

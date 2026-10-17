@@ -157,6 +157,25 @@ function bindForeach(element, viewModel, path, context, deps) {
     };
     const rowTemplate = readRowTemplate(element, path, version, doc);
 
+    // B3: check the row template now, even if the list is empty: syntax, placement and
+    // $root. names (binder._checkTemplate), and the one-root rule of every nested list
+    // (data-template ones followed once each, so a recursive tree template terminates).
+    // A row's own property names can only be checked when a row is rendered.
+    const seenTemplates = new Set(element.getAttribute("data-template") ? [element.getAttribute("data-template")] : []);
+    (function checkTemplate(template) {
+        binder._checkTemplate(template, viewModel);
+        const lists = (template.hasAttribute("data-foreach") ? [template] : [])
+            .concat(Array.from(template.querySelectorAll("[data-foreach]")));
+        for (const nested of lists) {
+            const nestedTemplate = readRowTemplate(nested, nested.getAttribute("data-foreach"), version, doc);
+            const nestedId = nested.getAttribute("data-template");
+            if (nestedId && !seenTemplates.has(nestedId)) {
+                seenTemplates.add(nestedId);
+                checkTemplate(nestedTemplate);
+            }
+        }
+    })(rowTemplate);
+
     // The list element's original children (inline template, whitespace). They were never
     // bound (foreach is a binding boundary), so they are simply taken out; if the first
     // render throws they are put back, so the element can be bound again once fixed.

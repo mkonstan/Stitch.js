@@ -128,7 +128,7 @@
                 const onParent = messageOf(tryBind(mount(NESTED('pick')), nestedModel([])));
                 t.match(onParent, /did you mean "\$parent\.pick"/, 'a handler on the parent row is suggested as $parent.pick');
                 const onRow = messageOf(tryBind(mount(NESTED('$root.own')), nestedModel([])));
-                t.match(onRow, /was not found on the root model.*did you mean "own"/, 'a $root. miss that exists on the row suggests the bare name');
+                t.match(onRow, /handler "\$root\.own" was not found on the root model.*use the bare name/, 'a $root. miss is caught at bind() (before any row exists) and points to the bare name for a row method');
                 // Three levels: a handler on the grandparent row (not the root) cannot be named.
                 const deep = mount('<div data-foreach="a"><div data-foreach="b"><div data-foreach="c"><button data-click="far">x</button></div></div></div>');
                 const deepMessage = messageOf(tryBind(deep, Stitch.Observable.create({

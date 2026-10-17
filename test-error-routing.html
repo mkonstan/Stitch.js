@@ -34,7 +34,10 @@
             'bind-errors-throw-to-the-caller',
             'flush-overflow-is-reported',
             'cleanup-errors-throw-after-every-cleanup',
-            'on-error-rejects-a-non-function'
+            'on-error-rejects-a-non-function',
+            'hooks-refuse-to-replace-an-installed-handler',
+            'handler-errors-go-to-on-error',
+            'once-handler-that-throws-unsubscribes'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -279,6 +282,60 @@
                     t.match(thrown ? thrown.message : '', /cleanup one failed/, `${how}() throws the cleanup error`);
                     t.deepEqual(cleanupRuns.slice().sort(), ['first', 'second'], `${how}() ran every cleanup before throwing`);
                 }
+            });
+
+            // S4: installing a second handler would silently re-route the first one's errors.
+            await StitchTest.test('hooks-refuse-to-replace-an-installed-handler', async (t) => {
+                for (const name of ['onError', 'onBindReport']) {
+                    const install = Stitch[name];
+                    const first = () => {};
+                    const remove = install(first);
+                    let thrown = null;
+                    try { install(() => {}); } catch (error) { thrown = error; }
+                    t.match(thrown ? thrown.message : '', /already installed.*null/, `${name}: installing a second handler throws, saying how to remove the first`);
+                    t.equal(typeof remove, 'function', `${name}: installing returns a remove function`);
+                    remove();
+                    let afterRemove = null;
+                    try { install(() => {}); } catch (error) { afterRemove = error; }
+                    t.equal(afterRemove, null, `${name}: after the remove function, a new handler installs`);
+                    install(null);
+                    t.equal(install(first) !== undefined, true, `${name}: after ${name}(null), a handler installs`);
+                    install(null);
+                }
+            });
+
+            // S5: an error thrown by a click / event handler goes to onError when one is installed.
+            await StitchTest.test('handler-errors-go-to-on-error', async (t) => {
+                const boom = new Error('click handler failed');
+                const host = mount('<button id="he-btn" data-click="act">x</button><input id="he-in" data-event="events">');
+                const model = Stitch.Observable.create({ act() { throw boom; }, events: { focus: 'onFocus' }, onFocus() { throw boom; } });
+                new Stitch.DataBinder().bind(host, model);
+                const calls = await withOnError(async () => {
+                    document.getElementById('he-btn').click();
+                    document.getElementById('he-in').dispatchEvent(new FocusEvent('focus'));
+                });
+                t.equal(calls.length, 2, 'both handler errors reached onError');
+                t.ok(calls.every(call => call.error === boom), 'with the thrown error itself');
+                t.equal(calls[0] && calls[0].context && calls[0].context.binding, 'data-click="act"', 'the context names the binding');
+                const caught = await captureUncaught(error => error === boom, async () => {
+                    document.getElementById('he-btn').click();
+                });
+                t.equal(caught.length, 1, 'with no onError handler the click error is uncaught, as before');
+            });
+
+            // S9: "once" means once, even when the callback throws.
+            await StitchTest.test('once-handler-that-throws-unsubscribes', async (t) => {
+                const model = Stitch.Observable.create({ a: 1 });
+                let runs = 0;
+                model.$once('ping', () => { runs++; throw new Error('once failed'); });
+                const calls = await withOnError(async () => {
+                    model.$emit('ping');
+                    await tick();
+                    model.$emit('ping');
+                    await tick();
+                });
+                t.equal(runs, 1, 'the $once callback ran once');
+                t.equal(calls.length, 1, 'its error went to onError once');
             });
 
             await StitchTest.test('on-error-rejects-a-non-function', async (t) => {

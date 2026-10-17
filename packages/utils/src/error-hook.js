@@ -1,6 +1,6 @@
 "use strict";
 
-const { VERSION } = require("./version");
+const { createHookSlot } = require("./hook-slot");
 
 /**
  * Where errors raised inside reactive updates go (D23).
@@ -12,20 +12,22 @@ const { VERSION } = require("./version");
  * like any other uncaught error. A handler that throws has its own error re-thrown the
  * same way. Errors on the synchronous bind() stack are thrown to the caller instead.
  */
-let errorHandler = null;
+const slot = createHookSlot("Stitch.onError");
 
 /**
- * Installs the one page-wide handler for errors raised inside reactive updates;
- * null removes it.
+ * Installs the one page-wide handler for errors raised inside reactive updates and
+ * returns a function that removes it; null removes the installed one. Installing while
+ * another handler is installed throws.
  * @param {Function|null} fn - called as fn(error, context)
+ * @returns {Function} remove
  */
 function onError(fn) {
-    if (fn !== null && typeof fn !== "function") {
-        throw new TypeError(
-            `[Stitch.js v${VERSION}] Stitch.onError(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`
-        );
-    }
-    errorHandler = fn;
+    return slot.install(fn);
+}
+
+/** True while a Stitch.onError handler is installed. */
+function hasErrorHandler() {
+    return slot.get() !== null;
 }
 
 function rethrowUncaught(error) {
@@ -41,7 +43,7 @@ function rethrowUncaught(error) {
  * @param {Object} [context] - what was running: { source, element?, binding?, event?, field? }
  */
 function reportError(error, context) {
-    const handler = errorHandler;
+    const handler = slot.get();
     if (!handler) {
         rethrowUncaught(error);
         return;
@@ -80,6 +82,7 @@ function runAllThenThrow(fns, context) {
 
 module.exports = {
     onError,
+    hasErrorHandler,
     reportError,
     runAllThenThrow
 };

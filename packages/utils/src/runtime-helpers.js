@@ -82,13 +82,16 @@ function getProperty(target, path) {
  * @param {string} where - e.g. '$watch("nmae")'
  */
 function assertPathExists(target, path, where) {
+    getProperty(undefined, path); // throws first for a value that is not a path at all
     const keys = String(path).split(".");
     let current = target;
     for (let i = 0; i < keys.length; i++) {
         if (current == null) {
             return;
         }
-        if (!(keys[i] in Object(current))) {
+        const own = Object.prototype.hasOwnProperty.call(Object(current), keys[i]) ||
+            (keys[i] === "size" && (current instanceof Map || current instanceof Set));
+        if (!own) {
             const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
             const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;
             throw new Error(

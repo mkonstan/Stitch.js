@@ -36,6 +36,7 @@
         { page: "test-reactive-lifecycle.html", title: "Reactive lifecycle", about: "Released effects stop and drop every subscription (computeds included); ReactiveSystem.dispose(); Stitch.debug.stats()" },
         { page: "test-strict-bindings.html", title: "Strict bindings", about: "Bindings found by selector over registered names; invalid syntax, missing properties and misplaced internal attributes throw; Stitch.onBindReport; registerBinding rules" },
         { page: "test-handler-paths.html", title: "Handler paths", about: "data-click / data-event handlers: bare name (current row), $parent., $root.; called with (rowItem, event); a miss throws with where it exists" },
+        { page: "test-api-arguments.html", title: "API arguments", about: "Every entry point that takes a selector, element, handler or event name throws on an invalid argument or no match" },
         { page: "test-error-routing.html", title: "Error routing", about: "Errors in reactive updates go to Stitch.onError or are re-thrown uncaught; the DOM keeps its last good state; model.on() fires without readers" },
         { page: "test-unbind-memory.html", title: "Unbind", about: "An unbound element stops updating" },
         { page: "test-foreach-context.html", title: "Foreach context", about: "Row context ($index, $parent) does not leak between lists" },

@@ -3,6 +3,18 @@
 const { VERSION } = require("../../utils/src/version");
 const { reportError } = require("../../utils/src/error-hook");
 
+function checkEvent(version, method, event) {
+    if (typeof event !== "string" || event === "") {
+        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, ...): the event name must be a non-empty string, got ${event === "" ? "an empty string" : typeof event}.`);
+    }
+}
+
+function checkCallback(version, method, callback) {
+    if (typeof callback !== "function") {
+        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, callback): callback must be a function, got ${callback === null ? "null" : typeof callback}.`);
+    }
+}
+
 class MessageBus {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
@@ -14,22 +26,40 @@ class MessageBus {
         this.MAX_FLUSH_DEPTH = 100;
     }
 
+    /**
+     * Subscribes callback to event ("*" receives every event). Returns a function that
+     * unsubscribes it (safe to call more than once).
+     */
     subscribe(event, callback) {
+        checkEvent(this.version, "subscribe", event);
+        checkCallback(this.version, "subscribe", callback);
         if (!this.subscribers.has(event)) {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        return () => this.unsubscribe(event, callback);
+        return () => this._remove(event, callback);
     }
 
+    /** Unsubscribes callback from event; a callback that is not subscribed throws. */
     unsubscribe(event, callback) {
-        const subscribers = this.subscribers.get(event);
-        if (subscribers) {
-            subscribers.delete(callback);
+        checkEvent(this.version, "unsubscribe", event);
+        checkCallback(this.version, "unsubscribe", callback);
+        if (!this._remove(event, callback)) {
+            throw new Error(
+                `[Stitch.js ${this.version}] MessageBus.unsubscribe("${event}", callback): that callback is not subscribed to "${event}". ` +
+                "Pass the same function that was subscribed (or call the function subscribe() returned)."
+            );
         }
     }
 
+    /** @private */
+    _remove(event, callback) {
+        const subscribers = this.subscribers.get(event);
+        return !!subscribers && subscribers.delete(callback);
+    }
+
     publish(event, payload) {
+        checkEvent(this.version, "publish", event);
         this.queue.push({
             event,
             payload,
@@ -41,6 +71,7 @@ class MessageBus {
     }
 
     publishSync(event, payload) {
+        checkEvent(this.version, "publishSync", event);
         this._executeEvent({
             event,
             payload,
@@ -120,6 +151,9 @@ class MessageBus {
     }
 
     use(middlewareFn) {
+        if (typeof middlewareFn !== "function") {
+            throw new TypeError(`[Stitch.js ${this.version}] MessageBus.use(middleware): middleware must be a function, got ${typeof middlewareFn}.`);
+        }
         this.middleware.push(middlewareFn);
     }
 

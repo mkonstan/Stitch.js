@@ -36,7 +36,15 @@
             'foreach-and-text-on-one-element-throw',
             'failed-bind-leaves-nothing-bound',
             'registered-after-bind-throws',
-            'model-api-mistakes-throw'
+            'model-api-mistakes-throw',
+            'custom-binding-literal-or-path',
+            'rebinding-a-bound-root-throws',
+            'double-binding-an-element-throws',
+            'failed-bind-releases-only-its-own-bindings',
+            'content-replacing-binding-over-bound-children-throws',
+            'empty-list-template-is-checked-at-bind',
+            'two-way-binding-to-a-row-value-throws',
+            'non-reactive-names-throw'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -60,6 +68,15 @@
 
         const messageOf = error => error ? String(error.message) : '';
 
+        function tryBindWith(binder, host, model) {
+            try {
+                binder.bind(host, model);
+                return null;
+            } catch (error) {
+                return error;
+            }
+        }
+
         // Custom bindings are registered before the first bind() on the page.
         const strictProbeReads = [];
         let registerErrors = null;
@@ -74,7 +91,9 @@
                 upper: attempt('myBinding', { bind() {} }),
                 builtIn: attempt('text', { bind() {} }),
                 internal: attempt('key', { bind() {} }),
-                twice: attempt('strictprobe', { bind() {} })
+                twice: attempt('strictprobe', { bind() {} }),
+                literal: attempt('tip', { value: 'literal', bind(element, viewModel, text) { element.title = text; } }),
+                badValue: attempt('tipbad', { value: 'text', bind() {} })
             };
         }
         registerErrors = collectRegisterErrors();
@@ -293,6 +312,162 @@
                     '$watch of a missing nested property throws');
                 t.match(messageOf(attempt(() => model.$watch('name'))), /callback must be a function/, '$watch without a callback throws');
                 t.match(messageOf(attempt(() => model.get('{ a: 1 }'))), /not a property path/, 'model.get with an inline object throws');
+            });
+
+            // D27: a custom binding declares how its value is read. value: 'literal' passes the
+            // attribute text as is (no lookup); the default, value: 'path', is a checked model path.
+            await StitchTest.test('custom-binding-literal-or-path', async (t) => {
+                t.equal(registerErrors.literal, null, 'a binding registered with value: "literal" is accepted');
+                t.match(messageOf(registerErrors.badValue), /value must be "path" or "literal"/, 'any other value kind throws at registration');
+                const host = mount('<span data-tip="Some help text: (not a path!)"></span>');
+                t.equal(tryBind(host, Stitch.Observable.create({})), null, 'a literal tooltip binds');
+                t.equal(host.firstChild.title, 'Some help text: (not a path!)', 'it receives the raw attribute text');
+                t.match(messageOf(tryBind(mount('<span data-strictprobe="nmae"></span>'), Stitch.Observable.create({ name: 'a' }))),
+                    /"nmae" is not a property of the model/, 'a path binding (the default) with a typo still throws');
+            });
+
+            // B1: a second bind() of a bound root throws; the DOM is not left on the old model silently.
+            await StitchTest.test('rebinding-a-bound-root-throws', async (t) => {
+                const host = mount('<span data-text="name"></span>');
+                const binder = new Stitch.DataBinder();
+                const m1 = Stitch.Observable.create({ name: 'one' });
+                const m2 = Stitch.Observable.create({ name: 'two' });
+                binder.bind(host, m1);
+                let error = null;
+                try { binder.bind(host, m2); } catch (e) { error = e; }
+                t.match(messageOf(error), /already bound.*unbind\(\)/, 'binding the same root again throws, saying to unbind() first');
+                t.equal(host.textContent, 'one', 'the page still shows the first model');
+                binder.unbind(host);
+                t.equal(tryBindWith(binder, host, m2), null, 'after unbind() the root binds again');
+                t.equal(host.textContent, 'two', 'and shows the new model');
+                const empty = mount('<p>static</p>');
+                binder.bind(empty, m1);
+                let again = null;
+                try { binder.bind(empty, m2); } catch (e) { again = e; }
+                t.match(messageOf(again), /already bound/, 'a bound root with no bindings inside still refuses a second bind()');
+            });
+
+            // S2 + S1: overlapping binds throw before binding anything, so nothing is released.
+            await StitchTest.test('double-binding-an-element-throws', async (t) => {
+                const host = mount('<div id="dbl-page"><span id="dbl-a" data-text="title"></span><div id="dbl-panel"><b id="dbl-b" data-text="title"></b></div></div>');
+                const m1 = Stitch.Observable.create({ title: 'T1' });
+                const m2 = Stitch.Observable.create({ title: 'T2' });
+                const first = new Stitch.DataBinder();
+                first.bind(host, m1);
+                const before = Stitch.debug.stats();
+                let other = null;
+                try { new Stitch.DataBinder().bind(document.getElementById('dbl-panel'), m2); } catch (e) { other = e; }
+                t.match(messageOf(other), /already bound by another DataBinder/, 'a second binder on a bound element throws');
+                let same = null;
+                try { first.bind(document.getElementById('dbl-panel'), m2); } catch (e) { same = e; }
+                t.match(messageOf(same), /already bound by this DataBinder/, 'the same binder on a bound sub-root throws');
+                t.deepEqual(Stitch.debug.stats(), before, 'the failed binds released nothing of the first bind');
+                m1.title = 'T1-changed';
+                await tick();
+                t.equal(document.getElementById('dbl-b').textContent, 'T1-changed', 'the element inside the sub-root still follows the first model');
+            });
+
+            await StitchTest.test('failed-bind-releases-only-its-own-bindings', async (t) => {
+                const binder = new Stitch.DataBinder();
+                const model = Stitch.Observable.create({ name: 'Ann' });
+                const good = mount('<span data-text="name"></span>');
+                binder.bind(good, model);
+                const before = Stitch.debug.stats();
+                const bad = mount('<span data-text="name"></span><b data-text="nmae"></b>');
+                t.match(messageOf(tryBindWith(binder, bad, model)), /"nmae" is not a property/, 'precondition: the second bind throws');
+                t.deepEqual(Stitch.debug.stats(), before, 'the counts are back to just after the first bind');
+                model.name = 'Bob';
+                await tick();
+                t.equal(good.textContent, 'Bob', 'the first bind still works');
+                t.equal(tryBindWith(binder, bad, Stitch.Observable.create({ name: 'x', nmae: 'y' })), null, 'the failed root can be bound once fixed');
+            });
+
+            // B2: a binding that replaces its element's content cannot have bound descendants.
+            await StitchTest.test('content-replacing-binding-over-bound-children-throws', async (t) => {
+                const model = () => Stitch.Observable.create({ greeting: 'Hello', name: 'Ann', save() {} });
+                const message = messageOf(tryBind(mount('<p id="cr-p" data-text="greeting"><b id="cr-b" data-text="name"></b></p>'), model()));
+                t.match(message, /<p id="cr-p" data-text="greeting">/, 'the error names the replacing element');
+                t.match(message, /<b id="cr-b" data-text="name">/, 'and the bound element inside it');
+                t.match(message, /would replace/, 'and says why');
+                t.match(messageOf(tryBind(mount('<p data-text="greeting"><button data-click="save">x</button></p>'), model())),
+                    /data-click="save"/, 'a click binding inside a data-text element throws too');
+                t.match(messageOf(tryBind(mount('<p data-text="greeting"><b data-text="nmae"></b></p>'), model())),
+                    /would replace/, 'even a typo inside is reported (not hidden by the replacement)');
+                const plain = mount('<p data-text="greeting"><b>placeholder</b></p>');
+                t.equal(tryBind(plain, model()), null, 'control: static content inside data-text is fine (it is replaced)');
+                t.equal(plain.textContent, 'Hello', 'control: the text renders');
+            });
+
+            // B3: the row template is checked at bind(), even when the list is empty.
+            await StitchTest.test('empty-list-template-is-checked-at-bind', async (t) => {
+                const model = () => Stitch.Observable.create({ items: [], title: 'T', remove() {} });
+                const cases = [
+                    ['<ul data-foreach="items"><li data-text="count + 1"></li></ul>', /expression/, 'invalid syntax'],
+                    ['<ul data-foreach="items"><li data-text="$root.nmae"></li></ul>', /"nmae" is not a property of the model/, 'a missing $root. property'],
+                    ['<ul data-foreach="items"><li><button data-click="$parent.$parent.x"></button></li></ul>', /only one scope prefix/, 'a bad handler reference'],
+                    ['<ul data-foreach="items"><li><button data-click="$root.nope"></button></li></ul>', /handler "\$root\.nope" was not found/, 'a missing $root. handler'],
+                    ['<ul data-foreach="items"><li data-key="x"></li></ul>', /data-key only works/, 'an internal attribute off its list'],
+                    ['<ul data-foreach="items"><li data-foreach="sub" data-text="a"><i></i></li></ul>', /would replace the list's rows/, 'foreach + text on one element'],
+                    ['<ul data-foreach="items"><li><ol data-foreach="sub"><b></b><i></i></ol></li></ul>', /has 2 root elements/, 'a nested template with two roots'],
+                    ['<ul data-foreach="items"><li data-text="title"><b data-text="title"></b></li></ul>', /would replace/, 'data-text over a bound child'],
+                    ['<ul data-foreach="items"><li><input data-value="$index"></li></ul>', /cannot write/, 'a two-way binding to $index']
+                ];
+                for (const [html, expected, what] of cases) {
+                    t.match(messageOf(tryBind(mount(html), model())), expected, `empty list: ${what} throws at bind()`);
+                }
+                // A row PROPERTY can only be checked once a row exists: at the first row render, via onError.
+                const host = mount('<ul data-foreach="items"><li data-text="titel"></li></ul>');
+                const m = model();
+                t.equal(tryBind(host, m), null, 'control: a row property name binds while the list is empty');
+                const calls = [];
+                Stitch.onError(error => calls.push(error));
+                try {
+                    m.items = [{ id: 1, title: 'one' }];
+                    await tick();
+                } finally {
+                    Stitch.onError(null);
+                }
+                t.match(messageOf(calls[0]), /"titel" is not a property of the current row/, 'the first row render reports the missing row property to onError');
+                t.equal(host.querySelectorAll('li').length, 0, 'and renders no broken row');
+            });
+
+            // B4: a two-way binding must have something to write to.
+            await StitchTest.test('two-way-binding-to-a-row-value-throws', async (t) => {
+                for (const name of ['$data', '$index', '$parent', '$root']) {
+                    const message = messageOf(tryBind(mount(`<ul data-foreach="tags"><li><input data-value="${name}"></li></ul>`),
+                        Stitch.Observable.create({ tags: ['a', 'b'] })));
+                    t.match(message, new RegExp(`data-value="\\${name}".*cannot write.*bind a property`), `data-value="${name}" throws, saying to bind a property`);
+                }
+                const host = mount('<ul data-foreach="rows"><li><input data-value="$data.name"></li></ul>');
+                const model = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }] });
+                t.equal(tryBind(host, model), null, 'control: data-value="$data.name" binds');
+                const input = host.querySelector('input');
+                input.value = 'typed';
+                input.dispatchEvent(new Event('input'));
+                t.equal(model.rows[0].name, 'typed', 'control: and writes to the row object');
+            });
+
+            // B5 + S6: only reactive properties are bindable; the error lists say so honestly.
+            await StitchTest.test('non-reactive-names-throw', async (t) => {
+                const underscore = messageOf(tryBind(mount('<span data-text="_count"></span>'), Stitch.Observable.create({ _count: 1, total: 2 })));
+                t.match(underscore, /"_count" is not reactive.*start with _/, 'a property starting with _ throws, saying it is not reactive');
+                const m = Stitch.Observable.create({ name: 'a' });
+                m.later = 1;
+                t.match(messageOf(tryBind(mount('<span data-text="later"></span>'), m)), /"later" is not reactive.*added after Observable\.create/,
+                    'a property added after create throws, saying why');
+                const listed = messageOf(tryBind(mount('<span data-text="cuont"></span>'), Stitch.Observable.create({ count: 1, _secret: 2 })));
+                t.match(listed, /has: count\./, 'the list of properties names only bindable ones');
+                t.match(listed, /Not bindable: _secret/, 'and names the non-reactive ones separately');
+                for (const name of ['toString', 'constructor', 'hasOwnProperty']) {
+                    t.match(messageOf(tryBind(mount(`<span data-visible="${name}"></span>`), Stitch.Observable.create({ a: 1 }))),
+                        new RegExp(`"${name}" is not a property of the model`), `data-visible="${name}" (a prototype name) throws`);
+                }
+                t.match(messageOf(tryBind(mount('<button data-click="toJSON"></button>'), Stitch.Observable.create({ a: 1 }))),
+                    /handler "toJSON" was not found/, 'data-click="toJSON" (a built-in helper, not a model method) throws');
+                t.equal(tryBind(mount('<span data-text="tags.size"></span><i data-text="list.length"></i><b data-text="list.0"></b>'),
+                    Stitch.Observable.create({ tags: new Set(['a']), list: ['x'] })), null, 'control: size of a Set, length and an index of an array bind');
+                t.equal(tryBind(mount('<span data-text="name.length"></span>'), Stitch.Observable.create({ name: 'abc' })), null,
+                    'control: the length of a string binds');
             });
 
             await StitchTest.test('registered-after-bind-throws', async (t) => {
