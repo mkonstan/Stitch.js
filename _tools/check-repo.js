@@ -16,6 +16,12 @@
  *                     `npm run <script>` mentioned exists in package.json.
  *   build-match       stitch.js and dist/stitch.assembled.js equal a fresh assembly of
  *                     packages/*, and stitch.min.js equals a fresh minification of it.
+ *   no-console        The library (packages/) never logs: an error is thrown, or goes to
+ *                     Stitch.onError (D3, D23). No console.warn / console.error anywhere in
+ *                     packages/, and no other console call outside comments.
+ *   no-random-ids     No Math.random in packages/: ids are counters (triage #14).
+ *   bundle-require    The generated bundles call no require(): every module is inlined, so
+ *                     the browser bundle never reaches for a file system (triage #9).
  *
  * Usage: node _tools/check-repo.js [--root <dir>] [--only <check>[,<check>]]
  * --root points the checks at another tree (the gate self-tests use this).
@@ -330,13 +336,69 @@ async function checkBuildMatch(root) {
 }
 
 // ---------------------------------------------------------------------------
+// no-console, no-random-ids (library source), bundle-require (generated bundles)
+
+const LIBRARY_DIR = "packages/";
+// Built from pieces so this file does not match its own patterns.
+const CONSOLE_WARN_ERROR = new RegExp("\\bconsole\\s*\\.\\s*(?:warn|error)\\b", "g");
+const CONSOLE_ANY = new RegExp("\\bconsole\\s*\\.\\s*[A-Za-z]+\\s*\\(", "g");
+const RANDOM = new RegExp("\\bMath\\s*\\.\\s*random\\b", "g");
+const BARE_REQUIRE = new RegExp("(?<![\\w$.])require\\s*\\(", "g");
+
+function libraryFiles(files) {
+    return files.filter((rel) => rel.startsWith(LIBRARY_DIR) && rel.endsWith(".js"));
+}
+
+/** True when index is inside a // line comment or a block comment of text (heuristic, per line). */
+function inComment(text, index) {
+    const lineStart = text.lastIndexOf("\n", index - 1) + 1;
+    const before = text.slice(lineStart, index);
+    if (/^\s*(?:\*|\/\*)/.test(before) || before.indexOf("//") !== -1) return true;
+    return false;
+}
+
+function findAll(root, rels, regex, describe, skip) {
+    const problems = [];
+    for (const rel of rels) {
+        const text = readText(root, rel);
+        regex.lastIndex = 0;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            if (skip && skip(text, match.index)) continue;
+            const snippet = text.slice(match.index, match.index + 50).split("\n")[0];
+            problems.push(`${rel}:${lineOf(text, match.index)}: ${describe}: ${snippet}`);
+        }
+    }
+    return problems;
+}
+
+function checkNoConsole(root, files) {
+    const rels = libraryFiles(files);
+    return findAll(root, rels, CONSOLE_WARN_ERROR, "console.warn/error in the library (throw, or route to Stitch.onError)")
+        .concat(findAll(root, rels, CONSOLE_ANY, "console call in the library",
+            (text, index) => inComment(text, index) || /^console\s*\.\s*(?:warn|error)\b/.test(text.slice(index))));
+}
+
+function checkNoRandomIds(root, files) {
+    return findAll(root, libraryFiles(files), RANDOM, "Math.random in the library (use a counter)");
+}
+
+function checkBundleRequire(root, files) {
+    const bundles = GENERATED_BUNDLES.filter((rel) => files.indexOf(rel) !== -1 || fs.existsSync(path.join(root, rel)));
+    return findAll(root, bundles, BARE_REQUIRE, "require() in the bundle (inline the module instead)");
+}
+
+// ---------------------------------------------------------------------------
 
 const CHECKS = {
     "version-literal": (root, files) => checkVersionLiterals(root, files),
     "stale-version": (root, files) => checkStaleVersions(root, files),
     "local-path": (root, files) => checkLocalPaths(root, files),
     "missing-reference": (root, files) => checkReferences(root, files),
-    "build-match": (root) => checkBuildMatch(root)
+    "build-match": (root) => checkBuildMatch(root),
+    "no-console": (root, files) => checkNoConsole(root, files),
+    "no-random-ids": (root, files) => checkNoRandomIds(root, files),
+    "bundle-require": (root, files) => checkBundleRequire(root, files)
 };
 
 async function runChecks(options = {}) {

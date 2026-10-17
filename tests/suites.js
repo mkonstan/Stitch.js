@@ -30,7 +30,7 @@
         { page: "test-edge-cases.html", title: "Edge cases", about: "Null/undefined values, circular references, rapid updates" },
         { page: "test-dispose.html", title: "Dispose", about: "DataBinder.dispose and listener cleanup" },
         { page: "test-custom-bindings.html", title: "Custom bindings", about: "DataBinder.registerBinding: arguments, effects, cleanup on unbind/dispose, rows" },
-        { page: "test-foreach-rendering.html", title: "Foreach rendering", about: "Nested lists, computed-filtered lists, replaced lists, hide/show, debug toggle" },
+        { page: "test-foreach-rendering.html", title: "Foreach rendering", about: "Nested lists, computed-filtered lists, replaced lists, hide/show" },
         { page: "test-foreach-keys.html", title: "Foreach keys", about: "The key rule (id / data-key / plain values, missing and duplicate keys throw) and the one-root rule, on every list path" },
         { page: "test-foreach-lifecycle.html", title: "Foreach lifecycle", about: "Removed rows release their bindings (filter, hide/show, select, replacement, nested); same key + same object reuses the row" },
         { page: "test-reactive-lifecycle.html", title: "Reactive lifecycle", about: "Released effects stop and drop every subscription (computeds included); ReactiveSystem.dispose(); Stitch.debug.stats()" },

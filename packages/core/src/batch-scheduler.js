@@ -1,6 +1,5 @@
 "use strict";
 
-const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
 const { reportError } = require("../../utils/src/error-hook");
 
@@ -18,7 +17,6 @@ function runReportingErrors(effect) {
 class BatchScheduler {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this._runEffect = options.runEffect || runReportingErrors;
         this._pendingEffects = new Set();
         this.flushing = false;
@@ -65,8 +63,6 @@ class BatchScheduler {
         this.flushScheduled = false;
         this.flushDepth++;
 
-        this.debug.enabled && this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
-
         const effectsToRun = Array.from(this._pendingEffects);
         this._pendingEffects.clear();
 
@@ -74,11 +70,8 @@ class BatchScheduler {
             this._runEffect(effect);
         });
 
-        this.debug.enabled && this.debug.groupEnd("effects");
-
         this.flushing = false;
         if (this._pendingEffects.size > 0) {
-            this.debug.enabled && this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
             this.scheduleFlush();
         } else {
             this.flushDepth = 0;

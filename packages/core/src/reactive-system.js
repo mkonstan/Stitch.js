@@ -1,6 +1,6 @@
 "use strict";
 
-const { MessageBus, NOOP_DEBUG } = require("./message-bus");
+const { MessageBus } = require("./message-bus");
 const { BatchScheduler } = require("./batch-scheduler");
 const { VERSION } = require("../../utils/src/version");
 const { REACTIVE_TOTALS } = require("../../utils/src/reactive-stats");
@@ -30,7 +30,6 @@ function notifyChangeHandlers(target, change) {
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this.effectStack = [];
         this.depsMap = new WeakMap();
         // Live counts for this system (Stitch.debug.stats() sums every system).
@@ -45,12 +44,10 @@ class ReactiveSystem {
 
         this.batchScheduler = new BatchSchedulerCtor({
             version: this.version,
-            debug: this.debug,
             runEffect: (effect) => this._rerun(effect)
         });
         this.messageBus = new MessageBusCtor({
-            version: this.version,
-            debug: this.debug
+            version: this.version
         });
         this.bubbleChangeUp = bubbleChangeUp;
 
@@ -92,16 +89,10 @@ class ReactiveSystem {
         return this.effectStack[this.effectStack.length - 1] || null;
     }
 
-    _getObjectId(obj) {
-        if (!obj) return "null";
-        return obj.__stitchId || obj.constructor?.name || "unknown";
-    }
-
     track(target, key) {
         const currentEffect = this.currentEffect;
 
         if (!currentEffect || this.disposed) {
-            this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
@@ -127,11 +118,6 @@ class ReactiveSystem {
             this._countSubscriptions(1);
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
-            effectId: currentEffect.id,
-            isComputed: !!currentEffect.isComputedRef,
-            dependencyCount: dep.size
-        });
     }
 
     trigger(target, key, oldValue, newValue) {
@@ -139,10 +125,6 @@ class ReactiveSystem {
         const dep = deps?.get(key);
 
         if (dep && dep.size > 0) {
-            this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
-                oldValue,
-                newValue
-            });
 
             const effectsToRun = new Set(dep);
             effectsToRun.forEach((dependent) => {
@@ -203,10 +185,6 @@ class ReactiveSystem {
             const unread = this._untrack(effect);
             this.effectStack.push(effect);
 
-            this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
-                stackDepth: this.effectStack.length,
-                batch: !!options.batch
-            });
 
             try {
                 return fn();
@@ -224,10 +202,6 @@ class ReactiveSystem {
         effect._generation = this._generation;
         this._countEffects(1);
 
-        this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
-            lazy: !!options.lazy,
-            batch: !!options.batch
-        });
 
         if (!options.lazy) {
             try {

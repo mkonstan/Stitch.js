@@ -104,23 +104,24 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | Module | Role | Used by |
 |---|---|---|
 | `packages/browser/index.js` | Browser package entry; composes runtime dependencies and exports `DataBinder` + helpers | `stitch.entry.js` |
-| `packages/browser/src/data-binder.js` | `DataBinder` class factory, bind traversal, hook dispatch, cleanup/dispose lifecycle | app code |
-| `packages/browser/src/binding-runtime.js` | Built-in binding handler registry + validation + runtime integrations | `DataBinder` |
-| `packages/browser/src/binding-scan-helpers.js` | Attribute scan and binding handler lookup helpers | `binding-runtime`, `DataBinder` |
+| `packages/browser/src/data-binder.js` | `DataBinder` class factory: finds Stitch's attributes by selector, checks each binding before binding it, hook dispatch, cleanup/dispose lifecycle, `registerBinding` rules, `onBindReport` | app code |
+| `packages/browser/src/binding-runtime.js` | Built-in binding handler registry (strict reads; errors on re-runs go to `Stitch.onError`) | `DataBinder` |
+| `packages/browser/src/binding-scan-helpers.js` | Binding discovery: the selector over registered names and internal attributes, per-element lookup, the opt-in bind report | `DataBinder` |
+| `packages/browser/src/binding-paths.js` | The one grammar and lookup for binding values: property-path syntax, strict reads (missing property throws), `$parent.` / `$root.` handler lookup | `DataBinder`, binding runtime, foreach |
 | `packages/browser/src/foreach-binding-orchestrator.js` | The one foreach implementation for every list element (`<select>` included): row template (one-root rule), keyed reconciliation, row release | `binding-runtime` |
 
 ### 4.4 Utils Package (`packages/utils`)
 
 | Module | Role | Used by |
 |---|---|---|
-| `packages/utils/index.js` | Utils package entry + debug facade + utility exports | `stitch.entry.js`, other packages |
-| `packages/utils/src/runtime-helpers.js` | `getProperty`, `setProperty`, arrow-function detection, path diagnostics | API + browser |
-| `packages/utils/src/debug-config.js` | Canonical debug category/color config, helpers, and `NOOP_DEBUG` singleton (shared across all packages) | browser/utils debug wiring, all packages |
+| `packages/utils/index.js` | Utils package entry: `Stitch.debug` (read-only `stats()`; there is no debug mode), `onError`, utility exports | `stitch.entry.js`, other packages |
+| `packages/utils/src/runtime-helpers.js` | `getProperty`, `setProperty`, `assertPathExists`, arrow-function detection | API + browser |
+| `packages/utils/src/error-hook.js` | `Stitch.onError`: where errors raised inside reactive updates go (re-thrown uncaught when no handler) | core, browser |
 | `packages/utils/src/attr-value-handlers.js` | `data-attr` value-type strategy handlers | browser binding runtime |
 | `packages/utils/src/value-binding-helpers.js` | value validators and value handlers (input/select/radio/number/range/default) | browser binding runtime |
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
 | `packages/utils/src/foreach-keys.js` | The list key rule (`id` / `data-key` / plain values; missing or duplicate keys throw) | foreach binding |
-| `packages/utils/src/foreach-row-context.js` | Row binding context (`$data`, `$index`, `$parent`) | foreach binding |
+| `packages/utils/src/foreach-row-context.js` | Row binding context (`$data`, `$index`, `$parent`, `$root`) | foreach binding |
 | `packages/utils/src/reactive-stats.js` | Live effect and subscription counts behind `Stitch.debug.stats()` | reactive system, utils debug facade |
 | `packages/utils/src/version.js` | The release version: reads the root `package.json` when unbuilt; the build stamps it as a constant in the bundle | every package entry and versioned class |
 | `packages/utils/src/reactive-object-helpers.js` | `defineHidden()` helper, change-handler add/remove, and `toJSON` serialization helpers | reactive factory, observable |

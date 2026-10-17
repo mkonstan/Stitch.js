@@ -1,13 +1,11 @@
 "use strict";
 
-const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
 const { reportError } = require("../../utils/src/error-hook");
 
 class MessageBus {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this.subscribers = new Map();
         this.queue = [];
         this.isFlushing = false;
@@ -21,9 +19,6 @@ class MessageBus {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        this.debug.enabled && this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
-            subscriberCount: this.subscribers.get(event).size
-        });
         return () => this.unsubscribe(event, callback);
     }
 
@@ -39,10 +34,6 @@ class MessageBus {
             event,
             payload,
             timestamp: Date.now()
-        });
-        this.debug.enabled && this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
-            payload,
-            queueLength: this.queue.length
         });
         if (!this.isFlushing) {
             Promise.resolve().then(() => this.flush());
@@ -76,18 +67,12 @@ class MessageBus {
         const eventsToProcess = [...this.queue];
         this.queue = [];
 
-        this.debug.enabled && this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
         eventsToProcess.forEach((eventData) => {
             this._executeEvent(eventData);
         });
-        this.debug.enabled && this.debug.groupEnd("messageBus");
 
         this.isFlushing = false;
         if (this.queue.length > 0) {
-            this.debug.enabled && this.debug.log(
-                "messageBus",
-                `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
-            );
             Promise.resolve().then(() => this.flush());
         } else {
             this.flushDepth = 0;
@@ -110,10 +95,6 @@ class MessageBus {
         const payload = processedData.payload;
         const subscribers = this.subscribers.get(event);
 
-        this.debug.enabled && this.debug.log("messageBus", `Executing event: "${event}"`, {
-            payload,
-            subscriberCount: subscribers ? subscribers.size : 0
-        });
 
         if (subscribers) {
             subscribers.forEach((callback) => {
@@ -148,6 +129,5 @@ class MessageBus {
 }
 
 module.exports = {
-    MessageBus,
-    NOOP_DEBUG
+    MessageBus
 };

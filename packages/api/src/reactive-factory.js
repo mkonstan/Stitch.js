@@ -4,12 +4,8 @@ const { ReactiveSystem } = require("../../core/src/reactive-system");
 const { ComputedRef } = require("../../core/src/computed-ref");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const objectHelpers = require("../../utils/src/reactive-object-helpers");
-const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
 const defineHidden = objectHelpers.defineHidden;
-
-// Debug labels for reactive objects: a counter (a label needs no randomness).
-let nextObjectId = 0;
 
 /**
  * Creates a standardized computed property marker.
@@ -43,7 +39,6 @@ function createComputedMarker(config, version) {
 }
 function createReactiveFactory(options = {}) {
     const Version = options.version || `v${VERSION}`;
-    const StitchDebug = options.debug || NOOP_DEBUG;
     const ReactiveSystemClass = options.ReactiveSystem || ReactiveSystem;
     const ComputedRefClass = options.ComputedRef || ComputedRef;
     const isArrowFunction = options.isArrowFunction || runtimeHelpers.isArrowFunction;
@@ -129,7 +124,7 @@ function createReactiveFactory(options = {}) {
     }
 
     // Now create ReactiveSystem with bubbleChangeUp dependency
-    reactiveSystem = new ReactiveSystemClass(bubbleChangeUp, { version: Version, debug: StitchDebug });
+    reactiveSystem = new ReactiveSystemClass(bubbleChangeUp, { version: Version });
 
     /**
      * Returns property descriptor with reactive get/set.
@@ -147,23 +142,13 @@ function createReactiveFactory(options = {}) {
             configurable: true,
             get() {
                 reactiveSystem.track(target, key);
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
-                    value: internal[key],
-                    hasEffect: !!reactiveSystem.currentEffect,
-                    effectId: reactiveSystem.currentEffect?.id
-                });
                 return internal[key];
             },
             set(newValue) {
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
-                    StitchDebug.enabled && StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
                     return;
                 }
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
-                    oldValue: oldValue,
-                    newValue: newValue
-                });
                 if (typeof newValue === "function" && isArrowFunction(newValue)) {
                     throw new Error(`Stitch.js ${Version}: Cannot set arrow function on property '${String(key)}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `Use regular function or ES6 method shorthand instead.`);
                 }
@@ -197,11 +182,7 @@ function createReactiveFactory(options = {}) {
         );
 
         if (explicitDeps) {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
-                deps: explicitDeps
-            });
         } else {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
         }
 
         return {
@@ -294,9 +275,6 @@ function createReactiveFactory(options = {}) {
         for (const [childKey, value] of Object.entries(obj)) {
             // Detect computed properties (standardized marker)
             if (value && typeof value === "object" && value.__isStitchComputed) {
-                StitchDebug.enabled && StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
-                    hasExplicitDeps: !!value.__explicitDeps
-                });
                 computedProps.set(childKey, value);
             } else {
                 regularProps[childKey] = value;
@@ -346,9 +324,6 @@ function createReactiveFactory(options = {}) {
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
-        if (StitchDebug.enabled && !target.__stitchId) {
-            defineHidden(target, "__stitchId", `obj_${++nextObjectId}`);
-        }
         attachParent(target, parent, key);
         defineHidden(target, "__isReactive", true);
         
@@ -369,9 +344,6 @@ function createReactiveFactory(options = {}) {
         
         // ⭐ OPTION 7 KEY CHANGE: Process computed properties
         computedProps.forEach((computedMarker, propKey) => {
-            StitchDebug.enabled && StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
-                hasExplicitDeps: !!computedMarker.__explicitDeps
-            });
             
             // Extract function and explicit dependencies
             const computeFn = computedMarker.fn;
@@ -381,10 +353,6 @@ function createReactiveFactory(options = {}) {
             let resolvedDeps = null;
             if (explicitDeps) {
                 resolvedDeps = resolveDependencies(explicitDeps, target);
-                StitchDebug.enabled && StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
-                    declared: explicitDeps,
-                    resolved: resolvedDeps
-                });
             }
             
             // Create computed descriptor
@@ -739,8 +707,8 @@ function createReactiveFactory(options = {}) {
         const resolved = new Set;
         for (const depKey of deps) {
             if (visited.has(depKey)) {
-                console.warn(`[Stitch.js ${Version}] Circular dependency detected: "${depKey}"\n` + `Dependency chain: ${Array.from(visited).join(" → ")} → ${depKey}`);
-                continue;
+                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps form a cycle: ${Array.from(visited).join(" → ")} → ${depKey}. ` +
+                    "Remove the computed from its own dependency chain.");
             }
             visited.add(depKey);
             

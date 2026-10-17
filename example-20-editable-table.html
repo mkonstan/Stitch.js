@@ -198,13 +198,6 @@
     </div>
 
     <script>
-        // Enable debug mode for diagnosis
-        Stitch.debug.enable();
-
-        // Disable noisy categories for focused logging
-        Stitch.debug.disableCategory('bindings');
-        Stitch.debug.disableCategory('messageBus');
-
         // Model definition
         const model = Stitch.Observable.create({
             // Table data with NESTED COMPUTED PROPERTIES

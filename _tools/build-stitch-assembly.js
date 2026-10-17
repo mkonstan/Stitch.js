@@ -120,9 +120,15 @@ function collectTransitiveModuleIds(initialIds, moduleSourceById, knownIds) {
     return selected;
 }
 
+/**
+ * The module table and the bundle's own require, as the opening of ONE closure that the
+ * entry source also runs in (see assemble). Nothing is put on the global object, and the
+ * bundle never calls a real require(): every module it needs is inlined, and an id the
+ * build cannot resolve fails the build.
+ */
 function buildInlinePrelude(modules) {
     const lines = [];
-    lines.push("(function(root){");
+    lines.push("(function(){");
     lines.push("  var __stitchModuleFactories = Object.create(null);");
     for (const mod of modules) {
         lines.push(`  __stitchModuleFactories[${mod.numericId}] = function(module, exports, __stitchRequire){`);
@@ -139,18 +145,10 @@ function buildInlinePrelude(modules) {
     lines.push("    factory(module, module.exports, __stitchRequire);");
     lines.push("    return module.exports;");
     lines.push("  }");
-    lines.push("  if (typeof root.__stitchInlineRequire !== 'function') {");
-    lines.push("    root.__stitchInlineRequire = function(id){");
-    lines.push("      try {");
-    lines.push("        return __stitchRequire(id);");
-    lines.push("      } catch (_error) {");
-    lines.push("        return null;");
-    lines.push("      }");
-    lines.push("    };");
-    lines.push("  }");
-    lines.push("})(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));");
     return lines.join("\n");
 }
+
+const CLOSE_BUNDLE = "})();";
 
 function patchEntrySourceForInlineRequire(entrySource, pathToNumericId) {
     return entrySource.replace(/require\((['"])(\.\/packages\/[^'"]+)\1\)/g, (_match, _quote, reqId) => {
@@ -158,11 +156,10 @@ function patchEntrySourceForInlineRequire(entrySource, pathToNumericId) {
             ? normalizeModuleId(reqId)
             : `${normalizeModuleId(reqId)}.js`;
         const numId = pathToNumericId.get(normalized);
-        const lit = JSON.stringify(reqId);
-        if (numId !== undefined) {
-            return `(typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(${numId}) || require(${lit})) : require(${lit}))`;
+        if (numId === undefined) {
+            throw new Error(`Cannot build assembly: stitch.entry.js requires "${reqId}", which is not an inlined module.`);
         }
-        return `(typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(${lit}) || require(${lit})) : require(${lit}))`;
+        return `__stitchRequire(${numId})`;
     });
 }
 
@@ -247,7 +244,8 @@ module.exports = { VERSION: ${JSON.stringify(pkg.version)} };
         licenseBanner,
         `/*! STITCH_ASSEMBLY_METADATA ${JSON.stringify(metadata)} */`,
         prelude,
-        patchedEntrySource
+        patchedEntrySource,
+        CLOSE_BUNDLE
     ].join("\n\n");
 
     return { output, metadata, entrySource };

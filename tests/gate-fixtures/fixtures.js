@@ -133,6 +133,7 @@ function write(dir, files) {
 const PKG = JSON.stringify({ name: "fixture", version: "9.8.7", scripts: { build: "echo build" } }, null, 2);
 const DRIVE = "C" + ":";
 const OLD = "v" + "1.0.0";
+const CONSOLE = "con" + "sole";
 const BUILD_TREE = ["package.json", "stitch.entry.js", "packages", "stitch.js", "stitch.min.js", "dist"];
 
 const staticFixtures = {
@@ -226,6 +227,51 @@ const staticFixtures = {
         check: "missing-reference",
         create: (dir) => write(dir, { "package.json": PKG, "page.html": "<script src=\"lib/missing.js\"></script>\n" }),
         expect: FAIL('page.html:1: attribute points to missing file "lib/missing.js"')
+    },
+    "no-console-control": {
+        check: "no-console",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            // Comments may show console use; code outside packages/ may log.
+            "packages/core/src/a.js": "/**\n * @example\n * " + CONSOLE + ".log(model.total);\n */\nfunction a() { throw new Error('x'); } // not " + CONSOLE + ".log(a)\n",
+            "tools/script.js": CONSOLE + ".log('fine outside the library');\n"
+        }),
+        expect: PASS
+    },
+    "no-console-warn": {
+        check: "no-console",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/core/src/a.js": "function a() {\n    " + CONSOLE + ".warn('swallowed');\n}\n" }),
+        expect: FAIL("packages/core/src/a.js:2: " + CONSOLE + ".warn/error in the library")
+    },
+    "no-console-error-in-comment": {
+        check: "no-console",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/core/src/a.js": "// " + CONSOLE + ".error(e) here\n" }),
+        expect: FAIL("packages/core/src/a.js:1: " + CONSOLE + ".warn/error in the library")
+    },
+    "no-console-log": {
+        check: "no-console",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/utils/index.js": "const x = 1; " + CONSOLE + ".log('debug on');\n" }),
+        expect: FAIL("packages/utils/index.js:1: console call in the library")
+    },
+    "no-random-ids-control": {
+        check: "no-random-ids",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/core/src/a.js": "let next = 0;\nconst id = ++next;\n" }),
+        expect: PASS
+    },
+    "no-random-ids": {
+        check: "no-random-ids",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/core/src/a.js": "const id = Math." + "random().toString(36).substr(2, 9);\n" }),
+        expect: FAIL("packages/core/src/a.js:1: Math.random in the library")
+    },
+    "bundle-require-control": {
+        check: "bundle-require",
+        create: (dir) => write(dir, { "package.json": PKG, "stitch.js": "var m = __stitchRequire(0); x.require(1);\n", "stitch.min.js": "var m=a(0);\n" }),
+        expect: PASS
+    },
+    "bundle-require": {
+        check: "bundle-require",
+        create: (dir) => write(dir, { "package.json": PKG, "stitch.js": "var ok = 1;\nvar m = (function(){ try { return re" + "quire(\"./packages/x\"); } catch (e) {} })();\n", "stitch.min.js": "var m=1;\n" }),
+        expect: FAIL("stitch.js:2: require() in the bundle")
     },
     "build-match-control": {
         check: "build-match",

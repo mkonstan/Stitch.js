@@ -1,17 +1,4 @@
 {
   "_about": "Tests that fail today because of a known defect. Listed + failed with exactly its \"expect\" failures = reported as known-failing. Listed + failed for any other reason = the runner FAILS (\"expect\" lists one entry per failed assertion: the failed-assertion messages, as prefixes matched on a word boundary, each at least 3 words and 15 characters and not a generic throw/precondition/control/harness line; every failure line must match one, and every one must match a failure line). Listed + passed = the runner FAILS until the entry is removed (the fix must remove its own marker). Unlisted + failed = the runner FAILS. Keys are <page>#<test id>; defects are described in KNOWN-ISSUES.md.",
-  "tests": {
-    "test-v3-defects.html#d5-strict-bindings-and-one-debug-switch": {
-      "defect": 5,
-      "sprint": "T2",
-      "summary": "Unknown binding names are ignored silently, and Stitch.debug does not switch the binder's debug output",
-      "expect": [
-        "bind() throws for the unknown binding data-txet",
-        "the error names the binding",
-        "the error names the element",
-        "the error lists the valid bindings",
-        "with Stitch.debug enabled, binding a missing property reports it"
-      ]
-    }
-  }
+  "tests": {}
 }

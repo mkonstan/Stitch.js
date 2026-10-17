@@ -355,9 +355,9 @@ The `NOOP_DEBUG` object is defined identically in 5 separate files:
 Each is the same 7-line object: `{ enabled: false, categories: Object.create(null), log(){}, group(){}, groupEnd(){} }`.
 
 ### Proposed Change
-Export `NOOP_DEBUG` from a single location. It's already exported from `packages/core/src/message-bus.js`. Have all other files import it from there (or better, from a dedicated `packages/utils/src/debug-config.js` which already exists and manages debug state).
+Export `NOOP_DEBUG` from a single location. It's already exported from `packages/core/src/message-bus.js`. Have all other files import it from there (or better, from a dedicated packages/utils/src/debug-config.js, which existed then and managed debug state; it was deleted in v3 with the debug switch, D26).
 
-Add to `debug-config.js`:
+Add to debug-config.js (since deleted):
 ```js
 const NOOP_DEBUG = {
     enabled: false,
@@ -375,7 +375,7 @@ const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 ```
 
 ### Files Changed
-- `packages/utils/src/debug-config.js` — export `NOOP_DEBUG`
+- packages/utils/src/debug-config.js (since deleted) — export `NOOP_DEBUG`
 - `packages/api/src/reactive-factory.js` — import from debug-config
 - `packages/browser/src/binding-runtime.js` — import from debug-config
 - `packages/browser/src/data-binder.js` — import from debug-config

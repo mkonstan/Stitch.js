@@ -35,7 +35,8 @@
             'internal-attributes-need-their-list',
             'foreach-and-text-on-one-element-throw',
             'failed-bind-leaves-nothing-bound',
-            'registered-after-bind-throws'
+            'registered-after-bind-throws',
+            'model-api-mistakes-throw'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -276,6 +277,22 @@
                 const error = tryBind(host, model);
                 t.match(messageOf(error), /"missing" is not a property/, 'precondition: the last binding throws');
                 t.deepEqual(Stitch.debug.stats(), before, 'the bindings made before the error were released');
+            });
+
+            await StitchTest.test('model-api-mistakes-throw', async (t) => {
+                const attempt = fn => { try { fn(); return null; } catch (error) { return error; } };
+                t.match(messageOf(attempt(() => Stitch.Observable.create({ a: 1 }, { debug: true }))), /unknown option "debug".*no debug mode/,
+                    'Observable.create with { debug: true } throws: there is no debug mode');
+                t.match(messageOf(attempt(() => Stitch.Observable.create({ a: 1 }, { isolatd: true }))), /unknown option "isolatd".*isolated/,
+                    'a misspelled option throws, naming the known options');
+                t.equal(attempt(() => Stitch.Observable.create({ a: 1 }, { isolated: true })), null, 'control: { isolated: true } is accepted');
+                const model = Stitch.Observable.create({ name: 'Ann', user: { email: 'a@x' } });
+                t.match(messageOf(attempt(() => model.$watch('nmae', () => {}))), /\$watch\("nmae"\): "nmae" is not a property of the model.*\bname\b/,
+                    '$watch of a missing property throws, listing the properties');
+                t.match(messageOf(attempt(() => model.$watch('user.mail', () => {}))), /"mail" is not a property of "user"/,
+                    '$watch of a missing nested property throws');
+                t.match(messageOf(attempt(() => model.$watch('name'))), /callback must be a function/, '$watch without a callback throws');
+                t.match(messageOf(attempt(() => model.get('{ a: 1 }'))), /not a property path/, 'model.get with an inline object throws');
             });
 
             await StitchTest.test('registered-after-bind-throws', async (t) => {

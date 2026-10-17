@@ -18,8 +18,7 @@
             'nested-foreach-renders-and-updates',
             'computed-filtered-list',
             'replace-list-with-new-ids',
-            'hide-and-show-list',
-            'debug-toggle-keeps-bindings-working'
+            'hide-and-show-list'
         ]);
 
         const tick = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -113,18 +112,6 @@
                 t.deepEqual(texts(host, 'li'), ['a2', 'b', 'c'], 'a change after the cycles reaches the live row');
             });
 
-            await StitchTest.test('debug-toggle-keeps-bindings-working', async (t) => {
-                const host = mount('<span data-text="label"></span>');
-                const model = Stitch.Observable.create({ label: 'one' });
-                Stitch.debug.enable();
-                new Stitch.DataBinder().bind(host, model);
-                await tick();
-                t.equal(host.textContent, 'one', 'binds with debug enabled');
-                Stitch.debug.disable();
-                model.label = 'two';
-                await tick();
-                t.equal(host.textContent, 'two', 'updates after debug is disabled');
-            });
         })();
     </script>
 </body>

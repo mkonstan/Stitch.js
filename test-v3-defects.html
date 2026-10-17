@@ -26,7 +26,7 @@
             'd2-same-id-new-object-rebinds',
             'd3-hidden-rows-release-bindings',
             'd4-root-handler-in-nested-foreach',
-            'd5-strict-bindings-and-one-debug-switch',
+            'd5-misspelled-binding-reported-and-no-debug-switch',
             'd6-computed-reader-stops-after-cleanup',
             'd7-multi-root-row-template-throws'
         ]);
@@ -192,48 +192,58 @@
                 t.deepEqual(lines, [], 'the click logged nothing');
             });
 
-            // Defect 5 (T2, D3): a misspelled binding throws, naming the element, the
-            // binding and the valid bindings; and Stitch.debug is the one debug switch
-            // (enabling it makes a missing property warn, disabling it silences that).
-            await StitchTest.test('d5-strict-bindings-and-one-debug-switch', async (t) => {
+            // Defect 5 (T2, D3, re-specified under D24/D26): mistakes are not silent, and there is
+            // one way to see what Stitch did with the page. Stitch reads only its own attributes:
+            // a misspelled name (data-txet) is not Stitch's, so it is not thrown (no fuzzy
+            // matching), but Stitch.onBindReport lists it as ignored, with its element. Other
+            // data-* attributes (test ids, Bootstrap, app data) never throw or log. A binding to
+            // a property the model lacks throws (D25). There is no debug on/off switch; only
+            // Stitch.debug.stats() remains (D26).
+            await StitchTest.test('d5-misspelled-binding-reported-and-no-debug-switch', async (t) => {
+                const reports = [];
                 const host = mount('<span id="v3-misspelled" data-txet="name"></span>');
-                const error = tryBind(host, Stitch.Observable.create({ name: 'x' }));
-                t.ok(error instanceof Error, 'bind() throws for the unknown binding data-txet');
-                const message = error ? String(error.message) : '';
-                t.match(message, /txet/, 'the error names the binding');
-                t.match(message, /span|v3-misspelled/i, 'the error names the element');
-                const listed = ['text', 'value', 'visible', 'foreach', 'click'].filter(name => new RegExp('\\b' + name + '\\b').test(message));
-                t.deepEqual(listed, ['text', 'value', 'visible', 'foreach', 'click'], 'the error lists the valid bindings');
+                let error = null;
+                Stitch.onBindReport(report => reports.push(report));
+                try {
+                    error = tryBind(host, Stitch.Observable.create({ name: 'x' }));
+                } finally {
+                    Stitch.onBindReport(null);
+                }
+                t.equal(error, null, 'a misspelled binding name is not a Stitch attribute, so bind() does not throw');
+                const misspelled = document.getElementById('v3-misspelled');
+                const ignored = reports.length ? reports[0].ignored : [];
+                t.ok(ignored.some(entry => entry.element === misspelled && entry.attribute === 'data-txet' && entry.value === 'name'),
+                    'the bind report lists data-txet as ignored, with its element and value');
 
-                // Control: data-* attributes that are not Stitch bindings (test ids, Bootstrap,
-                // app data) must not throw and must not warn, with debug on. HOW the binder tells
-                // data-txet from data-testid is a T2 design decision; only the outcome is fixed here.
+                // Control: data-* attributes that are not Stitch bindings must not throw and must
+                // not log, and they are reported as ignored, not bound.
                 const friendly = mount('<span data-text="name" data-testid="greeting" data-bs-toggle="tooltip" data-id="7"></span>');
                 let friendlyError = null;
+                const friendlyReports = [];
                 const friendlyLines = await captureConsole(async () => {
-                    Stitch.debug.enable();
-                    friendlyError = tryBind(friendly, Stitch.Observable.create({ name: 'Ann' }));
+                    Stitch.onBindReport(report => friendlyReports.push(report));
+                    try {
+                        friendlyError = tryBind(friendly, Stitch.Observable.create({ name: 'Ann' }));
+                    } finally {
+                        Stitch.onBindReport(null);
+                    }
                     await tick();
-                    Stitch.debug.disable();
                 });
                 t.equal(friendlyError, null, 'control: data-testid, data-bs-toggle and data-id do not throw');
                 t.equal(friendly.textContent, 'Ann', 'control: the element still binds its data-text');
-                t.deepEqual(friendlyLines.filter(line => /testid|bs-toggle|data-id|greeting|tooltip/.test(line)), [],
-                    'control: nothing warns about the non-Stitch attributes');
+                t.deepEqual(friendlyLines, [], 'control: binding logs nothing');
+                const friendlyReport = friendlyReports[0] || { bound: [], ignored: [] };
+                t.deepEqual(friendlyReport.ignored.map(entry => entry.attribute).sort(), ['data-bs-toggle', 'data-id', 'data-testid'],
+                    'control: the report lists them as ignored');
+                t.deepEqual(friendlyReport.bound.map(entry => entry.attribute), ['data-text'], 'control: the report lists data-text as bound');
 
-                const enabledLines = await captureConsole(async () => {
-                    Stitch.debug.enable();
-                    tryBind(mount('<span data-text="v3MissingProp"></span>'), Stitch.Observable.create({ exists: 1 }));
-                    await tick();
-                });
-                const disabledLines = await captureConsole(async () => {
-                    Stitch.debug.disable();
-                    tryBind(mount('<span data-text="v3MissingProp"></span>'), Stitch.Observable.create({ exists: 1 }));
-                    await tick();
-                });
-                const mentions = lines => lines.filter(line => line.includes('v3MissingProp')).length;
-                t.ok(mentions(enabledLines) > 0, 'with Stitch.debug enabled, binding a missing property reports it');
-                t.equal(mentions(disabledLines), 0, 'with Stitch.debug disabled, it is silent');
+                // A binding to a missing property is a mistake Stitch can see: it throws, always.
+                const missing = tryBind(mount('<span data-text="v3MissingProp"></span>'), Stitch.Observable.create({ exists: 1 }));
+                t.match(missing ? missing.message : '', /v3MissingProp.*\bexists\b/, 'a missing property throws, listing the properties of the model');
+
+                // One debug state, with no switch: only stats() remains.
+                t.deepEqual(Object.keys(Stitch.debug), ['stats'], 'Stitch.debug has stats() and nothing else (no enable/disable/categories)');
+                t.equal(typeof Stitch.debug.stats, 'function', 'Stitch.debug.stats is a function');
             });
 
             // Defect 6 (T1, triage #19): an effect that read a computed stops running after

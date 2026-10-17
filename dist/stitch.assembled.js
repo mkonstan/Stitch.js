@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":26,"moduleCount":26,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-paths.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-paths.js","5":"packages/browser/src/binding-runtime.js","6":"packages/browser/src/binding-scan-helpers.js","7":"packages/browser/src/data-binder.js","8":"packages/browser/src/foreach-binding-orchestrator.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/debug-config.js","17":"packages/utils/src/error-hook.js","18":"packages/utils/src/foreach-keys.js","19":"packages/utils/src/foreach-row-context.js","20":"packages/utils/src/reactive-object-helpers.js","21":"packages/utils/src/reactive-stats.js","22":"packages/utils/src/runtime-helpers.js","23":"packages/utils/src/type-converters.js","24":"packages/utils/src/value-binding-helpers.js","25":"packages/utils/src/version.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":25,"moduleCount":25,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-paths.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-paths.js","5":"packages/browser/src/binding-runtime.js","6":"packages/browser/src/binding-scan-helpers.js","7":"packages/browser/src/data-binder.js","8":"packages/browser/src/foreach-binding-orchestrator.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/error-hook.js","17":"packages/utils/src/foreach-keys.js","18":"packages/utils/src/foreach-row-context.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/reactive-stats.js","21":"packages/utils/src/runtime-helpers.js","22":"packages/utils/src/type-converters.js","23":"packages/utils/src/value-binding-helpers.js","24":"packages/utils/src/version.js"}} */
 
-(function(root){
+(function(){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -26,13 +26,30 @@ module.exports = {
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
 const { MessageBus } = __stitchRequire(12);
-const runtimeHelpers = __stitchRequire(22);
-const { defineHidden } = __stitchRequire(20);
+const runtimeHelpers = __stitchRequire(21);
+const { defineHidden } = __stitchRequire(19);
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
+
+// The options Observable.create / createArray / reactive accept. Anything else throws,
+// rather than being ignored (v2's { debug: true } is gone: there is no debug mode).
+const KNOWN_OPTIONS = ["isolated"];
+function checkOptions(method, options) {
+    if (options === null || typeof options !== "object") {
+        throw new TypeError(`[Stitch.js ${Version}] ${method}(data, options): options must be an object, got ${options === null ? "null" : typeof options}.`);
+    }
+    for (const key of Object.keys(options)) {
+        if (KNOWN_OPTIONS.indexOf(key) === -1) {
+            const hint = key === "debug"
+                ? " There is no debug mode in v3: mistakes throw (or go to Stitch.onError), and Stitch.onBindReport lists what bind() did."
+                : "";
+            throw new Error(`[Stitch.js ${Version}] ${method}(): unknown option "${key}". Known options: ${KNOWN_OPTIONS.join(", ")}.${hint}`);
+        }
+    }
+}
 class Observable {
     /**
      * Creates reactive object with eager conversion.
@@ -43,7 +60,6 @@ class Observable {
      * @param {Object} data - Data object to make reactive
      * @param {Object} [options={}] - Options
      * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
-     * @param {boolean} [options.debug] - Enable debug logging for this instance
      * @returns {Object} Reactive proxy
      * @example
      * // Basic reactive object
@@ -84,6 +100,7 @@ class Observable {
         if (!data || typeof data !== "object") {
             throw new Error("Observable.create() requires an object as input");
         }
+        checkOptions("Observable.create", options);
         if (data.__isReactive && data._factory) {
             throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
         }
@@ -132,6 +149,10 @@ class Observable {
 
         // $watch remains separate due to closure over previousValue
         defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
+            runtimeHelpers.assertPathExists(reactiveData, property, `$watch("${property}")`);
+            if (typeof callback !== "function") {
+                throw new TypeError(`[Stitch.js ${Version}] $watch("${property}", callback): callback must be a function, got ${typeof callback}.`);
+            }
             let previousValue = getProperty(reactiveData, property);
 
             // Create effect that tracks the property
@@ -154,12 +175,6 @@ class Observable {
             });
         });
 
-        if (options.debug) {
-            reactiveData.on(change => {
-                console.log(`[Stitch.js ${Version} Debug] ${change.field}:`, change.oldValue, "->", change.newValue);
-            });
-        }
-
         return reactiveData;
     }
 
@@ -179,6 +194,7 @@ class Observable {
         if (!Array.isArray(items)) {
             throw new Error("Observable.createArray() requires an array as input");
         }
+        checkOptions("Observable.createArray", options);
         const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
         defineHidden(reactiveArray, "_factory", factory);
@@ -194,6 +210,7 @@ class Observable {
      * @returns {Object} Reactive object
      */
     static reactive(obj, options = {}) {
+        checkOptions("Observable.reactive", options);
         if (obj && obj.__isReactive) {
             return obj;
         }
@@ -298,14 +315,10 @@ module.exports = {
 
 const { ReactiveSystem } = __stitchRequire(13);
 const { ComputedRef } = __stitchRequire(11);
-const runtimeHelpers = __stitchRequire(22);
-const objectHelpers = __stitchRequire(20);
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(25);
+const runtimeHelpers = __stitchRequire(21);
+const objectHelpers = __stitchRequire(19);
+const { VERSION } = __stitchRequire(24);
 const defineHidden = objectHelpers.defineHidden;
-
-// Debug labels for reactive objects: a counter (a label needs no randomness).
-let nextObjectId = 0;
 
 /**
  * Creates a standardized computed property marker.
@@ -339,7 +352,6 @@ function createComputedMarker(config, version) {
 }
 function createReactiveFactory(options = {}) {
     const Version = options.version || `v${VERSION}`;
-    const StitchDebug = options.debug || NOOP_DEBUG;
     const ReactiveSystemClass = options.ReactiveSystem || ReactiveSystem;
     const ComputedRefClass = options.ComputedRef || ComputedRef;
     const isArrowFunction = options.isArrowFunction || runtimeHelpers.isArrowFunction;
@@ -425,7 +437,7 @@ function createReactiveFactory(options = {}) {
     }
 
     // Now create ReactiveSystem with bubbleChangeUp dependency
-    reactiveSystem = new ReactiveSystemClass(bubbleChangeUp, { version: Version, debug: StitchDebug });
+    reactiveSystem = new ReactiveSystemClass(bubbleChangeUp, { version: Version });
 
     /**
      * Returns property descriptor with reactive get/set.
@@ -443,23 +455,13 @@ function createReactiveFactory(options = {}) {
             configurable: true,
             get() {
                 reactiveSystem.track(target, key);
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬆️ GET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
-                    value: internal[key],
-                    hasEffect: !!reactiveSystem.currentEffect,
-                    effectId: reactiveSystem.currentEffect?.id
-                });
                 return internal[key];
             },
             set(newValue) {
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
-                    StitchDebug.enabled && StitchDebug.log("reactivity", `SET SKIPPED (no change): ${reactiveSystem._getObjectId(target)}.${String(key)} = ${newValue}`);
                     return;
                 }
-                StitchDebug.enabled && StitchDebug.log("reactivity", `⬇️ SET: ${reactiveSystem._getObjectId(target)}.${String(key)}`, {
-                    oldValue: oldValue,
-                    newValue: newValue
-                });
                 if (typeof newValue === "function" && isArrowFunction(newValue)) {
                     throw new Error(`Stitch.js ${Version}: Cannot set arrow function on property '${String(key)}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `Use regular function or ES6 method shorthand instead.`);
                 }
@@ -493,11 +495,7 @@ function createReactiveFactory(options = {}) {
         );
 
         if (explicitDeps) {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)} with explicit deps`, {
-                deps: explicitDeps
-            });
         } else {
-            StitchDebug.enabled && StitchDebug.log("computed", `COMPUTED DESCRIPTOR CREATED for ${String(key)}`);
         }
 
         return {
@@ -590,9 +588,6 @@ function createReactiveFactory(options = {}) {
         for (const [childKey, value] of Object.entries(obj)) {
             // Detect computed properties (standardized marker)
             if (value && typeof value === "object" && value.__isStitchComputed) {
-                StitchDebug.enabled && StitchDebug.log("computed", `Found computed property at: ${childKey}`, {
-                    hasExplicitDeps: !!value.__explicitDeps
-                });
                 computedProps.set(childKey, value);
             } else {
                 regularProps[childKey] = value;
@@ -642,9 +637,6 @@ function createReactiveFactory(options = {}) {
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
-        if (StitchDebug.enabled && !target.__stitchId) {
-            defineHidden(target, "__stitchId", `obj_${++nextObjectId}`);
-        }
         attachParent(target, parent, key);
         defineHidden(target, "__isReactive", true);
         
@@ -665,9 +657,6 @@ function createReactiveFactory(options = {}) {
         
         // ⭐ OPTION 7 KEY CHANGE: Process computed properties
         computedProps.forEach((computedMarker, propKey) => {
-            StitchDebug.enabled && StitchDebug.log("computed", `Creating computed descriptor for: ${propKey}`, {
-                hasExplicitDeps: !!computedMarker.__explicitDeps
-            });
             
             // Extract function and explicit dependencies
             const computeFn = computedMarker.fn;
@@ -677,10 +666,6 @@ function createReactiveFactory(options = {}) {
             let resolvedDeps = null;
             if (explicitDeps) {
                 resolvedDeps = resolveDependencies(explicitDeps, target);
-                StitchDebug.enabled && StitchDebug.log("computed", `Resolved dependencies for "${propKey}":`, {
-                    declared: explicitDeps,
-                    resolved: resolvedDeps
-                });
             }
             
             // Create computed descriptor
@@ -1035,8 +1020,8 @@ function createReactiveFactory(options = {}) {
         const resolved = new Set;
         for (const depKey of deps) {
             if (visited.has(depKey)) {
-                console.warn(`[Stitch.js ${Version}] Circular dependency detected: "${depKey}"\n` + `Dependency chain: ${Array.from(visited).join(" → ")} → ${depKey}`);
-                continue;
+                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps form a cycle: ${Array.from(visited).join(" → ")} → ${depKey}. ` +
+                    "Remove the computed from its own dependency chain.");
             }
             visited.add(depKey);
             
@@ -1090,19 +1075,19 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 const foreachBindingOrchestrator = __stitchRequire(8);
 const bindingScanHelpers = __stitchRequire(6);
 const bindingRuntime = __stitchRequire(5);
 const dataBinderFactory = __stitchRequire(7);
-const runtimeHelpers = __stitchRequire(22);
+const runtimeHelpers = __stitchRequire(21);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(24);
-const typeConverters = __stitchRequire(23);
-const foreachKeys = __stitchRequire(18);
-const foreachRowContext = __stitchRequire(19);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
+const foreachKeys = __stitchRequire(17);
+const foreachRowContext = __stitchRequire(18);
 const bindingPaths = __stitchRequire(4);
-const errorHook = __stitchRequire(17);
+const errorHook = __stitchRequire(16);
 
 const typeConverterRegistry = typeConverters.createTypeConverters({ version: VERSION });
 function getTypeConverter(element, value) {
@@ -1185,8 +1170,8 @@ module.exports = {
  * name was looked up and where it does exist.
  */
 
-const { VERSION } = __stitchRequire(25);
-const { isRowContext } = __stitchRequire(19);
+const { VERSION } = __stitchRequire(24);
+const { isRowContext } = __stitchRequire(18);
 
 const PREFIX = `[Stitch.js v${VERSION}]`;
 const NAME = /^[A-Za-z_$][\w$]*$/;
@@ -1515,7 +1500,7 @@ module.exports = {
   __stitchModuleFactories[5] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 const paths = __stitchRequire(4);
 
 function createBindingRuntime(deps = {}) {
@@ -1922,8 +1907,8 @@ module.exports = {
   __stitchModuleFactories[7] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
-const { runAllThenThrow, reportError } = __stitchRequire(17);
+const { VERSION } = __stitchRequire(24);
+const { runAllThenThrow, reportError } = __stitchRequire(16);
 const paths = __stitchRequire(4);
 const discovery = __stitchRequire(6);
 
@@ -2754,7 +2739,7 @@ module.exports = {
   __stitchModuleFactories[9] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
 const { ComputedRef } = __stitchRequire(11);
@@ -2773,9 +2758,8 @@ module.exports = {
   __stitchModuleFactories[10] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(25);
-const { reportError } = __stitchRequire(17);
+const { VERSION } = __stitchRequire(24);
+const { reportError } = __stitchRequire(16);
 
 /** Runs a queued effect; an error goes to Stitch.onError (a flush is on no caller's stack). */
 function runReportingErrors(effect) {
@@ -2791,7 +2775,6 @@ function runReportingErrors(effect) {
 class BatchScheduler {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this._runEffect = options.runEffect || runReportingErrors;
         this._pendingEffects = new Set();
         this.flushing = false;
@@ -2838,8 +2821,6 @@ class BatchScheduler {
         this.flushScheduled = false;
         this.flushDepth++;
 
-        this.debug.enabled && this.debug.group("effects", `Flushing BatchScheduler (${this._pendingEffects.size} effects, depth: ${this.flushDepth})`);
-
         const effectsToRun = Array.from(this._pendingEffects);
         this._pendingEffects.clear();
 
@@ -2847,11 +2828,8 @@ class BatchScheduler {
             this._runEffect(effect);
         });
 
-        this.debug.enabled && this.debug.groupEnd("effects");
-
         this.flushing = false;
         if (this._pendingEffects.size > 0) {
-            this.debug.enabled && this.debug.log("effects", `New effects queued during flush (${this._pendingEffects.size}), scheduling next flush`);
             this.scheduleFlush();
         } else {
             this.flushDepth = 0;
@@ -2904,10 +2882,6 @@ class ComputedRef {
         this.id = ++nextComputedId;
         this.isComputedRef = true;
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
-            hasExplicitDeps: !!explicitDeps,
-            explicitDeps
-        });
     }
 
     markDirty() {
@@ -2918,7 +2892,6 @@ class ComputedRef {
         }
         this.failed = false;
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
         // Notify readers (effects and computeds) through the system's dependency map.
@@ -2947,7 +2920,6 @@ class ComputedRef {
     }
 
     evaluate() {
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
         const unread = this.reactiveSystem._untrack(this);
         this.reactiveSystem.effectStack.push(this);
 
@@ -2967,10 +2939,6 @@ class ComputedRef {
             this.dirty = false;
             this.failed = false;
 
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
-                value: this.value,
-                deps: this.deps.size
-            });
 
             return this.value;
         } finally {
@@ -2987,9 +2955,6 @@ class ComputedRef {
             return this.evaluate();
         }
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
-            value: this.value
-        });
         return this.value;
     }
 
@@ -3007,14 +2972,12 @@ module.exports = {
   __stitchModuleFactories[12] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { NOOP_DEBUG } = __stitchRequire(16);
-const { VERSION } = __stitchRequire(25);
-const { reportError } = __stitchRequire(17);
+const { VERSION } = __stitchRequire(24);
+const { reportError } = __stitchRequire(16);
 
 class MessageBus {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this.subscribers = new Map();
         this.queue = [];
         this.isFlushing = false;
@@ -3028,9 +2991,6 @@ class MessageBus {
             this.subscribers.set(event, new Set());
         }
         this.subscribers.get(event).add(callback);
-        this.debug.enabled && this.debug.log("messageBus", `Subscribed to event: "${event}"`, {
-            subscriberCount: this.subscribers.get(event).size
-        });
         return () => this.unsubscribe(event, callback);
     }
 
@@ -3046,10 +3006,6 @@ class MessageBus {
             event,
             payload,
             timestamp: Date.now()
-        });
-        this.debug.enabled && this.debug.log("messageBus", `Published event: "${event}" (queued)`, {
-            payload,
-            queueLength: this.queue.length
         });
         if (!this.isFlushing) {
             Promise.resolve().then(() => this.flush());
@@ -3083,18 +3039,12 @@ class MessageBus {
         const eventsToProcess = [...this.queue];
         this.queue = [];
 
-        this.debug.enabled && this.debug.group("messageBus", `Flushing Message Bus (${eventsToProcess.length} events, depth: ${this.flushDepth})`);
         eventsToProcess.forEach((eventData) => {
             this._executeEvent(eventData);
         });
-        this.debug.enabled && this.debug.groupEnd("messageBus");
 
         this.isFlushing = false;
         if (this.queue.length > 0) {
-            this.debug.enabled && this.debug.log(
-                "messageBus",
-                `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
-            );
             Promise.resolve().then(() => this.flush());
         } else {
             this.flushDepth = 0;
@@ -3117,10 +3067,6 @@ class MessageBus {
         const payload = processedData.payload;
         const subscribers = this.subscribers.get(event);
 
-        this.debug.enabled && this.debug.log("messageBus", `Executing event: "${event}"`, {
-            payload,
-            subscriberCount: subscribers ? subscribers.size : 0
-        });
 
         if (subscribers) {
             subscribers.forEach((callback) => {
@@ -3155,19 +3101,18 @@ class MessageBus {
 }
 
 module.exports = {
-    MessageBus,
-    NOOP_DEBUG
+    MessageBus
 };
 
   };
   __stitchModuleFactories[13] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { MessageBus, NOOP_DEBUG } = __stitchRequire(12);
+const { MessageBus } = __stitchRequire(12);
 const { BatchScheduler } = __stitchRequire(10);
-const { VERSION } = __stitchRequire(25);
-const { REACTIVE_TOTALS } = __stitchRequire(21);
-const { reportError } = __stitchRequire(17);
+const { VERSION } = __stitchRequire(24);
+const { REACTIVE_TOTALS } = __stitchRequire(20);
+const { reportError } = __stitchRequire(16);
 
 // Effect ids: a counter (an id is only a label; it needs no randomness).
 let nextEffectId = 0;
@@ -3193,7 +3138,6 @@ function notifyChangeHandlers(target, change) {
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
         this.version = options.version || `v${VERSION}`;
-        this.debug = options.debug || NOOP_DEBUG;
         this.effectStack = [];
         this.depsMap = new WeakMap();
         // Live counts for this system (Stitch.debug.stats() sums every system).
@@ -3208,12 +3152,10 @@ class ReactiveSystem {
 
         this.batchScheduler = new BatchSchedulerCtor({
             version: this.version,
-            debug: this.debug,
             runEffect: (effect) => this._rerun(effect)
         });
         this.messageBus = new MessageBusCtor({
-            version: this.version,
-            debug: this.debug
+            version: this.version
         });
         this.bubbleChangeUp = bubbleChangeUp;
 
@@ -3255,16 +3197,10 @@ class ReactiveSystem {
         return this.effectStack[this.effectStack.length - 1] || null;
     }
 
-    _getObjectId(obj) {
-        if (!obj) return "null";
-        return obj.__stitchId || obj.constructor?.name || "unknown";
-    }
-
     track(target, key) {
         const currentEffect = this.currentEffect;
 
         if (!currentEffect || this.disposed) {
-            this.debug.enabled && this.debug.log("reactivity", `TRACK SKIPPED (no current effect): ${this._getObjectId(target)}.${String(key)}`);
             return;
         }
 
@@ -3290,11 +3226,6 @@ class ReactiveSystem {
             this._countSubscriptions(1);
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRACK: ${this._getObjectId(target)}.${String(key)} -> ${currentEffect.id || "unknown"}`, {
-            effectId: currentEffect.id,
-            isComputed: !!currentEffect.isComputedRef,
-            dependencyCount: dep.size
-        });
     }
 
     trigger(target, key, oldValue, newValue) {
@@ -3302,10 +3233,6 @@ class ReactiveSystem {
         const dep = deps?.get(key);
 
         if (dep && dep.size > 0) {
-            this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
-                oldValue,
-                newValue
-            });
 
             const effectsToRun = new Set(dep);
             effectsToRun.forEach((dependent) => {
@@ -3366,10 +3293,6 @@ class ReactiveSystem {
             const unread = this._untrack(effect);
             this.effectStack.push(effect);
 
-            this.debug.enabled && this.debug.log("effects", `EFFECT RUNNING (id: ${effectId})`, {
-                stackDepth: this.effectStack.length,
-                batch: !!options.batch
-            });
 
             try {
                 return fn();
@@ -3387,10 +3310,6 @@ class ReactiveSystem {
         effect._generation = this._generation;
         this._countEffects(1);
 
-        this.debug.enabled && this.debug.log("effects", `EFFECT CREATED (id: ${effectId})`, {
-            lazy: !!options.lazy,
-            batch: !!options.batch
-        });
 
         if (!options.lazy) {
             try {
@@ -3525,63 +3444,35 @@ module.exports = {
   __stitchModuleFactories[14] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
-const helpers = __stitchRequire(22);
-const debugConfig = __stitchRequire(16);
+const { VERSION } = __stitchRequire(24);
+const helpers = __stitchRequire(21);
 const attrValueHandlers = __stitchRequire(15);
-const valueBindingHelpers = __stitchRequire(24);
-const typeConverters = __stitchRequire(23);
-const foreachKeys = __stitchRequire(18);
-const foreachRowContext = __stitchRequire(19);
-const reactiveObjectHelpers = __stitchRequire(20);
-const { readReactiveStats } = __stitchRequire(21);
-const errorHook = __stitchRequire(17);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
+const foreachKeys = __stitchRequire(17);
+const foreachRowContext = __stitchRequire(18);
+const reactiveObjectHelpers = __stitchRequire(19);
+const { readReactiveStats } = __stitchRequire(20);
+const errorHook = __stitchRequire(16);
 
-const debugState = debugConfig.createDebugState(`v${VERSION}`);
-const debug = {
-    enable() {
-        debugState.enabled = true;
-        console.log("[Stitch.js Debug] Enabled");
-    },
-    disable() {
-        debugState.enabled = false;
-        console.log("[Stitch.js Debug] Disabled");
-    },
-    enableCategory(category) {
-        if (debugConfig.isKnownDebugCategory(debugState.categories, category)) {
-            debugState.categories[category] = true;
-            console.log(`[Stitch.js Debug] Enabled category: ${category}`);
-        } else {
-            console.warn(debugConfig.formatUnknownCategoryWarning(category, debugState.categories));
-        }
-    },
-    disableCategory(category) {
-        if (debugConfig.isKnownDebugCategory(debugState.categories, category)) {
-            debugState.categories[category] = false;
-            console.log(`[Stitch.js Debug] Disabled category: ${category}`);
-        } else {
-            console.warn(debugConfig.formatUnknownCategoryWarning(category, debugState.categories));
-        }
-    },
-    categories() {
-        console.log("[Stitch.js Debug] Available categories:");
-        console.table(debugState.categories);
-    },
+/**
+ * Stitch.debug: read-only diagnostics. There is no debug mode to switch on or off (D26):
+ * mistakes throw (or go to Stitch.onError), and Stitch.onBindReport lists what bind() did.
+ */
+const debug = Object.freeze({
     /**
      * Live reactive-graph counts across the page, read-only: { effects, subscriptions }.
-     * Works whether or not debug output is enabled.
      */
     stats() {
         return readReactiveStats();
     }
-};
+});
 
 module.exports = {
     debug,
     onError: errorHook.onError,
     version: VERSION,
     ...helpers,
-    ...debugConfig,
     ...attrValueHandlers,
     ...valueBindingHelpers,
     ...typeConverters,
@@ -3681,105 +3572,7 @@ module.exports = {
   __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
 "use strict";
 
-/**
- * Canonical debug category toggles extracted from Stitch runtime defaults.
- */
-const DEFAULT_DEBUG_CATEGORIES = Object.freeze({
-    reactivity: true,
-    computed: true,
-    effects: true,
-    bindings: true,
-    messageBus: true,
-    warnings: true
-});
-
-/**
- * Canonical debug colors extracted from Stitch runtime defaults.
- */
-const DEFAULT_DEBUG_COLORS = Object.freeze({
-    reactivity: "#2196F3",
-    computed: "#4CAF50",
-    effects: "#FF9800",
-    bindings: "#9C27B0",
-    messageBus: "#F44336",
-    warnings: "#FF5722"
-});
-
-/**
- * Creates a mutable debug state object seeded from extracted defaults.
- *
- * @param {string} version
- * @returns {{version: string, enabled: boolean, categories: Object, colors: Object}}
- */
-function createDebugState(version) {
-    return {
-        version,
-        enabled: false,
-        categories: { ...DEFAULT_DEBUG_CATEGORIES },
-        colors: { ...DEFAULT_DEBUG_COLORS }
-    };
-}
-
-/**
- * Lists available debug categories from a category map.
- *
- * @param {Object} [categories]
- * @returns {string[]}
- */
-function listDebugCategories(categories = DEFAULT_DEBUG_CATEGORIES) {
-    return Object.keys(categories);
-}
-
-/**
- * Checks whether a category key exists in a category map.
- *
- * @param {Object} categories
- * @param {string} category
- * @returns {boolean}
- */
-function isKnownDebugCategory(categories, category) {
-    return !!categories && Object.prototype.hasOwnProperty.call(categories, category);
-}
-
-/**
- * Formats the standard unknown-category warning with current category list.
- *
- * @param {string} category
- * @param {Object} [categories]
- * @returns {string}
- */
-function formatUnknownCategoryWarning(category, categories = DEFAULT_DEBUG_CATEGORIES) {
-    return `[Stitch.js Debug] Unknown category: ${category}. Valid categories: ${listDebugCategories(categories).join(", ")}`;
-}
-
-/**
- * No-op debug object used as a default when debugging is disabled.
- * Provides the same interface as the real debug object so callers
- * don't need to check for null.
- */
-const NOOP_DEBUG = {
-    enabled: false,
-    categories: Object.create(null),
-    log() {},
-    group() {},
-    groupEnd() {}
-};
-
-module.exports = {
-    DEFAULT_DEBUG_CATEGORIES,
-    DEFAULT_DEBUG_COLORS,
-    NOOP_DEBUG,
-    createDebugState,
-    listDebugCategories,
-    isKnownDebugCategory,
-    formatUnknownCategoryWarning
-};
-
-  };
-  __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
-"use strict";
-
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 
 /**
  * Where errors raised inside reactive updates go (D23).
@@ -3864,7 +3657,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3991,7 +3784,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
 "use strict";
 
 // Every row context created by createItemContext (so a scope can be told from a model).
@@ -4044,7 +3837,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
 function defineHidden(target, name, value) {
@@ -4091,7 +3884,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4121,10 +3914,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(25);
+const { VERSION } = __stitchRequire(24);
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -4170,45 +3963,25 @@ function setProperty(target, path, value) {
 }
 
 /**
- * Safely retrieves property values using dot-notation paths.
+ * Reads a dot-notation path (model.get(path)). A missing name or a null/undefined step
+ * gives undefined. An inline object literal is not a path and throws.
  *
  * @param {Object} target
  * @param {string} path
- * @param {Object} [options]
- * @param {string} [options.version] defaults to the package version
- * @param {boolean} [options.debugEnabled=false]
  * @returns {*}
  */
-function getProperty(target, path, options = {}) {
-    const version = options.version || VERSION;
-    const debugEnabled = !!options.debugEnabled;
-
-    if (path.trim().startsWith("{")) {
-        console.error(
-            `[Stitch.js ${version}] Invalid binding syntax: "${path}"\n` +
-            `\n` +
-            `Inline object literals are not supported in bindings.\n` +
-            `Use a property path reference instead.`
+function getProperty(target, path) {
+    if (typeof path !== "string" || path.trim().startsWith("{")) {
+        throw new Error(
+            `[Stitch.js v${VERSION}] "${path}" is not a property path. Use a dot-separated name such as "user.name"; ` +
+            "an inline object is not supported."
         );
-        return undefined;
     }
-
     const keys = path.split(".");
     let current = target;
     for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        if (current == null) {
-            if (debugEnabled) {
-                const pathSoFar = keys.slice(0, i).join(".");
-                console.warn(`[Stitch.js ${version}] Property path "${path}" is null/undefined at "${pathSoFar}"`);
-            }
-            return undefined;
-        }
-        if (!(key in current)) {
-            if (debugEnabled) {
-                const pathSoFar = keys.slice(0, i).join(".");
-                console.warn(`[Stitch.js ${version}] Property "${key}" does not exist on object at path "${pathSoFar}". Full path: "${path}"`);
-            }
+        if (current == null || !(key in Object(current))) {
             return undefined;
         }
         current = current[key];
@@ -4217,57 +3990,45 @@ function getProperty(target, path, options = {}) {
 }
 
 /**
- * Checks if a property path exists on an object using dot notation.
+ * Throws when a path names a property that does not exist (a null/undefined step is fine),
+ * listing what the object on the path does have. Used where a misspelled name would
+ * otherwise do nothing, silently ($watch).
  *
- * @param {Object} obj
+ * @param {Object} target
  * @param {string} path
- * @returns {boolean}
+ * @param {string} where - e.g. '$watch("nmae")'
  */
-function propertyExists(obj, path) {
-    if (!obj || !path) return false;
-    const keys = path.split(".");
-    let current = obj;
-    for (const key of keys) {
-        if (current == null || !(key in current)) {
-            return false;
+function assertPathExists(target, path, where) {
+    const keys = String(path).split(".");
+    let current = target;
+    for (let i = 0; i < keys.length; i++) {
+        if (current == null) {
+            return;
         }
-        current = current[key];
+        if (!(keys[i] in Object(current))) {
+            const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
+            const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;
+            throw new Error(
+                `[Stitch.js v${VERSION}] ${where}: "${keys[i]}" is not a property of ${owner} (it has: ${names || "no properties"}). ` +
+                "Declare it in Observable.create() with a starting value (a property added later is not reactive), or fix the name."
+            );
+        }
+        current = current[keys[i]];
     }
-    return true;
-}
-
-/**
- * Finds similar top-level property names for typo hints.
- *
- * @param {Object} obj
- * @param {string} targetPath
- * @returns {string|null}
- */
-function findSimilarProperty(obj, targetPath) {
-    if (!obj || !targetPath) return null;
-    const targetKey = targetPath.split(".").pop();
-    const available = Object.keys(obj).filter(k => !k.startsWith("_"));
-    const similar = available.find(key => {
-        const lower1 = key.toLowerCase();
-        const lower2 = targetKey.toLowerCase();
-        return (lower1.includes(lower2) || lower2.includes(lower1)) && lower1 !== lower2;
-    });
-    return similar ? `Did you mean "${similar}"?` : null;
 }
 
 module.exports = {
     isArrowFunction,
     setProperty,
     getProperty,
-    propertyExists,
-    findSimilarProperty
+    assertPathExists
 };
 
   };
-  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION: DEFAULT_VERSION } = __stitchRequire(25);
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(24);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -4277,7 +4038,8 @@ const { VERSION: DEFAULT_VERSION } = __stitchRequire(25);
  * @returns {Object}
  */
 function createTypeConverters(options = {}) {
-    const version = options.version || DEFAULT_VERSION;
+    // A typed value that does not convert ("abc" in a data-type="int" input) becomes null:
+    // that is user input, handled by the page's validation, not a page mistake to report.
 
     return {
         int: {
@@ -4288,7 +4050,6 @@ function createTypeConverters(options = {}) {
                 if (value === "" || value === null || value === undefined) return null;
                 const parsed = parseInt(value, 10);
                 if (isNaN(parsed)) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to int. Returning null.`);
                     return null;
                 }
                 return parsed;
@@ -4310,7 +4071,6 @@ function createTypeConverters(options = {}) {
                 if (value === "" || value === null || value === undefined) return null;
                 const parsed = parseFloat(value);
                 if (isNaN(parsed)) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to float. Returning null.`);
                     return null;
                 }
                 return parsed;
@@ -4368,7 +4128,6 @@ function createTypeConverters(options = {}) {
                 if (value instanceof Date) return value;
                 const date = new Date(value);
                 if (isNaN(date.getTime())) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to date. Returning null.`);
                     return null;
                 }
                 return date;
@@ -4395,7 +4154,6 @@ function createTypeConverters(options = {}) {
                 if (value instanceof Date) return value;
                 const date = new Date(value);
                 if (isNaN(date.getTime())) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to datetime. Returning null.`);
                     return null;
                 }
                 return date;
@@ -4480,7 +4238,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4707,7 +4465,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[25] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
 module.exports = { VERSION: "2.1.0" };
@@ -4723,16 +4481,6 @@ module.exports = { VERSION: "2.1.0" };
     factory(module, module.exports, __stitchRequire);
     return module.exports;
   }
-  if (typeof root.__stitchInlineRequire !== 'function') {
-    root.__stitchInlineRequire = function(id){
-      try {
-        return __stitchRequire(id);
-      } catch (_error) {
-        return null;
-      }
-    };
-  }
-})(typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : this));
 
 /**
  * Stitch.js distribution entry. The version comes from package.json (stamped by the build). Source of truth is package modules under packages/*.
@@ -4740,10 +4488,10 @@ module.exports = { VERSION: "2.1.0" };
 (function () {
     "use strict";
 
-    const api = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(0) || require("./packages/api/index.js")) : require("./packages/api/index.js"));
-    const browser = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(3) || require("./packages/browser/index.js")) : require("./packages/browser/index.js"));
-    const core = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(9) || require("./packages/core/index.js")) : require("./packages/core/index.js"));
-    const utils = (typeof __stitchInlineRequire === "function" ? (__stitchInlineRequire(14) || require("./packages/utils/index.js")) : require("./packages/utils/index.js"));
+    const api = __stitchRequire(0);
+    const browser = __stitchRequire(3);
+    const core = __stitchRequire(9);
+    const utils = __stitchRequire(14);
 
     if (!api || !browser || !core || !utils) {
         throw new Error("Stitch.js bootstrap failed: one or more package modules could not be resolved.");
@@ -4757,13 +4505,8 @@ module.exports = { VERSION: "2.1.0" };
     if (typeof version !== "string" || !version) {
         throw new Error("Stitch.js bootstrap failed: package version is missing.");
     }
-    const debug = utils.debug || {
-        enable() {},
-        disable() {},
-        enableCategory() {},
-        disableCategory() {},
-        categories() {}
-    };
+    // Read-only diagnostics (stats()); there is no debug mode to switch.
+    const debug = utils.debug;
 
     const Stitch = {
         Observable,
@@ -4781,4 +4524,7 @@ module.exports = { VERSION: "2.1.0" };
     } else if (typeof module !== "undefined" && module.exports) {
         module.exports = Stitch;
     }
+})();
+
+
 })();

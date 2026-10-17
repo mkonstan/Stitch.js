@@ -21,13 +21,8 @@
     if (typeof version !== "string" || !version) {
         throw new Error("Stitch.js bootstrap failed: package version is missing.");
     }
-    const debug = utils.debug || {
-        enable() {},
-        disable() {},
-        enableCategory() {},
-        disableCategory() {},
-        categories() {}
-    };
+    // Read-only diagnostics (stats()); there is no debug mode to switch.
+    const debug = utils.debug;
 
     const Stitch = {
         Observable,

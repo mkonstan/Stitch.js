@@ -10,7 +10,8 @@ const { VERSION: DEFAULT_VERSION } = require("./version");
  * @returns {Object}
  */
 function createTypeConverters(options = {}) {
-    const version = options.version || DEFAULT_VERSION;
+    // A typed value that does not convert ("abc" in a data-type="int" input) becomes null:
+    // that is user input, handled by the page's validation, not a page mistake to report.
 
     return {
         int: {
@@ -21,7 +22,6 @@ function createTypeConverters(options = {}) {
                 if (value === "" || value === null || value === undefined) return null;
                 const parsed = parseInt(value, 10);
                 if (isNaN(parsed)) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to int. Returning null.`);
                     return null;
                 }
                 return parsed;
@@ -43,7 +43,6 @@ function createTypeConverters(options = {}) {
                 if (value === "" || value === null || value === undefined) return null;
                 const parsed = parseFloat(value);
                 if (isNaN(parsed)) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to float. Returning null.`);
                     return null;
                 }
                 return parsed;
@@ -101,7 +100,6 @@ function createTypeConverters(options = {}) {
                 if (value instanceof Date) return value;
                 const date = new Date(value);
                 if (isNaN(date.getTime())) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to date. Returning null.`);
                     return null;
                 }
                 return date;
@@ -128,7 +126,6 @@ function createTypeConverters(options = {}) {
                 if (value instanceof Date) return value;
                 const date = new Date(value);
                 if (isNaN(date.getTime())) {
-                    console.warn(`[Stitch.js ${version}] Failed to convert "${value}" to datetime. Returning null.`);
                     return null;
                 }
                 return date;

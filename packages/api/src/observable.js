@@ -9,6 +9,23 @@ const { VERSION } = require("../../utils/src/version");
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
+
+// The options Observable.create / createArray / reactive accept. Anything else throws,
+// rather than being ignored (v2's { debug: true } is gone: there is no debug mode).
+const KNOWN_OPTIONS = ["isolated"];
+function checkOptions(method, options) {
+    if (options === null || typeof options !== "object") {
+        throw new TypeError(`[Stitch.js ${Version}] ${method}(data, options): options must be an object, got ${options === null ? "null" : typeof options}.`);
+    }
+    for (const key of Object.keys(options)) {
+        if (KNOWN_OPTIONS.indexOf(key) === -1) {
+            const hint = key === "debug"
+                ? " There is no debug mode in v3: mistakes throw (or go to Stitch.onError), and Stitch.onBindReport lists what bind() did."
+                : "";
+            throw new Error(`[Stitch.js ${Version}] ${method}(): unknown option "${key}". Known options: ${KNOWN_OPTIONS.join(", ")}.${hint}`);
+        }
+    }
+}
 class Observable {
     /**
      * Creates reactive object with eager conversion.
@@ -19,7 +36,6 @@ class Observable {
      * @param {Object} data - Data object to make reactive
      * @param {Object} [options={}] - Options
      * @param {boolean} [options.isolated] - If true, creates an isolated ReactiveSystem instead of using the shared singleton
-     * @param {boolean} [options.debug] - Enable debug logging for this instance
      * @returns {Object} Reactive proxy
      * @example
      * // Basic reactive object
@@ -60,6 +76,7 @@ class Observable {
         if (!data || typeof data !== "object") {
             throw new Error("Observable.create() requires an object as input");
         }
+        checkOptions("Observable.create", options);
         if (data.__isReactive && data._factory) {
             throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
         }
@@ -108,6 +125,10 @@ class Observable {
 
         // $watch remains separate due to closure over previousValue
         defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
+            runtimeHelpers.assertPathExists(reactiveData, property, `$watch("${property}")`);
+            if (typeof callback !== "function") {
+                throw new TypeError(`[Stitch.js ${Version}] $watch("${property}", callback): callback must be a function, got ${typeof callback}.`);
+            }
             let previousValue = getProperty(reactiveData, property);
 
             // Create effect that tracks the property
@@ -130,12 +151,6 @@ class Observable {
             });
         });
 
-        if (options.debug) {
-            reactiveData.on(change => {
-                console.log(`[Stitch.js ${Version} Debug] ${change.field}:`, change.oldValue, "->", change.newValue);
-            });
-        }
-
         return reactiveData;
     }
 
@@ -155,6 +170,7 @@ class Observable {
         if (!Array.isArray(items)) {
             throw new Error("Observable.createArray() requires an array as input");
         }
+        checkOptions("Observable.createArray", options);
         const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
         const reactiveArray = factory.reactive([...items], new WeakSet);
         defineHidden(reactiveArray, "_factory", factory);
@@ -170,6 +186,7 @@ class Observable {
      * @returns {Object} Reactive object
      */
     static reactive(obj, options = {}) {
+        checkOptions("Observable.reactive", options);
         if (obj && obj.__isReactive) {
             return obj;
         }

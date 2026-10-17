@@ -23,10 +23,6 @@ class ComputedRef {
         this.id = ++nextComputedId;
         this.isComputedRef = true;
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
-            hasExplicitDeps: !!explicitDeps,
-            explicitDeps
-        });
     }
 
     markDirty() {
@@ -37,7 +33,6 @@ class ComputedRef {
         }
         this.failed = false;
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
 
         // Notify readers (effects and computeds) through the system's dependency map.
@@ -66,7 +61,6 @@ class ComputedRef {
     }
 
     evaluate() {
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTING VALUE (id: ${this.id})`);
         const unread = this.reactiveSystem._untrack(this);
         this.reactiveSystem.effectStack.push(this);
 
@@ -86,10 +80,6 @@ class ComputedRef {
             this.dirty = false;
             this.failed = false;
 
-            this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
-                value: this.value,
-                deps: this.deps.size
-            });
 
             return this.value;
         } finally {
@@ -106,9 +96,6 @@ class ComputedRef {
             return this.evaluate();
         }
 
-        this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED CACHED (id: ${this.id})`, {
-            value: this.value
-        });
         return this.value;
     }
 

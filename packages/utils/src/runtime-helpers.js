@@ -46,45 +46,25 @@ function setProperty(target, path, value) {
 }
 
 /**
- * Safely retrieves property values using dot-notation paths.
+ * Reads a dot-notation path (model.get(path)). A missing name or a null/undefined step
+ * gives undefined. An inline object literal is not a path and throws.
  *
  * @param {Object} target
  * @param {string} path
- * @param {Object} [options]
- * @param {string} [options.version] defaults to the package version
- * @param {boolean} [options.debugEnabled=false]
  * @returns {*}
  */
-function getProperty(target, path, options = {}) {
-    const version = options.version || VERSION;
-    const debugEnabled = !!options.debugEnabled;
-
-    if (path.trim().startsWith("{")) {
-        console.error(
-            `[Stitch.js ${version}] Invalid binding syntax: "${path}"\n` +
-            `\n` +
-            `Inline object literals are not supported in bindings.\n` +
-            `Use a property path reference instead.`
+function getProperty(target, path) {
+    if (typeof path !== "string" || path.trim().startsWith("{")) {
+        throw new Error(
+            `[Stitch.js v${VERSION}] "${path}" is not a property path. Use a dot-separated name such as "user.name"; ` +
+            "an inline object is not supported."
         );
-        return undefined;
     }
-
     const keys = path.split(".");
     let current = target;
     for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
-        if (current == null) {
-            if (debugEnabled) {
-                const pathSoFar = keys.slice(0, i).join(".");
-                console.warn(`[Stitch.js ${version}] Property path "${path}" is null/undefined at "${pathSoFar}"`);
-            }
-            return undefined;
-        }
-        if (!(key in current)) {
-            if (debugEnabled) {
-                const pathSoFar = keys.slice(0, i).join(".");
-                console.warn(`[Stitch.js ${version}] Property "${key}" does not exist on object at path "${pathSoFar}". Full path: "${path}"`);
-            }
+        if (current == null || !(key in Object(current))) {
             return undefined;
         }
         current = current[key];
@@ -93,48 +73,36 @@ function getProperty(target, path, options = {}) {
 }
 
 /**
- * Checks if a property path exists on an object using dot notation.
+ * Throws when a path names a property that does not exist (a null/undefined step is fine),
+ * listing what the object on the path does have. Used where a misspelled name would
+ * otherwise do nothing, silently ($watch).
  *
- * @param {Object} obj
+ * @param {Object} target
  * @param {string} path
- * @returns {boolean}
+ * @param {string} where - e.g. '$watch("nmae")'
  */
-function propertyExists(obj, path) {
-    if (!obj || !path) return false;
-    const keys = path.split(".");
-    let current = obj;
-    for (const key of keys) {
-        if (current == null || !(key in current)) {
-            return false;
+function assertPathExists(target, path, where) {
+    const keys = String(path).split(".");
+    let current = target;
+    for (let i = 0; i < keys.length; i++) {
+        if (current == null) {
+            return;
         }
-        current = current[key];
+        if (!(keys[i] in Object(current))) {
+            const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
+            const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;
+            throw new Error(
+                `[Stitch.js v${VERSION}] ${where}: "${keys[i]}" is not a property of ${owner} (it has: ${names || "no properties"}). ` +
+                "Declare it in Observable.create() with a starting value (a property added later is not reactive), or fix the name."
+            );
+        }
+        current = current[keys[i]];
     }
-    return true;
-}
-
-/**
- * Finds similar top-level property names for typo hints.
- *
- * @param {Object} obj
- * @param {string} targetPath
- * @returns {string|null}
- */
-function findSimilarProperty(obj, targetPath) {
-    if (!obj || !targetPath) return null;
-    const targetKey = targetPath.split(".").pop();
-    const available = Object.keys(obj).filter(k => !k.startsWith("_"));
-    const similar = available.find(key => {
-        const lower1 = key.toLowerCase();
-        const lower2 = targetKey.toLowerCase();
-        return (lower1.includes(lower2) || lower2.includes(lower1)) && lower1 !== lower2;
-    });
-    return similar ? `Did you mean "${similar}"?` : null;
 }
 
 module.exports = {
     isArrowFunction,
     setProperty,
     getProperty,
-    propertyExists,
-    findSimilarProperty
+    assertPathExists
 };
