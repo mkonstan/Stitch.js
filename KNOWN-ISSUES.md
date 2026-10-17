@@ -14,15 +14,14 @@ some tests.
 
 | # | Defect | Test (`<page>#<test id>`) | Target |
 |---|---|---|---|
-| 4 | In a nested list, a click handler cannot reach the root model: there is no `$root.` path, and `data-click="$root.remove"` does nothing, silently. | `test-v3-defects.html#d4-root-handler-in-nested-foreach` | T2 |
-| 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch`, `test-warnings.html#warns-missing-property`, `test-warnings.html#warns-missing-keys`, `test-warnings.html#warns-select-performance` | T2 |
+| 5 | Mistakes are silent. A misspelled binding name (`data-txet`) is ignored, and `Stitch.debug.enable()` does not turn on the binder's warnings, so debug mode reports nothing. | `test-v3-defects.html#d5-strict-bindings-and-one-debug-switch` | T2 |
 
 "Target" is the planned hardening sprint for the next major release (v3): T1 covers list correctness and
 binding lifecycle, T2 covers strictness and debug mode.
 
 ### Fixed
 
-These were fixed in T1. Their tests stay in place and now pass on every run, so a regression
+These were fixed in T1 and T2. Their tests stay in place and now pass on every run, so a regression
 fails the build.
 
 | # | Defect | Test (`<page>#<test id>`) | Fixed in |
@@ -31,6 +30,7 @@ fails the build.
 | 2 | Reloading a list with new objects that have the same ids keeps the old rows bound to the old objects, so the page keeps showing the old values. | `test-v3-defects.html#d2-same-id-new-object-rebinds` | T1 |
 | 3 | Rows removed from a list (for example by hiding and showing it) keep their bindings alive. Each later change runs once per leaked binding, and the leak grows with every cycle. | `test-v3-defects.html#d3-hidden-rows-release-bindings` | T1 |
 | 6 | An effect that read a computed property keeps running after it is cleaned up (for example after `binder.unbind(element)`), and keeps writing to its element. | `test-v3-defects.html#d6-computed-reader-stops-after-cleanup` | T1 |
+| 4 | In a nested list, a click handler could not reach the root model: there was no `$root.` path, and `data-click="$root.remove"` did nothing, silently. v3: a handler is a bare name (current row), `$parent.name` or `$root.name`; it receives the row item; a name that is not found throws. | `test-v3-defects.html#d4-root-handler-in-nested-foreach` | T2 |
 | 7 | A list row template with more than one root element (for example `<h4>` followed by `<ul>` inside a `data-foreach` container) silently renders only the first root; the rest, including any nested list, never appears. No error is raised. v3 requires exactly one root element and throws otherwise. | `test-v3-defects.html#d7-multi-root-row-template-throws` | T1 |
 
 ## How to check

@@ -130,11 +130,12 @@ function defineRowIndex(itemContext, index, reactiveSystem) {
  * @param {string} path - the data-foreach path
  * @param {{reactiveSystem: Object, binder: Object}} context
  * @param {Object} deps
- * @param {Function} deps.validateBinding
- * @param {Function} deps.getProperty
+ * @param {Function} deps.pathReader - (element, attribute, path) => strict reader (binding-paths.js)
  * @param {Function} deps.getValueValidator
  * @param {Function} deps.createItemContext
  * @param {Function} deps.resolveRowKeys
+ * @param {Function} deps.runAllThenThrow
+ * @param {Function} deps.reportError
  * @param {string} deps.version
  * @param {Document} [deps.doc]
  * @returns {Function} the list's effect
@@ -145,7 +146,9 @@ function bindForeach(element, viewModel, path, context, deps) {
     const binder = context.binder;
     const reactiveSystem = context.reactiveSystem;
 
-    deps.validateBinding(viewModel, path, "foreach", element);
+    // Strict reads (D25): the binder checked the path at bind(); a later change that
+    // makes it missing throws inside the re-render, so it goes to Stitch.onError.
+    const readList = deps.pathReader(element, "data-foreach", path);
 
     const list = {
         name: path,
@@ -161,7 +164,8 @@ function bindForeach(element, viewModel, path, context, deps) {
     originalChildren.forEach(node => element.removeChild(node));
 
     const isSelect = element.tagName === "SELECT";
-    const valuePath = isSelect ? element.getAttribute("data-value") : null;
+    const valuePath = isSelect && element.hasAttribute("data-value") ? element.getAttribute("data-value").trim() : null;
+    const readValue = valuePath ? deps.pathReader(element, "data-value", valuePath) : null;
     let placeholder = null;
     if (isSelect && element.getAttribute("data-default-text")) {
         placeholder = doc.createElement("option");
@@ -211,7 +215,7 @@ function bindForeach(element, viewModel, path, context, deps) {
     }
 
     function readItems() {
-        const value = deps.getProperty(viewModel, path);
+        const value = readList(viewModel);
         if (value === undefined || value === null) {
             return [];
         }
@@ -289,7 +293,7 @@ function bindForeach(element, viewModel, path, context, deps) {
 
     function restoreSelectValue() {
         if (valuePath) {
-            const currentValue = deps.getProperty(viewModel, valuePath);
+            const currentValue = readValue(viewModel);
             if (currentValue !== undefined && currentValue !== null) {
                 const validator = deps.getValueValidator(element);
                 const validValue = validator.validate(element, currentValue, viewModel, valuePath, "render");

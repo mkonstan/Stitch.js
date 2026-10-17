@@ -488,11 +488,11 @@
                 <div class="status-box">
                     <strong>Active Classes:</strong><br>
                     <span data-visible="classToggles.active">✅ active</span>
-                    <span data-visible="!classToggles.active">❌ active</span><br>
+                    <span data-visible="classTogglesOff.active">❌ active</span><br>
                     <span data-visible="classToggles.highlight">✅ highlight</span>
-                    <span data-visible="!classToggles.highlight">❌ highlight</span><br>
+                    <span data-visible="classTogglesOff.highlight">❌ highlight</span><br>
                     <span data-visible="classToggles.disabled">✅ disabled</span>
-                    <span data-visible="!classToggles.disabled">❌ disabled</span>
+                    <span data-visible="classTogglesOff.disabled">❌ disabled</span>
                 </div>
             </div>
 
@@ -607,11 +607,11 @@
                 <div class="status-box">
                     <strong>Attributes Present:</strong><br>
                     <span data-visible="isRequired">✅ required=""</span>
-                    <span data-visible="!isRequired">❌ required (removed)</span><br>
+                    <span data-visible="notRequired">❌ required (removed)</span><br>
                     <span data-visible="isDisabled">✅ disabled=""</span>
-                    <span data-visible="!isDisabled">❌ disabled (removed)</span><br>
+                    <span data-visible="notDisabled">❌ disabled (removed)</span><br>
                     <span data-visible="isReadonly">✅ readonly=""</span>
-                    <span data-visible="!isReadonly">❌ readonly (removed)</span>
+                    <span data-visible="notReadonly">❌ readonly (removed)</span>
                 </div>
             </div>
 
@@ -643,9 +643,9 @@
 
                 <div class="status-box">
                     <strong>Attributes:</strong><br>
-                    title: <span data-text="showTitle ? '✅ Present' : '❌ Removed'"></span><br>
-                    data-id: <span data-text="showDataId ? '✅ Present' : '❌ Removed'"></span><br>
-                    aria-label: <span data-text="showAriaLabel ? '✅ Present' : '❌ Removed'"></span>
+                    title: <span data-text="titleStatus"></span><br>
+                    data-id: <span data-text="dataIdStatus"></span><br>
+                    aria-label: <span data-text="ariaLabelStatus"></span>
                 </div>
             </div>
 
@@ -756,7 +756,7 @@
                            data-value="emailInput"
                            data-attr="emailAttrs"
                            data-class="emailClasses">
-                    <small data-visible="!isEmailValid" data-text="emailError" style="color: #dc3545;"></small>
+                    <small data-visible="isEmailInvalid" data-text="emailError" style="color: #dc3545;"></small>
                     <small data-visible="isEmailValid" style="color: #28a745;">✅ Valid email</small>
                 </div>
 
@@ -767,7 +767,7 @@
                            data-value="passwordInput"
                            data-attr="passwordAttrs"
                            data-class="passwordClasses">
-                    <small data-visible="!isPasswordValid" data-text="passwordError" style="color: #dc3545;"></small>
+                    <small data-visible="isPasswordInvalid" data-text="passwordError" style="color: #dc3545;"></small>
                     <small data-visible="isPasswordValid" style="color: #28a745;">✅ Strong password</small>
                 </div>
 
@@ -777,11 +777,11 @@
 
                 <div class="status-box" style="font-size: 0.85em; margin-top: 15px;">
                     <strong>ARIA Attributes:</strong><br>
-                    Email: aria-invalid="<span data-text="!isEmailValid"></span>",
+                    Email: aria-invalid="<span data-text="emailAriaInvalid"></span>",
                     aria-describedby="email-error"<br>
-                    Password: aria-invalid="<span data-text="!isPasswordValid"></span>",
+                    Password: aria-invalid="<span data-text="passwordAriaInvalid"></span>",
                     aria-describedby="password-error"<br>
-                    <strong>Form Valid:</strong> <span data-text="isFormValid ? '✅ Yes' : '❌ No'"></span>
+                    <strong>Form Valid:</strong> <span data-text="formValidText"></span>
                 </div>
             </div>
 
@@ -792,7 +792,7 @@
 
                 <div class="control-row">
                     <button data-click="toggleTheme">
-                        <span data-text="theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'"></span>
+                        <span data-text="themeToggleText"></span>
                     </button>
                 </div>
 
@@ -857,6 +857,16 @@
                 highlight: false,
                 disabled: false
             },
+
+            // The opposite of each toggle, for the "off" markers. A binding names a property:
+            // an expression such as "!classToggles.active" is not allowed, so it is a computed.
+            classTogglesOff: Stitch.computed(function() {
+                return {
+                    active: !this.classToggles.active,
+                    highlight: !this.classToggles.highlight,
+                    disabled: !this.classToggles.disabled
+                };
+            }),
 
             // Example 1.3: State-Based Classes
             buttonState: 'primary', // primary, success, danger, warning
@@ -1106,6 +1116,22 @@
 
             // Example 3.3: Theme Switcher
             theme: 'light', // light, dark
+
+            // Display helpers. A binding names a property: expressions such as
+            // "!isRequired" or "showTitle ? ... : ..." are not allowed in an attribute
+            // (they throw), so each one is a computed.
+            notRequired: Stitch.computed(function() { return !this.isRequired; }),
+            notDisabled: Stitch.computed(function() { return !this.isDisabled; }),
+            notReadonly: Stitch.computed(function() { return !this.isReadonly; }),
+            titleStatus: Stitch.computed(function() { return this.showTitle ? '✅ Present' : '❌ Removed'; }),
+            dataIdStatus: Stitch.computed(function() { return this.showDataId ? '✅ Present' : '❌ Removed'; }),
+            ariaLabelStatus: Stitch.computed(function() { return this.showAriaLabel ? '✅ Present' : '❌ Removed'; }),
+            isEmailInvalid: Stitch.computed(function() { return !this.isEmailValid; }),
+            isPasswordInvalid: Stitch.computed(function() { return !this.isPasswordValid; }),
+            emailAriaInvalid: Stitch.computed(function() { return this.emailAttrs['aria-invalid']; }),
+            passwordAriaInvalid: Stitch.computed(function() { return this.passwordAttrs['aria-invalid']; }),
+            formValidText: Stitch.computed(function() { return this.isFormValid ? '✅ Yes' : '❌ No'; }),
+            themeToggleText: Stitch.computed(function() { return this.theme === 'light' ? '🌙 Switch to Dark' : '☀️ Switch to Light'; }),
 
             themeTitle: Stitch.computed(function() {
                 return this.theme === 'light' ? 'Light Theme' : 'Dark Theme';

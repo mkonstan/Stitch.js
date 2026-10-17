@@ -36,7 +36,8 @@
         computed,
         version,
         debug,
-        onError: utils.onError
+        onError: utils.onError,
+        onBindReport: browser.onBindReport
     };
 
     if (typeof window !== "undefined") {

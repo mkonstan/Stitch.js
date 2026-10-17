@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js handler path tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Handler paths</h1>
+    <p>
+        <code>data-click</code> and the handler names in a <code>data-event</code> map name a
+        handler by a bare name (the current row; the model outside a list),
+        <code>$parent.name</code> (one level up) or <code>$root.name</code> (the root model), and
+        nothing else (D12). The handler is called with <code>this</code> = the object it is on and
+        <code>(rowItem, event)</code>. A name that is not found throws from <code>bind()</code>,
+        saying where it was looked up and where it does exist.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'bare-name-outside-a-list',
+            'bare-name-is-the-current-row',
+            'parent-is-one-level-up',
+            'root-from-a-nested-row',
+            'miss-says-where-it-exists',
+            'miss-everywhere-throws',
+            'not-a-function-throws',
+            'parent-outside-a-list-throws',
+            'event-map-uses-the-same-rules',
+            'replaced-handler-is-used'
+        ]);
+
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        function tryBind(host, model) {
+            try {
+                new Stitch.DataBinder().bind(host, model);
+                return null;
+            } catch (error) {
+                return error;
+            }
+        }
+
+        const messageOf = error => error ? String(error.message) : '';
+
+        // Two nested lists: groups -> items. Every handler records (this, args).
+        function nestedModel(calls, extra = {}) {
+            return Stitch.Observable.create(Object.assign({
+                groups: [
+                    { id: 'g1', label: 'G1', pick(item, event) { calls.push({ at: 'group', self: this, item, event }); },
+                      items: [
+                          { id: 'i1', name: 'first', own(item, event) { calls.push({ at: 'item', self: this, item, event }); } },
+                          { id: 'i2', name: 'second', own(item, event) { calls.push({ at: 'item', self: this, item, event }); } }
+                      ] }
+                ],
+                remove(item, event) { calls.push({ at: 'root', self: this, item, event }); }
+            }, extra));
+        }
+        const NESTED = (click) =>
+            '<div data-foreach="groups"><ul data-foreach="items"><li><button data-click="' + click + '">x</button></li></ul></div>';
+
+        (async () => {
+            await StitchTest.test('bare-name-outside-a-list', async (t) => {
+                const calls = [];
+                const host = mount('<button data-click="save">save</button>');
+                const model = Stitch.Observable.create({ save(item, event) { calls.push({ self: this, item, event }); } });
+                t.equal(tryBind(host, model), null, 'binds');
+                host.querySelector('button').click();
+                t.equal(calls.length, 1, 'the handler ran once');
+                t.ok(calls[0] && calls[0].self === model, 'this is the model');
+                t.ok(calls[0] && calls[0].item === model, 'the first argument is the model (there is no row)');
+                t.ok(calls[0] && calls[0].event instanceof MouseEvent, 'the second argument is the click event');
+            });
+
+            await StitchTest.test('bare-name-is-the-current-row', async (t) => {
+                const calls = [];
+                const host = mount(NESTED('own'));
+                const model = nestedModel(calls);
+                t.equal(tryBind(host, model), null, 'binds');
+                host.querySelectorAll('button')[1].click();
+                const row = model.groups[0].items[1];
+                t.equal(calls.length, 1, 'the row handler ran once');
+                t.ok(calls[0] && calls[0].self === row, 'this is the clicked row item');
+                t.ok(calls[0] && calls[0].item === row, 'the first argument is the clicked row item');
+            });
+
+            await StitchTest.test('parent-is-one-level-up', async (t) => {
+                const calls = [];
+                const host = mount(NESTED('$parent.pick'));
+                const model = nestedModel(calls);
+                t.equal(tryBind(host, model), null, 'binds');
+                host.querySelectorAll('button')[0].click();
+                t.equal(calls.length, 1, 'the parent row handler ran once');
+                t.ok(calls[0] && calls[0].self === model.groups[0], 'this is the parent row item (the group)');
+                t.ok(calls[0] && calls[0].item === model.groups[0].items[0], 'the first argument is the clicked row item');
+                t.ok(calls[0] && calls[0].event instanceof MouseEvent, 'the second argument is the click event');
+            });
+
+            await StitchTest.test('root-from-a-nested-row', async (t) => {
+                const calls = [];
+                const host = mount(NESTED('$root.remove'));
+                const model = nestedModel(calls);
+                t.equal(tryBind(host, model), null, 'binds');
+                host.querySelectorAll('button')[1].click();
+                t.equal(calls.length, 1, 'the root handler ran once');
+                t.ok(calls[0] && calls[0].self === model, 'this is the root model');
+                t.ok(calls[0] && calls[0].item === model.groups[0].items[1], 'the first argument is the clicked row item');
+            });
+
+            await StitchTest.test('miss-says-where-it-exists', async (t) => {
+                const onRoot = messageOf(tryBind(mount(NESTED('remove')), nestedModel([])));
+                t.match(onRoot, /handler "remove" was not found on the current row/, 'a bare name missing on the row throws, saying where it was looked up');
+                t.match(onRoot, /did you mean "\$root\.remove"/, 'and suggests $root.remove, where it exists');
+                const onParent = messageOf(tryBind(mount(NESTED('pick')), nestedModel([])));
+                t.match(onParent, /did you mean "\$parent\.pick"/, 'a handler on the parent row is suggested as $parent.pick');
+                const onRow = messageOf(tryBind(mount(NESTED('$root.own')), nestedModel([])));
+                t.match(onRow, /was not found on the root model.*did you mean "own"/, 'a $root. miss that exists on the row suggests the bare name');
+                // Three levels: a handler on the grandparent row (not the root) cannot be named.
+                const deep = mount('<div data-foreach="a"><div data-foreach="b"><div data-foreach="c"><button data-click="far">x</button></div></div></div>');
+                const deepMessage = messageOf(tryBind(deep, Stitch.Observable.create({
+                    a: [{ id: 1, far() {}, b: [{ id: 2, c: [{ id: 3 }] }] }]
+                })));
+                t.match(deepMessage, /2 levels up, which a handler cannot name.*\$root\.far/, 'a handler two levels up says to move it to the root');
+            });
+
+            await StitchTest.test('miss-everywhere-throws', async (t) => {
+                const message = messageOf(tryBind(mount('<button data-click="nope">x</button>'), Stitch.Observable.create({ save() {} })));
+                t.match(message, /data-click="nope"/, 'the error names the binding');
+                t.match(message, /<button/, 'the error names the element');
+                t.match(message, /exists nowhere a handler can reach/, 'the error says it exists nowhere');
+            });
+
+            await StitchTest.test('not-a-function-throws', async (t) => {
+                const message = messageOf(tryBind(mount('<button data-click="count">x</button>'), Stitch.Observable.create({ count: 3 })));
+                t.match(message, /"count" on the model is number, not a function/, 'a non-function throws');
+            });
+
+            await StitchTest.test('parent-outside-a-list-throws', async (t) => {
+                const message = messageOf(tryBind(mount('<button data-click="$parent.save">x</button>'), Stitch.Observable.create({ save() {} })));
+                t.match(message, /only available inside a foreach row/, '$parent. outside a list throws');
+            });
+
+            await StitchTest.test('event-map-uses-the-same-rules', async (t) => {
+                const calls = [];
+                const host = mount('<ul data-foreach="rows"><li><input data-event="$root.rowEvents"></li></ul>');
+                const model = Stitch.Observable.create({
+                    rowEvents: { focus: '$root.touched', blur: 'leave' },
+                    rows: [{ id: 1, leave(item, event) { calls.push({ at: 'row', self: this, item, event }); } }],
+                    touched(item, event) { calls.push({ at: 'root', self: this, item, event }); }
+                });
+                t.equal(tryBind(host, model), null, 'binds');
+                const input = host.querySelector('input');
+                input.dispatchEvent(new FocusEvent('focus'));
+                input.dispatchEvent(new FocusEvent('blur'));
+                t.deepEqual(calls.map(call => call.at), ['root', 'row'], 'each named handler ran');
+                t.ok(calls[0] && calls[0].self === model && calls[0].item === model.rows[0], '$root. handler: this = the model, first argument = the row item');
+                t.ok(calls[1] && calls[1].self === model.rows[0] && calls[1].event instanceof FocusEvent, 'bare handler: this = the row item, second argument = the event');
+                const missing = messageOf(tryBind(mount('<input data-event="evts">'), Stitch.Observable.create({ evts: { input: 'nope' } })));
+                t.match(missing, /\(event "input"\): handler "nope" was not found/, 'a missing handler in the map throws, naming the event');
+            });
+
+            await StitchTest.test('replaced-handler-is-used', async (t) => {
+                const calls = [];
+                const host = mount('<button data-click="act">x</button>');
+                const model = Stitch.Observable.create({ act() { calls.push('old'); } });
+                new Stitch.DataBinder().bind(host, model);
+                model.act = function () { calls.push('new'); };
+                host.querySelector('button').click();
+                t.deepEqual(calls, ['new'], 'a click calls the handler the model has now');
+            });
+        })();
+    </script>
+</body>
+</html>

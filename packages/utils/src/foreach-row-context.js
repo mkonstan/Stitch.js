@@ -1,9 +1,18 @@
 "use strict";
 
+// Every row context created by createItemContext (so a scope can be told from a model).
+const ROW_CONTEXTS = new WeakSet();
+
+/** True when scope is a foreach row context (not a model). */
+function isRowContext(scope) {
+    return scope !== null && typeof scope === "object" && ROW_CONTEXTS.has(scope);
+}
+
 /**
  * Creates the binding context of one foreach row: the row's own fields (through the
  * prototype chain, so two-way bindings write to the row object), plus $data (the row
- * itself), $index and $parent (the list's view model).
+ * itself), $index, $parent (the list's view model: the model, or the enclosing row's
+ * context) and $root (the model the outermost list belongs to).
  * The foreach binding replaces $index with a reactive accessor.
  *
  * @param {*} item
@@ -26,9 +35,16 @@ function createItemContext(item, index, viewModel) {
     }
     context.$index = index;
     context.$parent = viewModel;
+    Object.defineProperty(context, "$root", {
+        value: isRowContext(viewModel) ? viewModel.$root : viewModel,
+        writable: false,
+        enumerable: false
+    });
+    ROW_CONTEXTS.add(context);
     return context;
 }
 
 module.exports = {
-    createItemContext
+    createItemContext,
+    isRowContext
 };

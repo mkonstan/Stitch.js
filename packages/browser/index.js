@@ -6,21 +6,13 @@ const bindingScanHelpers = require("./src/binding-scan-helpers");
 const bindingRuntime = require("./src/binding-runtime");
 const dataBinderFactory = require("./src/data-binder");
 const runtimeHelpers = require("../utils/src/runtime-helpers");
-const debugConfig = require("../utils/src/debug-config");
 const attrValueHandlers = require("../utils/src/attr-value-handlers");
 const valueBindingHelpers = require("../utils/src/value-binding-helpers");
 const typeConverters = require("../utils/src/type-converters");
 const foreachKeys = require("../utils/src/foreach-keys");
 const foreachRowContext = require("../utils/src/foreach-row-context");
+const bindingPaths = require("./src/binding-paths");
 const errorHook = require("../utils/src/error-hook");
-
-const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
-const stitchDebug = {
-    ...stitchDebugState,
-    log() {},
-    group() {},
-    groupEnd() {}
-};
 
 const typeConverterRegistry = typeConverters.createTypeConverters({ version: VERSION });
 function getTypeConverter(element, value) {
@@ -45,20 +37,13 @@ function getValueHandler(element) {
 }
 
 const runtimeBinding = bindingRuntime.createBindingRuntime({
-    version: VERSION,
-    debug: stitchDebug,
-    getProperty: runtimeHelpers.getProperty,
     setProperty: runtimeHelpers.setProperty,
     getValueHandler,
     getValueValidator,
-    getTypeConverter,
     getAttrHandler: attrValueHandlers.getAttrHandler,
-    propertyExists: runtimeHelpers.propertyExists,
-    findSimilarProperty: runtimeHelpers.findSimilarProperty,
-    bindForeach(element, viewModel, path, context, validateBinding) {
+    bindForeach(element, viewModel, path, context) {
         return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
-            validateBinding,
-            getProperty: runtimeHelpers.getProperty,
+            pathReader: bindingPaths.pathReader,
             getValueValidator,
             createItemContext: foreachRowContext.createItemContext,
             resolveRowKeys: foreachKeys.resolveRowKeys,
@@ -71,11 +56,8 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
 });
 
 const DataBinder = dataBinderFactory.createDataBinderClass({
-    version: VERSION,
-    debug: stitchDebug,
-    getProperty: runtimeHelpers.getProperty,
+    version: `v${VERSION}`,
     getBindingHandler: runtimeBinding.getBindingHandler,
-    scanCustomAttributes: runtimeBinding.scanCustomAttributes,
     bindingHandlers: runtimeBinding.BINDING_HANDLERS
 });
 
@@ -85,5 +67,6 @@ module.exports = {
     ...foreachBindingOrchestrator,
     ...bindingScanHelpers,
     ...bindingRuntime,
-    ...dataBinderFactory
+    ...dataBinderFactory,
+    ...bindingPaths
 };

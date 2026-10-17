@@ -1,19 +1,13 @@
 "use strict";
 
-const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
+const paths = require("./binding-paths");
 
 function createBindingRuntime(deps = {}) {
-    const Version = deps.version || `v${VERSION}`;
-    const StitchDebug = deps.debug || NOOP_DEBUG;
-    const getProperty = deps.getProperty;
     const setProperty = deps.setProperty;
     const getValueHandler = deps.getValueHandler;
     const getValueValidator = deps.getValueValidator;
-    const getTypeConverter = deps.getTypeConverter;
     const getAttrHandler = deps.getAttrHandler;
-    const propertyExists = deps.propertyExists;
-    const findSimilarProperty = deps.findSimilarProperty;
     const bindForeach = deps.bindForeach;
 
 /** What onError is told when a binding's update throws: the element and the binding. */
@@ -21,46 +15,54 @@ function bindingErrorContext(element, type, path) {
     return { source: "binding", element, binding: `data-${type}="${path}"` };
 }
 
-function validateBinding(viewModel, path, bindingType, element) {
-    if (!StitchDebug.enabled) return true;
-    if (!propertyExists(viewModel, path)) {
-        const suggestion = findSimilarProperty(viewModel, path);
-        const availableProps = Object.keys(viewModel).filter(k => !k.startsWith("_")).slice(0, 10);
-        console.warn(`[Stitch.js] ${bindingType} binding failed: Property "${path}" not found\n`, {
-            element: element.tagName,
-            elementId: element.id || "(no id)",
-            elementClasses: element.className || "(no classes)",
-            expectedProperty: path,
-            availableProperties: availableProps,
-            totalProperties: Object.keys(viewModel).filter(k => !k.startsWith("_")).length,
-            suggestion: suggestion
-        });
-        return false;
-    }
-    return true;
+/** An error about one binding: `[Stitch.js vX] <span data-text="x">: message`. */
+function bindingError(element, type, path, message) {
+    return new Error(`[Stitch.js v${VERSION}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
+}
+
+function describeValue(value) {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "an array";
+    return typeof value === "string" ? `the string ${JSON.stringify(value)}` : `${typeof value} ${String(value)}`;
+}
+
+/**
+ * Creates a binding effect that reads the binding's path strictly (a missing property
+ * throws: from bind() on the first run, to Stitch.onError on a later one) and applies it.
+ */
+function valueEffect(element, viewModel, type, path, context, apply) {
+    const read = paths.pathReader(element, `data-${type}`, path);
+    const eff = context.reactiveSystem.effect(() => {
+        apply(read(viewModel));
+    }, { batch: true, errorContext: bindingErrorContext(element, type, path) });
+    context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+    return eff;
 }
 
 /**
  * @typedef {Object} BindingHandler
  * @property {Function} bind - Establishes reactive binding
+ * @property {string} [kind] - "handler" when the value names an event handler (D12)
+ *   instead of a property path; the binder then leaves the lookup to the binding.
  */
 
 /**
  * BINDING_HANDLERS - Registry of built-in binding handlers implementing Strategy Pattern.
- * 
- * Each handler encapsulates complete binding logic for its type (text, value, visible, etc.),
- * enabling clean two-way data binding, event handling, and list rendering.
+ *
+ * Every value is checked by the binder before bind() is called: valid property-path
+ * syntax, and a path that exists on the model (see binding-paths.js). Click names a
+ * handler instead (kind: "handler").
  * Supports custom binding registration via DataBinder.registerBinding().
- * 
+ *
  * @const {Object.<string, BindingHandler>}
  * @example
  * // Custom binding registration (PUBLIC API)
  * Stitch.DataBinder.registerBinding('tooltip', {
  *     bind(element, viewModel, path, context) {
- *         context.reactiveSystem.effect(() => {
- *             const value = getProperty(viewModel, path);
- *             element.setAttribute('title', value || '');
+ *         const effect = context.reactiveSystem.effect(() => {
+ *             element.setAttribute('title', viewModel[path] || '');
  *         });
+ *         context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
  *     }
  * });
  * // Usage: <button data-tooltip="helpText">Help</button>
@@ -72,15 +74,14 @@ const BINDING_HANDLERS = {
      */
     text: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "text", element);
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
+            valueEffect(element, viewModel, "text", path, context, value => {
                 if (typeof value === "function") {
-                    console.warn(`[Stitch.js ${Version}] Binding 'text' to a function: "${path}". Did you mean to call it or use a computed property?`);
+                    throw bindingError(element, "text", path,
+                        `"${path}" is a function; data-text shows a value. Make it a computed ` +
+                        "(Stitch.computed(function () { ... })) and bind that, or bind the property it returns.");
                 }
                 element.textContent = value != null ? value : "";
-            }, { batch: true, errorContext: bindingErrorContext(element, "text", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     },
     /**
@@ -89,21 +90,12 @@ const BINDING_HANDLERS = {
      */
     value: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "value", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: value binding (two-way) for "${path}"`, {
-                element: element.tagName,
-                type: element.type
-            });
             const handler = getValueHandler(element);
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
-                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
+            valueEffect(element, viewModel, "value", path, context, value => {
                 handler.modelToView(element, value, viewModel, path);
-            }, { batch: true, errorContext: bindingErrorContext(element, "value", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
             const updateModel = () => {
                 const value = handler.viewToModel(element);
-                StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (View→Model): "${path}" = ${value}`);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
@@ -122,12 +114,9 @@ const BINDING_HANDLERS = {
      */
     visible: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "visible", element);
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
+            valueEffect(element, viewModel, "visible", path, context, value => {
                 element.style.display = value ? "" : "none";
-            }, { batch: true, errorContext: bindingErrorContext(element, "visible", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     },
     /**
@@ -136,88 +125,85 @@ const BINDING_HANDLERS = {
      */
     enabled: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "enabled", element);
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
+            valueEffect(element, viewModel, "enabled", path, context, value => {
                 element.disabled = !value;
-            }, { batch: true, errorContext: bindingErrorContext(element, "enabled", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     },
     /**
-     * click binding - Attaches click event handler.
-     * Supports $parent context for calling parent methods from foreach loops.
+     * click binding - Calls a handler on click (D12).
+     * The value is a bare name (the current row; the model outside a list), $parent.name
+     * (one level up) or $root.name (the root model). The handler is called with this = the
+     * object it is on, and (rowItem, event). A name that is not found throws from bind().
      */
     click: {
+        kind: "handler",
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "click", element);
+            const where = paths.describeBinding(element, "data-click", path);
+            const ref = paths.parseHandlerRef(where, path);
+            paths.resolveHandler(viewModel, ref, where);
             const clickHandler = e => {
-                const handler = getProperty(viewModel, path);
-                if (typeof handler === "function") {
-                    // UNWRAP: If viewModel is a context wrapper (has $data), pass $data (the original item)
-                    // This ensures handlers receive the actual model, not the context wrapper
-                    const target = (viewModel && viewModel.$data) ? viewModel.$data : viewModel;
-                    
-                    if (path.startsWith("$parent.") && viewModel.$data !== undefined) {
-                        // Case 1: Calling parent method from child context (e.g. data-click="$parent.remove")
-                        // Call on parent, pass target (the item) as first arg, event as second
-                        handler.call(viewModel.$parent, target, e);
-                    } else {
-                        // Case 2: Calling method on self (e.g. data-click="toggle")
-                        // Call on target (the item), pass event as first arg
-                        handler.call(target, e);
-                    }
-                }
+                // Looked up again on every click: the model may have replaced the method.
+                const target = paths.resolveHandler(viewModel, ref, where);
+                target.fn.call(target.owner, target.item, e);
             };
             element.addEventListener("click", clickHandler);
             context.binder._trackCleanup(element, () => element.removeEventListener("click", clickHandler));
         }
     },
     /**
-     * event binding - Generic event handler for any DOM event.
-     * Binds multiple event types to handler methods in single declaration.
-     *
-     * ⚠️ SYNTAX REQUIREMENT: Binding value must be a property path (e.g., "eventBindings"),
-     * NOT an inline object literal. Inline objects like data-event="{ click: fn }"
-     * will fail because Stitch.js treats all binding values as property paths.
-     * Define the object in your model and reference it by property name.
+     * event binding - Handlers for any DOM events.
+     * The value names a model property holding an object that maps event names to handler
+     * names (resolved like data-click: bare, $parent.name or $root.name) or functions,
+     * e.g. { input: "validate", blur: "$root.save" }. Each handler is called with
+     * this = the object it is on, and (rowItem, event).
      */
     event: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "event", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `EVENT BINDING: "${path}"`, {
-                element: element.tagName
-            });
+            const where = paths.describeBinding(element, "data-event", path);
+            const read = paths.pathReader(element, "data-event", path);
             // Track active listeners so each effect run can replace prior registrations.
             const eventListeners = [];
             const removeEventListeners = () => {
-                eventListeners.forEach(({ eventName, wrappedHandler }) => {
-                    element.removeEventListener(eventName, wrappedHandler);
+                eventListeners.forEach(({ eventName, listener }) => {
+                    element.removeEventListener(eventName, listener);
                 });
                 eventListeners.length = 0;
             };
             const eff = context.reactiveSystem.effect(() => {
-                // Avoid duplicate listeners when effect re-runs.
-                removeEventListeners();
-
-                const eventConfig = getProperty(viewModel, path);
-                if (!eventConfig || typeof eventConfig !== "object") {
-                    console.error(`[Stitch.js ${Version}] event: binding requires an object. Got: ${typeof eventConfig}`);
-                    return;
+                const eventConfig = read(viewModel);
+                if (!eventConfig || typeof eventConfig !== "object" || Array.isArray(eventConfig)) {
+                    throw bindingError(element, "event", path,
+                        `the value must be an object that maps event names to handlers, e.g. { input: "validate" }; ` +
+                        `got ${describeValue(eventConfig)}.`);
                 }
-                for (const [eventName, handlerPath] of Object.entries(eventConfig)) {
-                    const handler = typeof handlerPath === "string" ? getProperty(viewModel, handlerPath) : handlerPath;
-                    if (typeof handler === "function") {
-                        StitchDebug.enabled && StitchDebug.log("bindings", `  Registering: ${eventName} → ${handlerPath}`, {
-                            event: eventName
-                        });
-                        const wrappedHandler = e => handler.call(viewModel, e);
-                        element.addEventListener(eventName, wrappedHandler);
-                        eventListeners.push({ eventName, wrappedHandler });
-                    } else {
-                        console.warn(`[Stitch.js ${Version}] event: binding handler not found: "${handlerPath}"`);
+                // Resolve every entry first: if one is wrong, the listeners stay as they were.
+                const next = Object.keys(eventConfig).map(eventName => {
+                    const entry = eventConfig[eventName];
+                    const entryWhere = `${where} (event "${eventName}")`;
+                    if (typeof entry === "function") {
+                        const item = paths.rowItemOf(viewModel);
+                        return { eventName, listener: e => entry.call(item, item, e) };
                     }
-                }
+                    if (typeof entry !== "string") {
+                        throw new Error(`[Stitch.js v${VERSION}] ${entryWhere}: the handler must be a handler name ` +
+                            `(e.g. "validate" or "$root.save") or a function; got ${describeValue(entry)}.`);
+                    }
+                    const ref = paths.parseHandlerRef(entryWhere, entry);
+                    paths.resolveHandler(viewModel, ref, entryWhere);
+                    return {
+                        eventName,
+                        listener: e => {
+                            const target = paths.resolveHandler(viewModel, ref, entryWhere);
+                            target.fn.call(target.owner, target.item, e);
+                        }
+                    };
+                });
+                removeEventListeners();
+                next.forEach(({ eventName, listener }) => {
+                    element.addEventListener(eventName, listener);
+                    eventListeners.push({ eventName, listener });
+                });
             }, { batch: true, errorContext: bindingErrorContext(element, "event", path) });
             context.binder._trackCleanup(element, () => {
                 removeEventListeners();
@@ -228,142 +214,76 @@ const BINDING_HANDLERS = {
     /**
      * class binding - Dynamic CSS class management.
      *
-     * ⚠️ SYNTAX REQUIREMENT: Binding value must be a property path (e.g., "classBindings"),
-     * NOT an inline object literal. Inline objects like data-class="{ active: true }"
-     * will fail because Stitch.js treats all binding values as property paths.
-     * Define the object in your model and reference it by property name.
-     *
-     * ⚠️ CRITICAL: String mode replaces ALL classes (destroys framework CSS).
-     * ALWAYS use object mode (computed) with elements that have static classes.
-     * String mode should only be used when element has NO static classes.
+     * The value names a property (an inline object literal is invalid syntax and throws).
      *
      * Two modes:
-     * - String mode: `element.className = value` (replaces all classes - DESTRUCTIVE)
-     * - Object mode: `element.classList.toggle()` (selective toggle - PRESERVES unlisted classes)
-     *
-     * HOW OBJECT MODE PRESERVATION WORKS:
-     * Object mode "preserves" classes by simple omission - it ONLY toggles classes
-     * that are LISTED in the object. Any class NOT in the object is left untouched.
-     * This is NOT "smart preservation" - it's just classList.toggle() not caring about
-     * classes it wasn't asked to toggle.
+     * - String mode: `element.className = value` (replaces ALL classes, framework CSS included).
+     *   Use it only on elements with no static classes.
+     * - Object mode: `element.classList.toggle()` for each listed class name; classes not
+     *   listed are left untouched.
+     * null / undefined: no change. Any other value throws.
      *
      * @example
-     * // ❌ BAD: String mode destroys Bootstrap classes
-     * // HTML: <button class="btn btn-primary" data-class="buttonState">
-     * // Model: { buttonState: 'active' }
-     * // Result: class="active" (btn btn-primary DESTROYED by className assignment)
-     *
-     * @example
-     * // ✅ GOOD: Object mode preserves unlisted classes
-     * // HTML: <button class="btn btn-primary" data-class="buttonClasses">
-     * // Model: { buttonClasses: computed(function() { return { active: this.isActive }; }) }
-     * // Result: class="btn btn-primary active"
-     * // Why preserved? Object only lists 'active', so toggle() ignores 'btn' and 'btn-primary'
-     *
-     * @example
-     * // Object mode only affects classes it knows about:
      * // HTML: <div class="foo bar baz" data-class="classes">
      * // Model: { classes: { bar: false, qux: true } }
      * // Result: class="foo baz qux"
-     * // - 'foo' preserved (not in object, never touched)
-     * // - 'bar' removed (in object, value is false)
-     * // - 'baz' preserved (not in object, never touched)
-     * // - 'qux' added (in object, value is true)
      */
     class: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "class", element);
-            StitchDebug.enabled && StitchDebug.log("bindings", `BINDING: class binding for "${path}"`, {
-                element: element.tagName,
-                initialClasses: Array.from(element.classList)
-            });
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
-                StitchDebug.enabled && StitchDebug.log("bindings", `CLASS BINDING UPDATE: "${path}"`, {
-                    element: element.tagName,
-                    valueType: typeof value,
-                    value: value
-                });
+            valueEffect(element, viewModel, "class", path, context, value => {
                 if (typeof value === "string") {
                     element.className = value;
-                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Set className to: "${value}"`);
-                } else if (value && typeof value === "object") {
+                } else if (value && typeof value === "object" && !Array.isArray(value)) {
                     Object.keys(value).forEach(className => {
-                        const shouldHaveClass = !!value[className];
-                        element.classList.toggle(className, shouldHaveClass);
-                        StitchDebug.enabled && StitchDebug.log("bindings", `  → Toggle "${className}": ${shouldHaveClass}`);
+                        element.classList.toggle(className, !!value[className]);
                     });
-                    StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
+                } else if (value !== null && value !== undefined) {
+                    throw bindingError(element, "class", path,
+                        `the value must be a class string or an object of { className: boolean }; got ${describeValue(value)}.`);
                 }
-            }, { batch: true, errorContext: bindingErrorContext(element, "class", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     },
     /**
      * attr binding - Dynamic HTML attribute management with type-aware handling.
      *
-     * ⚠️ SYNTAX REQUIREMENT: Binding value must be a property path (e.g., "attrBindings"),
-     * NOT an inline object literal. Inline objects like data-attr="{ title: 'Text' }"
-     * will fail because Stitch.js treats all binding values as property paths.
-     * Define the object in your model and reference it by property name.
+     * The value names a property holding an object of { attributeName: value }; only the
+     * attributes it lists are managed (static attributes stay; a listed one is overwritten).
+     * Supports strings, numbers, booleans, objects (style), arrays (class), null/undefined
+     * (removes the attribute). A null / undefined object: no change. Any other value throws.
      *
-     * PRESERVATION: Only manages attributes IN binding object.
-     * Static HTML attributes NOT in binding remain unchanged.
-     *
-     * ⚠️ WARNING: If attribute exists in BOTH HTML and binding, binding wins (overwrites static value).
-     * 
-     * Supports: strings, numbers, booleans, objects (style), arrays (class), null/undefined (removes).
-     * 
      * @example
-     * // Static attributes preserved
-     * // HTML: <input type="text" id="username" placeholder="Enter name" data-attr="dynamicAttrs">
-     * // Model: { dynamicAttrs: { 'aria-invalid': true } }
-     * // Result: type, id, placeholder preserved; aria-invalid added
-     * 
-     * @example
-     * // Boolean attributes - use actual booleans
-     * dynamicAttrs: {
-     *     'disabled': true,      // ✅ Sets disabled=""
-     *     'required': false,     // ✅ Removes required attribute
-     *     'readonly': "false"    // ❌ WRONG: Sets readonly="false" (still readonly!)
-     * }
-     * 
-     * @example
-     * // Null/undefined removes attributes
-     * dynamicAttrs: {
-     *     'title': showTooltip ? tooltipText : null,  // Conditionally remove
-     *     'data-id': hasId ? userId : undefined       // Conditionally remove
-     * }
+     * // Model: { linkAttrs: { href: url, target: "_blank", 'aria-disabled': false } }
+     * // HTML: <a data-attr="linkAttrs">
      */
     attr: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "attr", element);
-            const eff = context.reactiveSystem.effect(() => {
-                const value = getProperty(viewModel, path);
-                if (typeof value === "object" && value !== null) {
+            valueEffect(element, viewModel, "attr", path, context, value => {
+                if (typeof value === "object" && value !== null && !Array.isArray(value)) {
                     Object.keys(value).forEach(attrName => {
                         const attrValue = value[attrName];
                         const handler = getAttrHandler(attrValue);
                         handler.apply(element, attrName, attrValue);
                     });
-                } else {
-                    console.warn(`[Stitch.js ${Version}] attr: binding requires an object value. Example: attr: { href: url, target: "_blank" }`);
+                } else if (value !== null && value !== undefined) {
+                    throw bindingError(element, "attr", path,
+                        `the value must be an object of { attributeName: value }, e.g. { href: url, target: "_blank" }; ` +
+                        `got ${describeValue(value)}.`);
                 }
-            }, { batch: true, errorContext: bindingErrorContext(element, "attr", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     },
     /**
      * foreach binding - Keyed list rendering (see foreach-binding-orchestrator.js).
      * One implementation for every list element, <select> included.
-     * Provides $data, $index, $parent context variables.
+     * Provides $data, $index, $parent and $root to the rows.
      */
     foreach: {
         bind(element, viewModel, path, context) {
             if (typeof bindForeach !== "function") {
-                throw new Error(`[Stitch.js ${Version}] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
+                throw new Error(`[Stitch.js v${VERSION}] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
             }
-            return bindForeach(element, viewModel, path, context, validateBinding);
+            return bindForeach(element, viewModel, path, context);
         }
     },
     /**
@@ -372,118 +292,28 @@ const BINDING_HANDLERS = {
      */
     loading: {
         bind(element, viewModel, path, context) {
-            validateBinding(viewModel, path, "loading", element);
-            const eff = context.reactiveSystem.effect(() => {
-                const isLoading = getProperty(viewModel, path);
-                element.disabled = isLoading;
-                element.classList.toggle("loading", isLoading);
+            valueEffect(element, viewModel, "loading", path, context, isLoading => {
+                element.disabled = !!isLoading;
+                element.classList.toggle("loading", !!isLoading);
                 element.setAttribute("aria-busy", isLoading ? "true" : "false");
-            }, { batch: true, errorContext: bindingErrorContext(element, "loading", path) });
-            context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
+            });
         }
     }
 };
 
 /**
- * Lazily resolves extracted binding-scan helpers in CommonJS environments.
- * Browser script usage keeps local implementations for single-file compatibility.
+ * Retrieves a binding handler by name (e.g. 'text' for data-text), or null.
  *
- * @returns {{getBindingHandler: Function, scanCustomAttributes: Function}|null}
- */
-let _externalBindingScanIntegrationAttempted = false;
-let _externalBindingScanIntegration = null;
-function resolveExternalBindingScanIntegration() {
-    if (_externalBindingScanIntegrationAttempted) {
-        return _externalBindingScanIntegration;
-    }
-
-    _externalBindingScanIntegrationAttempted = true;
-    if (typeof module === "undefined" || !module.exports || typeof require !== "function") {
-        return null;
-    }
-
-    try {
-        const bindingScanModule = require("./packages/browser/src/binding-scan-helpers");
-        if (bindingScanModule &&
-            typeof bindingScanModule.getBindingHandler === "function" &&
-            typeof bindingScanModule.scanCustomAttributes === "function") {
-            _externalBindingScanIntegration = bindingScanModule;
-        } else {
-            _externalBindingScanIntegration = null;
-        }
-    } catch (error) {
-        _externalBindingScanIntegration = null;
-    }
-
-    return _externalBindingScanIntegration;
-}
-
-/**
- * Retrieves binding handler from BINDING_HANDLERS registry by type name.
- * 
- * @param {string} type - Binding type (e.g., 'text', 'value', 'click')
- * @returns {BindingHandler|null} Handler with bind() method, or null if not found
- * @example
- * const handler = getBindingHandler('text');
- * // Returns: BINDING_HANDLERS.text
+ * @param {string} type
+ * @returns {BindingHandler|null}
  */
 function getBindingHandler(type) {
-    const external = resolveExternalBindingScanIntegration();
-    if (external) {
-        return external.getBindingHandler(type, BINDING_HANDLERS);
-    }
-    return BINDING_HANDLERS[type] || null;
-}
-
-/**
- * Scans element attributes to find data-* bindings that correspond to registered handlers.
- * Filters out non-binding data-* attributes (like data-template, data-default-text).
- * 
- * @param {HTMLElement} element - Element to scan for binding attributes
- * @returns {Array<Object>} Array of binding objects [{type, path, attributeName}]
- * @example
- * // Single binding
- * // HTML: <div data-text="message"></div>
- * const bindings = scanCustomAttributes(divEl);
- * // Returns: [{ type: 'text', path: 'message', attributeName: 'data-text' }]
- * 
- * @example
- * // Multiple bindings
- * // HTML: <input data-value="count" data-enabled="isActive">
- * const bindings = scanCustomAttributes(inputEl);
- * // Returns: [
- * //   { type: 'value', path: 'count', attributeName: 'data-value' },
- * //   { type: 'enabled', path: 'isActive', attributeName: 'data-enabled' }
- * // ]
- */
-function scanCustomAttributes(element) {
-    const external = resolveExternalBindingScanIntegration();
-    if (external) {
-        return external.scanCustomAttributes(element, BINDING_HANDLERS);
-    }
-    const bindings = [];
-    for (const attr of element.attributes) {
-        if (attr.name.startsWith("data-")) {
-            const type = attr.name.substring(5);
-            const handler = getBindingHandler(type);
-            if (handler) {
-                bindings.push({
-                    type: type,
-                    path: attr.value,
-                    attributeName: attr.name
-                });
-            }
-        }
-    }
-    return bindings;
+    return Object.prototype.hasOwnProperty.call(BINDING_HANDLERS, type) ? BINDING_HANDLERS[type] : null;
 }
 
     return {
-        validateBinding,
         BINDING_HANDLERS,
-        getBindingHandler,
-        scanCustomAttributes,
-        resolveExternalBindingScanIntegration
+        getBindingHandler
     };
 }
 

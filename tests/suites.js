@@ -34,12 +34,13 @@
         { page: "test-foreach-keys.html", title: "Foreach keys", about: "The key rule (id / data-key / plain values, missing and duplicate keys throw) and the one-root rule, on every list path" },
         { page: "test-foreach-lifecycle.html", title: "Foreach lifecycle", about: "Removed rows release their bindings (filter, hide/show, select, replacement, nested); same key + same object reuses the row" },
         { page: "test-reactive-lifecycle.html", title: "Reactive lifecycle", about: "Released effects stop and drop every subscription (computeds included); ReactiveSystem.dispose(); Stitch.debug.stats()" },
+        { page: "test-strict-bindings.html", title: "Strict bindings", about: "Bindings found by selector over registered names; invalid syntax, missing properties and misplaced internal attributes throw; Stitch.onBindReport; registerBinding rules" },
+        { page: "test-handler-paths.html", title: "Handler paths", about: "data-click / data-event handlers: bare name (current row), $parent., $root.; called with (rowItem, event); a miss throws with where it exists" },
         { page: "test-error-routing.html", title: "Error routing", about: "Errors in reactive updates go to Stitch.onError or are re-thrown uncaught; the DOM keeps its last good state; model.on() fires without readers" },
         { page: "test-unbind-memory.html", title: "Unbind", about: "An unbound element stops updating" },
         { page: "test-foreach-context.html", title: "Foreach context", about: "Row context ($index, $parent) does not leak between lists" },
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },
         { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
-        { page: "test-warnings.html", title: "Debug warnings", about: "Debug mode warns about missing properties, missing keys, large selects" },
         { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
         { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" }
     ];

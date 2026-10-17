@@ -384,7 +384,7 @@
                     <strong>event:</strong> Generic event binding for any DOM event<br>
                     <strong>Syntax:</strong> data-event="eventMapProperty"<br>
                     <strong>Multiple Events:</strong> Bind multiple events to same element<br>
-                    <strong>Event Object:</strong> Full access to native DOM event in handlers<br>
+                    <strong>Handler arguments:</strong> (rowItem, event): the current row item (the model outside a list), then the native DOM event<br>
                     <strong>Supported:</strong> change, input, submit, blur, focus, keyup, mouseenter, dblclick, and more!
                 </p>
             </div>
@@ -399,6 +399,8 @@
             username: '',
             usernameStatus: 'Not focused yet',
 
+            // Each handler named here is called as handler(rowItem, event): outside a list the
+            // first argument is the model itself, the second the DOM event.
             usernameEvents: {
                 input: 'onUsernameInput',
                 focus: 'onUsernameFocus',
@@ -435,17 +437,17 @@
                 };
             }),
 
-            onUsernameInput(event) {
+            onUsernameInput(model, event) {
                 this.usernameStatus = 'Typing...';
                 this.logEvent('input', `Username changed to: "${this.username}"`);
             },
 
-            onUsernameFocus(event) {
+            onUsernameFocus(model, event) {
                 this.usernameStatus = 'Focused - typing...';
                 this.logEvent('focus', 'Username field focused');
             },
 
-            onUsernameBlur(event) {
+            onUsernameBlur(model, event) {
                 this.usernameStatus = this.isUsernameValid ? 'Valid ✓' : 'Invalid ✗';
                 this.logEvent('blur', 'Username field lost focus');
             },
@@ -460,7 +462,7 @@
                 reset: 'onFormReset'
             },
 
-            onFormSubmit(event) {
+            onFormSubmit(model, event) {
                 event.preventDefault();
                 this.formSubmitted = true;
                 this.logEvent('submit', `Form submitted with email: ${this.formEmail}`);
@@ -470,7 +472,7 @@
                 }, 3000);
             },
 
-            onFormReset(event) {
+            onFormReset(model, event) {
                 this.formSubmitted = false;
                 this.formEmail = '';
                 this.formPassword = '';
@@ -487,7 +489,7 @@
                 keydown: 'onSearchKeyDown'
             },
 
-            onSearchKeyUp(event) {
+            onSearchKeyUp(model, event) {
                 this.lastKeyPressed = event.key;
 
                 if (event.key === 'Enter') {
@@ -498,7 +500,7 @@
                 }
             },
 
-            onSearchKeyDown(event) {
+            onSearchKeyDown(model, event) {
                 // Example: Ctrl+K shortcut
                 if (event.ctrlKey && event.key === 'k') {
                     event.preventDefault();
@@ -531,7 +533,7 @@
                 return item ? item.name : '';
             }),
 
-            onCategoryChange(event) {
+            onCategoryChange(model, event) {
                 this.selectedItem = '';
 
                 const items = {
@@ -576,18 +578,18 @@
                 };
             }),
 
-            onMouseEnter(event) {
+            onMouseEnter(model, event) {
                 this.isHovering = true;
                 this.hoverCount++;
                 this.logEvent('mouseenter', 'Mouse entered button');
             },
 
-            onMouseLeave(event) {
+            onMouseLeave(model, event) {
                 this.isHovering = false;
                 this.logEvent('mouseleave', 'Mouse left button');
             },
 
-            onDoubleClick(event) {
+            onDoubleClick(model, event) {
                 this.doubleClickCount++;
                 this.logEvent('dblclick', 'Button double-clicked');
             },
@@ -609,7 +611,7 @@
                 return this.commentText.length;
             }),
 
-            onCommentInput(event) {
+            onCommentInput(model, event) {
                 this.commentInputCount++;
 
                 // Enforce max length
@@ -618,17 +620,17 @@
                 }
             },
 
-            onCommentFocus(event) {
+            onCommentFocus(model, event) {
                 this.commentFocusCount++;
                 this.logEvent('focus', 'Comment field focused');
             },
 
-            onCommentBlur(event) {
+            onCommentBlur(model, event) {
                 this.commentBlurCount++;
                 this.logEvent('blur', 'Comment field blurred');
             },
 
-            onCommentKeyUp(event) {
+            onCommentKeyUp(model, event) {
                 // Could add auto-save, word count, etc.
             },
 

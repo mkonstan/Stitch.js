@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js strict binding tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Strict bindings</h1>
+    <p>
+        Stitch reads only its own attributes, found by selector (D24). A binding to a property
+        the model does not have throws, listing what it has (D25). Invalid syntax in a Stitch
+        binding throws, naming the element, the binding, the value and the fix. Other
+        <code>data-*</code> attributes are never read, unless <code>Stitch.onBindReport(fn)</code>
+        is installed: then they are reported as ignored.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'register-binding-rules',
+            'missing-property-throws-for-every-binding',
+            'missing-nested-property-throws',
+            'missing-row-property-throws',
+            'missing-property-on-rerender-goes-to-on-error',
+            'invalid-syntax-throws',
+            'value-shape-errors-throw',
+            'only-registered-attributes-are-read',
+            'bind-report-lists-bound-and-ignored',
+            'internal-attributes-need-their-list',
+            'foreach-and-text-on-one-element-throw',
+            'failed-bind-leaves-nothing-bound',
+            'registered-after-bind-throws'
+        ]);
+
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        function tryBind(host, model) {
+            try {
+                new Stitch.DataBinder().bind(host, model);
+                return null;
+            } catch (error) {
+                return error;
+            }
+        }
+
+        const messageOf = error => error ? String(error.message) : '';
+
+        // Custom bindings are registered before the first bind() on the page.
+        const strictProbeReads = [];
+        let registerErrors = null;
+        function collectRegisterErrors() {
+            const attempt = (name, handler) => {
+                try { Stitch.DataBinder.registerBinding(name, handler); return null; } catch (error) { return error; }
+            };
+            return {
+                ok: attempt('strictprobe', {
+                    bind(element, viewModel, path) { strictProbeReads.push(viewModel[path]); }
+                }),
+                upper: attempt('myBinding', { bind() {} }),
+                builtIn: attempt('text', { bind() {} }),
+                internal: attempt('key', { bind() {} }),
+                twice: attempt('strictprobe', { bind() {} })
+            };
+        }
+        registerErrors = collectRegisterErrors();
+
+        (async () => {
+            await StitchTest.test('register-binding-rules', async (t) => {
+                t.equal(registerErrors.ok, null, 'a lowercase new name registers before any bind()');
+                t.match(messageOf(registerErrors.upper), /lowercase/, 'a name with capitals throws (HTML lowercases attribute names)');
+                t.match(messageOf(registerErrors.builtIn), /already registered.*built-in/, 'registering over a built-in binding throws');
+                t.match(messageOf(registerErrors.internal), /reserved/, 'a name of an internal attribute (data-key) throws');
+                t.match(messageOf(registerErrors.twice), /already registered/, 'registering the same name twice throws');
+            });
+
+            await StitchTest.test('missing-property-throws-for-every-binding', async (t) => {
+                const cases = {
+                    text: '<span data-text="nmae"></span>',
+                    value: '<input data-value="nmae">',
+                    visible: '<span data-visible="nmae"></span>',
+                    enabled: '<button data-enabled="nmae"></button>',
+                    class: '<span data-class="nmae"></span>',
+                    attr: '<span data-attr="nmae"></span>',
+                    foreach: '<ul data-foreach="nmae"><li></li></ul>',
+                    loading: '<button data-loading="nmae"></button>',
+                    event: '<input data-event="nmae">',
+                    strictprobe: '<span data-strictprobe="nmae"></span>'
+                };
+                for (const [binding, html] of Object.entries(cases)) {
+                    const error = tryBind(mount(html), Stitch.Observable.create({ name: 'Ann', age: 7 }));
+                    const message = messageOf(error);
+                    t.ok(error instanceof Error, `data-${binding}: a missing property throws`);
+                    t.match(message, new RegExp(`data-${binding}="nmae"`), `data-${binding}: the error names the binding`);
+                    t.ok(/\bname\b/.test(message) && /\bage\b/.test(message), `data-${binding}: the error lists the model's properties`);
+                }
+                t.deepEqual(strictProbeReads, [], 'the custom binding was never called for the missing property');
+                const later = messageOf(tryBind(mount('<span data-text="addedLater"></span>'), Stitch.Observable.create({ name: 'Ann' })));
+                t.match(later, /Observable\.create\(\)/, 'the error says to declare the property in Observable.create()');
+                t.match(messageOf(tryBind(mount('<span data-text="nmae"></span>'), Stitch.Observable.create({ name: 'Ann' }))),
+                    /Did you mean "name"/, 'a near miss gets a suggestion');
+            });
+
+            await StitchTest.test('missing-nested-property-throws', async (t) => {
+                const error = tryBind(mount('<span data-text="user.nmae"></span>'), Stitch.Observable.create({ user: { name: 'Ann', email: 'a@x' } }));
+                t.match(messageOf(error), /"nmae" is not a property of "user"/, 'the error names the missing name and the object it was looked up on');
+                t.ok(/\bname\b/.test(messageOf(error)) && /\bemail\b/.test(messageOf(error)), 'the error lists that object\'s properties');
+
+                // A null step is a value (nothing to show), not a missing property.
+                const host = mount('<span data-text="selected.name"></span>');
+                const model = Stitch.Observable.create({ selected: null });
+                t.equal(tryBind(host, model), null, 'a path through a null value binds');
+                t.equal(host.textContent, '', 'it shows nothing while the value is null');
+                model.selected = { name: 'Bob' };
+                await tick();
+                t.equal(host.textContent, 'Bob', 'it shows the value once the object arrives');
+            });
+
+            await StitchTest.test('missing-row-property-throws', async (t) => {
+                const error = tryBind(mount('<ul data-foreach="rows"><li data-text="titel"></li></ul>'),
+                    Stitch.Observable.create({ rows: [{ id: 1, title: 'one' }] }));
+                const message = messageOf(error);
+                t.match(message, /data-text="titel"/, 'a missing row property throws, naming the binding');
+                t.match(message, /current row/, 'the error says it was looked up on the current row');
+                t.ok(/\btitle\b/.test(message) && /\$parent\b/.test(message) && /\$root\b/.test(message), 'the error lists the row\'s fields and $parent / $root');
+                const good = mount('<ul data-foreach="rows"><li data-text="$root.label"></li></ul>');
+                t.equal(tryBind(good, Stitch.Observable.create({ label: 'L', rows: [{ id: 1 }] })), null, '$root. paths work in a row');
+                t.equal(good.textContent, 'L', 'and read the root model');
+            });
+
+            await StitchTest.test('missing-property-on-rerender-goes-to-on-error', async (t) => {
+                const host = mount('<span data-text="selected.name"></span>');
+                const model = Stitch.Observable.create({ selected: { name: 'Ann' } });
+                new Stitch.DataBinder().bind(host, model);
+                const calls = [];
+                Stitch.onError(error => calls.push(error));
+                try {
+                    model.selected = { id: 1 };
+                    await tick();
+                } finally {
+                    Stitch.onError(null);
+                }
+                t.equal(calls.length, 1, 'onError was called once');
+                t.match(messageOf(calls[0]), /"name" is not a property of "selected"/, 'with the missing-property error');
+                t.equal(host.textContent, 'Ann', 'the DOM keeps its last good state');
+            });
+
+            await StitchTest.test('invalid-syntax-throws', async (t) => {
+                const model = () => Stitch.Observable.create({ isActive: true, count: 1, done: false, a: 1, b: 2, save() {} });
+                const cases = [
+                    ['<span data-class="{ active: isActive }"></span>', 'data-class', /inline object/],
+                    ['<span data-text="count + 1"></span>', 'data-text', /expression/],
+                    ['<span data-visible="!done"></span>', 'data-visible', /expression/],
+                    ['<span data-text="save()"></span>', 'data-text', /call/],
+                    ['<input data-value="a, visible: b">', 'data-value', /one binding/],
+                    ['<span data-text=""></span>', 'data-text', /empty/],
+                    ['<span data-text="a..b"></span>', 'data-text', /not a property path/],
+                    ['<button data-click="save()"></button>', 'data-click', /call/],
+                    ['<button data-click="$parent.$parent.save"></button>', 'data-click', /only one scope prefix/]
+                ];
+                for (const [html, attribute, fix] of cases) {
+                    const message = messageOf(tryBind(mount(html), model()));
+                    const value = html.match(/="([^"]*)"/)[1];
+                    t.ok(message.includes(`${attribute}="${value}"`), `${html}: the error names the binding and its value`);
+                    t.match(message, /<(span|input|button)/, `${html}: the error names the element`);
+                    t.match(message, fix, `${html}: the error says what is wrong and how to fix it`);
+                }
+            });
+
+            await StitchTest.test('value-shape-errors-throw', async (t) => {
+                const cases = [
+                    ['<span data-text="fn"></span>', { fn() {} }, /is a function/],
+                    ['<input data-event="evts">', { evts: 'click' }, /must be an object/],
+                    ['<input data-event="evts">', { evts: { input: 42 } }, /handler must be a handler name/],
+                    ['<span data-attr="attrs"></span>', { attrs: 'title' }, /must be an object/],
+                    ['<span data-class="cls"></span>', { cls: 42 }, /class string or an object/]
+                ];
+                for (const [html, data, expected] of cases) {
+                    t.match(messageOf(tryBind(mount(html), Stitch.Observable.create(data))), expected, `${html} with ${JSON.stringify(data)} throws`);
+                }
+            });
+
+            await StitchTest.test('only-registered-attributes-are-read', async (t) => {
+                const html = '<span data-text="name" data-txt="name" data-testid="greeting" data-bs-toggle="tooltip" data-id="7" data-other="{ not: a path }"></span>';
+                // Count reads of every element's attribute list while bind() runs.
+                const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'attributes');
+                const originalNames = Element.prototype.getAttributeNames;
+                let listReads = 0;
+                Object.defineProperty(Element.prototype, 'attributes', {
+                    configurable: true,
+                    get() { listReads++; return descriptor.get.call(this); }
+                });
+                Element.prototype.getAttributeNames = function () { listReads++; return originalNames.call(this); };
+                let error;
+                let host;
+                try {
+                    host = mount(html);
+                    error = tryBind(host, Stitch.Observable.create({ name: 'Ann' }));
+                } finally {
+                    Object.defineProperty(Element.prototype, 'attributes', descriptor);
+                    Element.prototype.getAttributeNames = originalNames;
+                }
+                t.equal(error, null, 'other data-* attributes (data-txt, data-testid, data-bs-*, data-id, garbage) do not throw');
+                t.equal(host.textContent, 'Ann', 'the element still binds data-text');
+                t.equal(listReads, 0, 'bind() never lists an element\'s attributes (no report installed)');
+            });
+
+            await StitchTest.test('bind-report-lists-bound-and-ignored', async (t) => {
+                const host = mount(
+                    '<div data-testid="panel"><span id="rp-misspelled" data-txt="name"></span><span data-text="name" data-bs-toggle="tooltip"></span>' +
+                    '<ul data-foreach="rows" data-key="code"><li data-text="code" data-row-extra="x"></li></ul></div>');
+                const reports = [];
+                Stitch.onBindReport(report => reports.push(report));
+                let error;
+                try {
+                    error = tryBind(host, Stitch.Observable.create({ name: 'Ann', rows: [{ code: 'a' }, { code: 'b' }] }));
+                } finally {
+                    Stitch.onBindReport(null);
+                }
+                t.equal(error, null, 'bind() succeeds');
+                t.equal(reports.length, 1, 'the report function was called once');
+                const report = reports[0] || { bound: [], ignored: [] };
+                const names = list => list.map(entry => entry.attribute).sort();
+                t.deepEqual(names(report.ignored), ['data-bs-toggle', 'data-row-extra', 'data-row-extra', 'data-testid', 'data-txt'],
+                    'ignored lists every data-* attribute that is not Stitch\'s (rendered rows included)');
+                t.ok(report.ignored.some(entry => entry.attribute === 'data-txt' && entry.element === document.getElementById('rp-misspelled') && entry.value === 'name'),
+                    'each entry gives the element, the attribute and its value (data-txt is reported, not thrown)');
+                t.deepEqual(names(report.bound), ['data-foreach', 'data-key', 'data-text', 'data-text', 'data-text'],
+                    'bound lists Stitch\'s bindings and internal attributes');
+
+                const after = [];
+                Stitch.onBindReport(report => after.push(report));
+                Stitch.onBindReport(null);
+                tryBind(mount('<span data-txt="x"></span>'), Stitch.Observable.create({}));
+                t.deepEqual(after, [], 'with the report removed, nothing is reported');
+                let thrown = null;
+                try { Stitch.onBindReport('nope'); } catch (e) { thrown = e; }
+                t.match(messageOf(thrown), /onBindReport/, 'onBindReport throws for a non-function');
+            });
+
+            await StitchTest.test('internal-attributes-need-their-list', async (t) => {
+                const model = () => Stitch.Observable.create({ rows: [] });
+                t.match(messageOf(tryBind(mount('<ul data-key="sku"></ul>'), model())), /data-key only works on an element with data-foreach/,
+                    'data-key without data-foreach throws');
+                t.match(messageOf(tryBind(mount('<div data-template="tpl"></div>'), model())), /data-template only works on an element with data-foreach/,
+                    'data-template without data-foreach throws');
+                t.match(messageOf(tryBind(mount('<ul data-foreach="rows" data-default-text="Pick"><li></li></ul>'), model())), /only works on a <select>/,
+                    'data-default-text on a non-select throws');
+                t.match(messageOf(tryBind(mount('<select data-foreach="rows" data-default-value="0"><option></option></select>'), model())), /data-default-text/,
+                    'data-default-value without data-default-text throws');
+            });
+
+            await StitchTest.test('foreach-and-text-on-one-element-throw', async (t) => {
+                const message = messageOf(tryBind(mount('<ul data-foreach="rows" data-text="title"><li></li></ul>'),
+                    Stitch.Observable.create({ title: 'T', rows: [] })));
+                t.match(message, /data-text would replace the list's rows/, 'data-foreach with data-text on one element throws');
+            });
+
+            await StitchTest.test('failed-bind-leaves-nothing-bound', async (t) => {
+                const before = Stitch.debug.stats();
+                const host = mount('<div><span data-text="name"></span><ul data-foreach="rows"><li data-text="name"></li></ul><b data-text="missing"></b></div>');
+                const model = Stitch.Observable.create({ name: 'Ann', rows: [{ id: 1, name: 'r' }] });
+                const error = tryBind(host, model);
+                t.match(messageOf(error), /"missing" is not a property/, 'precondition: the last binding throws');
+                t.deepEqual(Stitch.debug.stats(), before, 'the bindings made before the error were released');
+            });
+
+            await StitchTest.test('registered-after-bind-throws', async (t) => {
+                let thrown = null;
+                try {
+                    Stitch.DataBinder.registerBinding('toolate', { bind() {} });
+                } catch (error) {
+                    thrown = error;
+                }
+                t.match(messageOf(thrown), /after bind\(\)/, 'registerBinding after a bind() throws');
+                t.match(messageOf(thrown), /before the first bind\(\)/, 'the error says to register before the first bind()');
+            });
+        })();
+    </script>
+</body>
+</html>

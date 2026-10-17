@@ -44,7 +44,7 @@ const SETTLE_MS = 300;
 const SELF_TEST_CONCURRENCY = 4;
 const LIBRARY_PATH = /^\/(?:.*\/)?stitch(?:\.min)?\.js$/;
 // The public window.Stitch surface. Changing it is a deliberate API change: update here.
-const PUBLIC_EXPORTS = ["DataBinder", "MessageBus", "Observable", "computed", "debug", "onError", "version"];
+const PUBLIC_EXPORTS = ["DataBinder", "MessageBus", "Observable", "computed", "debug", "onBindReport", "onError", "version"];
 
 const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
