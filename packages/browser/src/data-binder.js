@@ -2,6 +2,7 @@
 
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
+const { runAllThenThrow } = require("../../utils/src/error-hook");
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -53,13 +54,10 @@ class DataBinder {
         this.reactiveSystem = viewModel._factory.reactiveSystem;
 
         // Global onChange hook: subscribe once per root bind and route model change events.
+        // It runs as a model change handler, so an error in it goes to Stitch.onError.
         if (typeof this.hooks.onChange === "function") {
             const onChangeHandler = change => {
-                try {
-                    this.hooks.onChange.call(this, change, viewModel, element);
-                } catch (error) {
-                    console.warn(`[Stitch.js ${Version}] DataBinder onChange hook error:`, error);
-                }
+                this.hooks.onChange.call(this, change, viewModel, element);
             };
             viewModel.on(onChangeHandler);
             this._trackCleanup(element, () => viewModel.off(onChangeHandler));
@@ -146,12 +144,10 @@ class DataBinder {
             });
             this.boundElements.add(element);
 
+            // On the bind() stack an error here throws to the caller; for a row rendered
+            // later it is part of the list's re-render and goes to Stitch.onError.
             if (typeof this.hooks.onBind === "function") {
-                try {
-                    this.hooks.onBind.call(this, element, context, customBindings);
-                } catch (error) {
-                    console.warn(`[Stitch.js ${Version}] DataBinder onBind hook error:`, error);
-                }
+                this.hooks.onBind.call(this, element, context, customBindings);
             }
         }
     }
@@ -246,17 +242,17 @@ class DataBinder {
      * @private
      */
     _unbindTree(root) {
-        this._releaseElement(root);
+        const elements = [root];
         if (typeof root.querySelectorAll === "function" && root.firstElementChild) {
-            const descendants = root.querySelectorAll("*");
-            for (let i = 0; i < descendants.length; i++) {
-                this._releaseElement(descendants[i]);
-            }
+            elements.push(...root.querySelectorAll("*"));
         }
+        // Every cleanup runs, even after one throws; then the first error is thrown.
+        runAllThenThrow(elements.map(element => () => this._releaseElement(element)), { source: "unbind" });
     }
 
     /**
-     * Runs one element's cleanups and forgets the element.
+     * Runs one element's cleanups and forgets the element. Every cleanup runs; the first
+     * error is thrown afterwards.
      * @private
      */
     _releaseElement(element) {
@@ -264,9 +260,7 @@ class DataBinder {
         const cleanups = this._elementCleanups.get(element);
         if (cleanups) {
             this._elementCleanups.delete(element);
-            cleanups.forEach(fn => {
-                try { fn(); } catch (e) { console.error(`[Stitch.js ${Version}] unbind cleanup error:`, e); }
-            });
+            runAllThenThrow(cleanups, { source: "unbind", element });
         }
     }
 
@@ -297,15 +291,14 @@ class DataBinder {
         if (this._disposed) return;
         this._disposed = true;
 
-        // Run all cleanup functions (effects + event listeners)
-        this._elementCleanups.forEach(cleanups => {
-            cleanups.forEach(fn => {
-                try { fn(); } catch(e) { console.warn(`[Stitch.js ${Version}] dispose cleanup error:`, e); }
-            });
-        });
+        // Run all cleanup functions (effects + event listeners); every one runs, then the
+        // first error (if any) is thrown.
+        const cleanups = [];
+        this._elementCleanups.forEach(set => set.forEach(fn => cleanups.push(fn)));
         this._elementCleanups.clear();
         this.boundElements.clear();
         this.reactiveSystem = null;
+        runAllThenThrow(cleanups, { source: "dispose" });
 
         StitchDebug.enabled && StitchDebug.log("bindings", "DataBinder disposed");
     }

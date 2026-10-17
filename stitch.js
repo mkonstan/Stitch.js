@@ -1,13 +1,13 @@
 /*! Stitch.js v2.1.0 | MIT License | https://github.com/user/Stitch.js */
 
-/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":24,"moduleCount":24,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/core/index.js","9":"packages/core/src/batch-scheduler.js","10":"packages/core/src/computed-ref.js","11":"packages/core/src/message-bus.js","12":"packages/core/src/reactive-system.js","13":"packages/utils/index.js","14":"packages/utils/src/attr-value-handlers.js","15":"packages/utils/src/debug-config.js","16":"packages/utils/src/foreach-keys.js","17":"packages/utils/src/foreach-row-context.js","18":"packages/utils/src/reactive-object-helpers.js","19":"packages/utils/src/reactive-stats.js","20":"packages/utils/src/runtime-helpers.js","21":"packages/utils/src/type-converters.js","22":"packages/utils/src/value-binding-helpers.js","23":"packages/utils/src/version.js"}} */
+/*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":25,"moduleCount":25,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/debug-config.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-runtime.js","5":"packages/browser/src/binding-scan-helpers.js","6":"packages/browser/src/data-binder.js","7":"packages/browser/src/foreach-binding-orchestrator.js","8":"packages/core/index.js","9":"packages/core/src/batch-scheduler.js","10":"packages/core/src/computed-ref.js","11":"packages/core/src/message-bus.js","12":"packages/core/src/reactive-system.js","13":"packages/utils/index.js","14":"packages/utils/src/attr-value-handlers.js","15":"packages/utils/src/debug-config.js","16":"packages/utils/src/error-hook.js","17":"packages/utils/src/foreach-keys.js","18":"packages/utils/src/foreach-row-context.js","19":"packages/utils/src/reactive-object-helpers.js","20":"packages/utils/src/reactive-stats.js","21":"packages/utils/src/runtime-helpers.js","22":"packages/utils/src/type-converters.js","23":"packages/utils/src/value-binding-helpers.js","24":"packages/utils/src/version.js"}} */
 
 (function(root){
   var __stitchModuleFactories = Object.create(null);
   __stitchModuleFactories[0] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const { createReactiveFactory } = __stitchRequire(2);
 const { Observable, computed } = __stitchRequire(1);
 
@@ -26,10 +26,10 @@ module.exports = {
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
 const { MessageBus } = __stitchRequire(11);
-const runtimeHelpers = __stitchRequire(20);
-const { defineHidden } = __stitchRequire(18);
+const runtimeHelpers = __stitchRequire(21);
+const { defineHidden } = __stitchRequire(19);
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
@@ -149,7 +149,8 @@ class Observable {
                     previousValue = currentValue;
                 }
             }, {
-                batch: options.batch !== undefined ? options.batch : false  // Immediate by default
+                batch: options.batch !== undefined ? options.batch : false,  // Immediate by default
+                errorContext: { source: "watch", property }
             });
         });
 
@@ -297,11 +298,14 @@ module.exports = {
 
 const { ReactiveSystem } = __stitchRequire(12);
 const { ComputedRef } = __stitchRequire(10);
-const runtimeHelpers = __stitchRequire(20);
-const objectHelpers = __stitchRequire(18);
+const runtimeHelpers = __stitchRequire(21);
+const objectHelpers = __stitchRequire(19);
 const { NOOP_DEBUG } = __stitchRequire(15);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const defineHidden = objectHelpers.defineHidden;
+
+// Debug labels for reactive objects: a counter (a label needs no randomness).
+let nextObjectId = 0;
 
 /**
  * Creates a standardized computed property marker.
@@ -639,7 +643,7 @@ function createReactiveFactory(options = {}) {
             defineHidden(target, "_changeHandlers", new Set);
         }
         if (StitchDebug.enabled && !target.__stitchId) {
-            defineHidden(target, "__stitchId", `obj_${Math.random().toString(36).substr(2, 9)}`);
+            defineHidden(target, "__stitchId", `obj_${++nextObjectId}`);
         }
         attachParent(target, parent, key);
         defineHidden(target, "__isReactive", true);
@@ -1086,18 +1090,19 @@ module.exports = {
   __stitchModuleFactories[3] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const foreachBindingOrchestrator = __stitchRequire(7);
 const bindingScanHelpers = __stitchRequire(5);
 const bindingRuntime = __stitchRequire(4);
 const dataBinderFactory = __stitchRequire(6);
-const runtimeHelpers = __stitchRequire(20);
+const runtimeHelpers = __stitchRequire(21);
 const debugConfig = __stitchRequire(15);
 const attrValueHandlers = __stitchRequire(14);
-const valueBindingHelpers = __stitchRequire(22);
-const typeConverters = __stitchRequire(21);
-const foreachKeys = __stitchRequire(16);
-const foreachRowContext = __stitchRequire(17);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
+const foreachKeys = __stitchRequire(17);
+const foreachRowContext = __stitchRequire(18);
+const errorHook = __stitchRequire(16);
 
 const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
 const stitchDebug = {
@@ -1147,6 +1152,8 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
             getValueValidator,
             createItemContext: foreachRowContext.createItemContext,
             resolveRowKeys: foreachKeys.resolveRowKeys,
+            runAllThenThrow: errorHook.runAllThenThrow,
+            reportError: errorHook.reportError,
             version: `v${VERSION}`,
             doc: typeof document !== "undefined" ? document : null
         });
@@ -1176,7 +1183,7 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(15);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 function createBindingRuntime(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1190,6 +1197,11 @@ function createBindingRuntime(deps = {}) {
     const propertyExists = deps.propertyExists;
     const findSimilarProperty = deps.findSimilarProperty;
     const bindForeach = deps.bindForeach;
+
+/** What onError is told when a binding's update throws: the element and the binding. */
+function bindingErrorContext(element, type, path) {
+    return { source: "binding", element, binding: `data-${type}="${path}"` };
+}
 
 function validateBinding(viewModel, path, bindingType, element) {
     if (!StitchDebug.enabled) return true;
@@ -1249,7 +1261,7 @@ const BINDING_HANDLERS = {
                     console.warn(`[Stitch.js ${Version}] Binding 'text' to a function: "${path}". Did you mean to call it or use a computed property?`);
                 }
                 element.textContent = value != null ? value : "";
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "text", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -1269,7 +1281,7 @@ const BINDING_HANDLERS = {
                 const value = getProperty(viewModel, path);
                 StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
                 handler.modelToView(element, value, viewModel, path);
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "value", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
             const updateModel = () => {
                 const value = handler.viewToModel(element);
@@ -1296,7 +1308,7 @@ const BINDING_HANDLERS = {
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
                 element.style.display = value ? "" : "none";
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "visible", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -1310,7 +1322,7 @@ const BINDING_HANDLERS = {
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
                 element.disabled = !value;
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "enabled", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -1388,7 +1400,7 @@ const BINDING_HANDLERS = {
                         console.warn(`[Stitch.js ${Version}] event: binding handler not found: "${handlerPath}"`);
                     }
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "event", path) });
             context.binder._trackCleanup(element, () => {
                 removeEventListeners();
                 context.reactiveSystem.cleanup(eff);
@@ -1465,7 +1477,7 @@ const BINDING_HANDLERS = {
                     });
                     StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "class", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -1519,7 +1531,7 @@ const BINDING_HANDLERS = {
                 } else {
                     console.warn(`[Stitch.js ${Version}] attr: binding requires an object value. Example: attr: { href: url, target: "_blank" }`);
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "attr", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -1548,7 +1560,7 @@ const BINDING_HANDLERS = {
                 element.disabled = isLoading;
                 element.classList.toggle("loading", isLoading);
                 element.setAttribute("aria-busy", isLoading ? "true" : "false");
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "loading", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     }
@@ -1729,7 +1741,8 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(15);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
+const { runAllThenThrow } = __stitchRequire(16);
 
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
@@ -1781,13 +1794,10 @@ class DataBinder {
         this.reactiveSystem = viewModel._factory.reactiveSystem;
 
         // Global onChange hook: subscribe once per root bind and route model change events.
+        // It runs as a model change handler, so an error in it goes to Stitch.onError.
         if (typeof this.hooks.onChange === "function") {
             const onChangeHandler = change => {
-                try {
-                    this.hooks.onChange.call(this, change, viewModel, element);
-                } catch (error) {
-                    console.warn(`[Stitch.js ${Version}] DataBinder onChange hook error:`, error);
-                }
+                this.hooks.onChange.call(this, change, viewModel, element);
             };
             viewModel.on(onChangeHandler);
             this._trackCleanup(element, () => viewModel.off(onChangeHandler));
@@ -1874,12 +1884,10 @@ class DataBinder {
             });
             this.boundElements.add(element);
 
+            // On the bind() stack an error here throws to the caller; for a row rendered
+            // later it is part of the list's re-render and goes to Stitch.onError.
             if (typeof this.hooks.onBind === "function") {
-                try {
-                    this.hooks.onBind.call(this, element, context, customBindings);
-                } catch (error) {
-                    console.warn(`[Stitch.js ${Version}] DataBinder onBind hook error:`, error);
-                }
+                this.hooks.onBind.call(this, element, context, customBindings);
             }
         }
     }
@@ -1974,17 +1982,17 @@ class DataBinder {
      * @private
      */
     _unbindTree(root) {
-        this._releaseElement(root);
+        const elements = [root];
         if (typeof root.querySelectorAll === "function" && root.firstElementChild) {
-            const descendants = root.querySelectorAll("*");
-            for (let i = 0; i < descendants.length; i++) {
-                this._releaseElement(descendants[i]);
-            }
+            elements.push(...root.querySelectorAll("*"));
         }
+        // Every cleanup runs, even after one throws; then the first error is thrown.
+        runAllThenThrow(elements.map(element => () => this._releaseElement(element)), { source: "unbind" });
     }
 
     /**
-     * Runs one element's cleanups and forgets the element.
+     * Runs one element's cleanups and forgets the element. Every cleanup runs; the first
+     * error is thrown afterwards.
      * @private
      */
     _releaseElement(element) {
@@ -1992,9 +2000,7 @@ class DataBinder {
         const cleanups = this._elementCleanups.get(element);
         if (cleanups) {
             this._elementCleanups.delete(element);
-            cleanups.forEach(fn => {
-                try { fn(); } catch (e) { console.error(`[Stitch.js ${Version}] unbind cleanup error:`, e); }
-            });
+            runAllThenThrow(cleanups, { source: "unbind", element });
         }
     }
 
@@ -2025,15 +2031,14 @@ class DataBinder {
         if (this._disposed) return;
         this._disposed = true;
 
-        // Run all cleanup functions (effects + event listeners)
-        this._elementCleanups.forEach(cleanups => {
-            cleanups.forEach(fn => {
-                try { fn(); } catch(e) { console.warn(`[Stitch.js ${Version}] dispose cleanup error:`, e); }
-            });
-        });
+        // Run all cleanup functions (effects + event listeners); every one runs, then the
+        // first error (if any) is thrown.
+        const cleanups = [];
+        this._elementCleanups.forEach(set => set.forEach(fn => cleanups.push(fn)));
         this._elementCleanups.clear();
         this.boundElements.clear();
         this.reactiveSystem = null;
+        runAllThenThrow(cleanups, { source: "dispose" });
 
         StitchDebug.enabled && StitchDebug.log("bindings", "DataBinder disposed");
     }
@@ -2264,16 +2269,30 @@ function bindForeach(element, viewModel, path, context, deps) {
             // their own effects, not to the list (a row change must not re-render the list).
             reactiveSystem.untracked(() => binder._bindElement(el, itemContext, []));
         } catch (error) {
-            binder._unbindTree(el);
+            releaseAfterFailure(el);
             throw error;
         }
         return row;
     }
 
+    // Releases rows built by a render that is failing. The render's own error is the one
+    // thrown; a cleanup error on the way is reported separately, not lost.
+    function releaseAfterFailure(el) {
+        try {
+            binder._unbindTree(el);
+        } catch (cleanupError) {
+            deps.reportError(cleanupError, { source: "unbind", element: el });
+        }
+    }
+
     function releaseRow(row) {
-        binder._unbindTree(row.el);
-        if (row.el.parentNode === element) {
-            element.removeChild(row.el);
+        try {
+            binder._unbindTree(row.el);
+        } finally {
+            // Even if a cleanup threw, the row leaves the list.
+            if (row.el.parentNode === element) {
+                element.removeChild(row.el);
+            }
         }
     }
 
@@ -2315,16 +2334,24 @@ function bindForeach(element, viewModel, path, context, deps) {
                 next.set(keys[index], row);
             }
         } catch (error) {
-            created.forEach(row => binder._unbindTree(row.el));
+            created.forEach(row => releaseAfterFailure(row.el));
             throw error;
         }
 
-        // 3. Release every old row that is not reused (key gone, or a new object).
+        // 3. Release every old row that is not reused (key gone, or a new object). A cleanup
+        //    that throws does not stop the render; its error is thrown once the list is done.
+        const releases = [];
         rows.forEach((row, key) => {
             if (next.get(key) !== row) {
-                releaseRow(row);
+                releases.push(() => releaseRow(row));
             }
         });
+        let releaseError = null;
+        try {
+            deps.runAllThenThrow(releases, { source: "binding", element, binding: `data-foreach="${path}"` });
+        } catch (error) {
+            releaseError = { error };
+        }
 
         // 4. Put rows in order after the placeholder (if any).
         let cursor = placeholder ? placeholder.nextSibling : element.firstChild;
@@ -2341,6 +2368,9 @@ function bindForeach(element, viewModel, path, context, deps) {
             ordered[index].setIndex(index);
         }
         rows = next;
+        if (releaseError) {
+            throw releaseError.error;
+        }
     }
 
     function restoreSelectValue() {
@@ -2371,7 +2401,7 @@ function bindForeach(element, viewModel, path, context, deps) {
             if (isSelect) {
                 restoreSelectValue();
             }
-        }, { batch: true });
+        }, { batch: true, errorContext: { source: "binding", element, binding: `data-foreach="${path}"` } });
     } catch (error) {
         // The first render threw (effect() has released the effect, and reconcile has
         // released any rows it built): restore the element as it was before bind().
@@ -2384,8 +2414,10 @@ function bindForeach(element, viewModel, path, context, deps) {
 
     binder._trackCleanup(element, () => {
         reactiveSystem.cleanup(effect);
-        rows.forEach(row => binder._unbindTree(row.el));
+        const released = rows;
         rows = new Map();
+        deps.runAllThenThrow(Array.from(released.values(), row => () => binder._unbindTree(row.el)),
+            { source: "unbind", element });
     });
     return effect;
 }
@@ -2415,7 +2447,7 @@ module.exports = {
   __stitchModuleFactories[8] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 const { MessageBus } = __stitchRequire(11);
 const { BatchScheduler } = __stitchRequire(9);
 const { ComputedRef } = __stitchRequire(10);
@@ -2435,12 +2467,25 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(15);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
+const { reportError } = __stitchRequire(16);
+
+/** Runs a queued effect; an error goes to Stitch.onError (a flush is on no caller's stack). */
+function runReportingErrors(effect) {
+    try {
+        effect();
+    } catch (error) {
+        reportError(error, effect.options && effect.options.errorContext
+            ? effect.options.errorContext
+            : { source: "effect" });
+    }
+}
 
 class BatchScheduler {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
+        this._runEffect = options.runEffect || runReportingErrors;
         this._pendingEffects = new Set();
         this.flushing = false;
         this.flushScheduled = false;
@@ -2469,13 +2514,16 @@ class BatchScheduler {
         if (this.flushing) return;
 
         if (this.flushDepth >= this.MAX_FLUSH_DEPTH) {
-            console.error(
-                `[Stitch.js ${this.version} BatchScheduler] Maximum flush depth exceeded.\n` +
-                "Possible infinite loop detected. Queue cleared."
-            );
+            const dropped = this._pendingEffects.size;
             this._pendingEffects.clear();
             this.flushDepth = 0;
             this.flushScheduled = false;
+            reportError(new Error(
+                `[Stitch.js ${this.version}] Stopped an infinite loop of updates: effects kept re-queuing each other ` +
+                `for ${this.MAX_FLUSH_DEPTH} rounds (${dropped} still queued were dropped). An effect, computed or ` +
+                "binding probably writes a value that it, or something it triggers, reads. Move the write out of " +
+                "the effect, or guard it so the value stops changing."
+            ), { source: "scheduler" });
             return;
         }
 
@@ -2489,11 +2537,7 @@ class BatchScheduler {
         this._pendingEffects.clear();
 
         effectsToRun.forEach((effect) => {
-            try {
-                effect();
-            } catch (error) {
-                console.error(`[Stitch.js ${this.version} BatchScheduler] Error in effect:`, error);
-            }
+            this._runEffect(effect);
         });
 
         this.debug.enabled && this.debug.groupEnd("effects");
@@ -2535,6 +2579,9 @@ module.exports = {
 // (ReactiveSystem.cleanup) removes it from every computed it read.
 const COMPUTED_VALUE_KEY = "value";
 
+// Ids are labels only: a counter (a label needs no randomness).
+let nextComputedId = 0;
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -2543,9 +2590,11 @@ class ComputedRef {
         this.explicitDeps = explicitDeps;
         this.value = undefined;
         this.dirty = true;
+        // True after an evaluation threw (the computed stays dirty, see markDirty).
+        this.failed = false;
         this.deps = new Set();
         this._generation = reactiveSystem._generation;
-        this.id = Math.random().toString(36).substr(2, 9);
+        this.id = ++nextComputedId;
         this.isComputedRef = true;
 
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
@@ -2555,9 +2604,12 @@ class ComputedRef {
     }
 
     markDirty() {
-        if (this.dirty) {
+        // Already dirty: readers were told. Except after a failed evaluation: then the
+        // readers that saw the error must hear about the change that may fix it.
+        if (this.dirty && !this.failed) {
             return;
         }
+        this.failed = false;
 
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
@@ -2599,8 +2651,14 @@ class ComputedRef {
                 }
             }
 
-            this.value = this.getter.call(this.context);
+            try {
+                this.value = this.getter.call(this.context);
+            } catch (error) {
+                this.failed = true;
+                throw error;
+            }
             this.dirty = false;
+            this.failed = false;
 
             this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
                 value: this.value,
@@ -2643,7 +2701,8 @@ module.exports = {
 "use strict";
 
 const { NOOP_DEBUG } = __stitchRequire(15);
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
+const { reportError } = __stitchRequire(16);
 
 class MessageBus {
     constructor(options = {}) {
@@ -2701,12 +2760,14 @@ class MessageBus {
     flush() {
         if (this.isFlushing || this.queue.length === 0) return;
         if (this.flushDepth >= this.MAX_FLUSH_DEPTH) {
-            console.error(
-                `[Stitch.js ${this.version} MessageBus] Maximum flush depth (${this.MAX_FLUSH_DEPTH}) exceeded.\n` +
-                "Possible infinite loop detected. Event queue has been cleared."
-            );
+            const dropped = this.queue.map((e) => e.event);
             this.flushDepth = 0;
             this.queue = [];
+            reportError(new Error(
+                `[Stitch.js ${this.version}] MessageBus stopped an infinite loop: events kept publishing each other for ` +
+                `${this.MAX_FLUSH_DEPTH} rounds; the queued events were dropped (${dropped.join(", ")}). ` +
+                "A subscriber probably publishes an event that leads back to itself."
+            ), { source: "messageBus", event: dropped[0] });
             return;
         }
 
@@ -2727,9 +2788,6 @@ class MessageBus {
                 "messageBus",
                 `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
             );
-            if (this.flushDepth > 5) {
-                console.warn(`[Stitch.js ${this.version} MessageBus] Flush depth > 5. Queued events:`, this.queue.map((e) => e.event).join(", "));
-            }
             Promise.resolve().then(() => this.flush());
         } else {
             this.flushDepth = 0;
@@ -2739,7 +2797,13 @@ class MessageBus {
     _executeEvent(eventData) {
         let processedData = eventData;
         for (const middlewareFn of this.middleware) {
-            processedData = middlewareFn(processedData) || processedData;
+            try {
+                processedData = middlewareFn(processedData) || processedData;
+            } catch (error) {
+                // A failing middleware drops this one event; the bus keeps working.
+                reportError(error, { source: "messageBus", event: eventData.event, middleware: true });
+                return;
+            }
         }
 
         const event = processedData.event;
@@ -2756,7 +2820,8 @@ class MessageBus {
                 try {
                     callback(payload);
                 } catch (error) {
-                    console.error(`[Stitch.js ${this.version} MessageBus] Error in subscriber for event "${event}":`, error);
+                    // A subscriber error must not stop delivery to the other subscribers.
+                    reportError(error, { source: "messageBus", event });
                 }
             });
         }
@@ -2767,7 +2832,7 @@ class MessageBus {
                 try {
                     callback({ event, payload });
                 } catch (error) {
-                    console.error(`[Stitch.js ${this.version} MessageBus] Error in wildcard subscriber:`, error);
+                    reportError(error, { source: "messageBus", event, wildcard: true });
                 }
             });
         }
@@ -2793,8 +2858,30 @@ module.exports = {
 
 const { MessageBus, NOOP_DEBUG } = __stitchRequire(11);
 const { BatchScheduler } = __stitchRequire(9);
-const { VERSION } = __stitchRequire(23);
-const { REACTIVE_TOTALS } = __stitchRequire(19);
+const { VERSION } = __stitchRequire(24);
+const { REACTIVE_TOTALS } = __stitchRequire(20);
+const { reportError } = __stitchRequire(16);
+
+// Effect ids: a counter (an id is only a label; it needs no randomness).
+let nextEffectId = 0;
+
+/**
+ * Calls every change handler of target (model.on()). A handler that throws goes to
+ * Stitch.onError; it does not stop the other handlers or the write that caused the change.
+ */
+function notifyChangeHandlers(target, change) {
+    const handlers = target && target._changeHandlers;
+    if (!handlers || handlers.size === 0) {
+        return;
+    }
+    Array.from(handlers).forEach((handler) => {
+        try {
+            handler(change);
+        } catch (error) {
+            reportError(error, { source: "change-handler", field: change.field, target });
+        }
+    });
+}
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
@@ -2814,7 +2901,8 @@ class ReactiveSystem {
 
         this.batchScheduler = new BatchSchedulerCtor({
             version: this.version,
-            debug: this.debug
+            debug: this.debug,
+            runEffect: (effect) => this._rerun(effect)
         });
         this.messageBus = new MessageBusCtor({
             version: this.version,
@@ -2827,17 +2915,13 @@ class ReactiveSystem {
             const fullPath = payload.fullPath;
             const oldValue = payload.oldValue;
             const newValue = payload.newValue;
-            if (parent._changeHandlers && parent._changeHandlers.size > 0) {
-                parent._changeHandlers.forEach((handler) => {
-                    handler({
-                        field: fullPath,
-                        oldValue,
-                        newValue,
-                        target: parent,
-                        nestedChange: true
-                    });
-                });
-            }
+            notifyChangeHandlers(parent, {
+                field: fullPath,
+                oldValue,
+                newValue,
+                target: parent,
+                nestedChange: true
+            });
         });
 
         this.messageBus.subscribe("array-mutation", (payload) => {
@@ -2847,16 +2931,12 @@ class ReactiveSystem {
             const oldLength = payload.oldLength;
             const newLength = payload.newLength;
 
-            if (target._changeHandlers) {
-                target._changeHandlers.forEach((handler) => {
-                    handler({
-                        field: "items",
-                        action: method,
-                        args,
-                        target
-                    });
-                });
-            }
+            notifyChangeHandlers(target, {
+                field: "items",
+                action: method,
+                args,
+                target
+            });
 
             if (this.bubbleChangeUp) {
                 this.bubbleChangeUp(target, "items", oldLength, newLength);
@@ -2914,39 +2994,50 @@ class ReactiveSystem {
         const deps = this.depsMap.get(target);
         const dep = deps?.get(key);
 
-        if (!dep || dep.size === 0) {
-            this.debug.enabled && this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
-            return;
+        if (dep && dep.size > 0) {
+            this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+                oldValue,
+                newValue
+            });
+
+            const effectsToRun = new Set(dep);
+            effectsToRun.forEach((dependent) => {
+                if (dependent.disposed) {
+                    return;
+                }
+                if (dependent.isComputedRef) {
+                    dependent.markDirty();
+                } else if (dependent.options && dependent.options.batch) {
+                    this.batchScheduler.queue(dependent);
+                } else {
+                    this._rerun(dependent);
+                }
+            });
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+        // Change handlers (model.on()) fire for every write, whether or not anything
+        // reactive reads the property.
+        notifyChangeHandlers(target, {
+            field: key,
             oldValue,
-            newValue
+            newValue,
+            target
         });
+    }
 
-        const effectsToRun = new Set(dep);
-        effectsToRun.forEach((dependent) => {
-            if (dependent.disposed) {
-                return;
-            }
-            if (dependent.isComputedRef) {
-                dependent.markDirty();
-            } else if (dependent.options && dependent.options.batch) {
-                this.batchScheduler.queue(dependent);
-            } else {
-                dependent();
-            }
-        });
-
-        if (target._changeHandlers) {
-            target._changeHandlers.forEach((handler) => {
-                handler({
-                    field: key,
-                    oldValue,
-                    newValue,
-                    target
-                });
-            });
+    /**
+     * Re-runs an effect because something it read changed. This is never on the stack of
+     * the code that created the effect, so an error goes to Stitch.onError (or is re-thrown
+     * uncaught) instead of breaking the write that triggered it.
+     * @private
+     */
+    _rerun(effect) {
+        try {
+            effect();
+        } catch (error) {
+            reportError(error, effect.options && effect.options.errorContext
+                ? effect.options.errorContext
+                : { source: "effect" });
         }
     }
 
@@ -2959,7 +3050,7 @@ class ReactiveSystem {
         if (this.disposed) {
             throw new Error(`[Stitch.js ${this.version}] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
         }
-        const effectId = Math.random().toString(36).substr(2, 9);
+        const effectId = ++nextEffectId;
 
         const effect = () => {
             if (effect.disposed || this.disposed) {
@@ -3127,16 +3218,17 @@ module.exports = {
   __stitchModuleFactories[13] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
-const helpers = __stitchRequire(20);
+const { VERSION } = __stitchRequire(24);
+const helpers = __stitchRequire(21);
 const debugConfig = __stitchRequire(15);
 const attrValueHandlers = __stitchRequire(14);
-const valueBindingHelpers = __stitchRequire(22);
-const typeConverters = __stitchRequire(21);
-const foreachKeys = __stitchRequire(16);
-const foreachRowContext = __stitchRequire(17);
-const reactiveObjectHelpers = __stitchRequire(18);
-const { readReactiveStats } = __stitchRequire(19);
+const valueBindingHelpers = __stitchRequire(23);
+const typeConverters = __stitchRequire(22);
+const foreachKeys = __stitchRequire(17);
+const foreachRowContext = __stitchRequire(18);
+const reactiveObjectHelpers = __stitchRequire(19);
+const { readReactiveStats } = __stitchRequire(20);
+const errorHook = __stitchRequire(16);
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -3179,6 +3271,7 @@ const debug = {
 
 module.exports = {
     debug,
+    onError: errorHook.onError,
     version: VERSION,
     ...helpers,
     ...debugConfig,
@@ -3379,6 +3472,94 @@ module.exports = {
   __stitchModuleFactories[16] = function(module, exports, __stitchRequire){
 "use strict";
 
+const { VERSION } = __stitchRequire(24);
+
+/**
+ * Where errors raised inside reactive updates go (D23).
+ *
+ * An effect re-run, a list re-render, a change handler or a MessageBus subscriber runs
+ * outside the caller's stack, so its error cannot be thrown to anyone. It is passed to
+ * the handler installed with Stitch.onError(fn) as fn(error, context). With no handler
+ * it is re-thrown uncaught on a fresh task, so it reaches window.onerror and the console
+ * like any other uncaught error. A handler that throws has its own error re-thrown the
+ * same way. Errors on the synchronous bind() stack are thrown to the caller instead.
+ */
+let errorHandler = null;
+
+/**
+ * Installs the one page-wide handler for errors raised inside reactive updates;
+ * null removes it.
+ * @param {Function|null} fn - called as fn(error, context)
+ */
+function onError(fn) {
+    if (fn !== null && typeof fn !== "function") {
+        throw new TypeError(
+            `[Stitch.js v${VERSION}] Stitch.onError(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`
+        );
+    }
+    errorHandler = fn;
+}
+
+function rethrowUncaught(error) {
+    setTimeout(() => {
+        throw error;
+    }, 0);
+}
+
+/**
+ * Hands an error raised inside a reactive update to Stitch.onError, or re-throws it
+ * uncaught when no handler is installed.
+ * @param {*} error
+ * @param {Object} [context] - what was running: { source, element?, binding?, event?, field? }
+ */
+function reportError(error, context) {
+    const handler = errorHandler;
+    if (!handler) {
+        rethrowUncaught(error);
+        return;
+    }
+    try {
+        handler(error, context || { source: "unknown" });
+    } catch (handlerError) {
+        rethrowUncaught(handlerError);
+    }
+}
+
+/**
+ * Runs every function, even when one throws, then throws the first error (if any).
+ * Any further errors go to reportError, so none is lost.
+ * Used where several independent cleanups must all run.
+ * @param {Iterable<Function>} fns
+ * @param {Object} [context] - passed to reportError for the second and later errors
+ */
+function runAllThenThrow(fns, context) {
+    let first = null;
+    for (const fn of fns) {
+        try {
+            fn();
+        } catch (error) {
+            if (first === null) {
+                first = { error };
+            } else {
+                reportError(error, context);
+            }
+        }
+    }
+    if (first !== null) {
+        throw first.error;
+    }
+}
+
+module.exports = {
+    onError,
+    reportError,
+    runAllThenThrow
+};
+
+  };
+  __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
+"use strict";
+
 /**
  * THE key rule for list rows. Every foreach path (inline template, data-template,
  * <select> options, lists that come and go) resolves row keys here and nowhere else.
@@ -3503,7 +3684,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[17] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3540,7 +3721,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[18] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
 "use strict";
 
 function defineHidden(target, name, value) {
@@ -3587,7 +3768,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[19] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -3617,10 +3798,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[20] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION } = __stitchRequire(23);
+const { VERSION } = __stitchRequire(24);
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -3760,10 +3941,10 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[21] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
 "use strict";
 
-const { VERSION: DEFAULT_VERSION } = __stitchRequire(23);
+const { VERSION: DEFAULT_VERSION } = __stitchRequire(24);
 
 /**
  * Builds the type converter registry with Stitch-compatible behavior.
@@ -3976,7 +4157,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[22] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
 "use strict";
 
 /**
@@ -4203,7 +4384,7 @@ module.exports = {
 };
 
   };
-  __stitchModuleFactories[23] = function(module, exports, __stitchRequire){
+  __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
 module.exports = { VERSION: "2.1.0" };
@@ -4267,7 +4448,8 @@ module.exports = { VERSION: "2.1.0" };
         MessageBus,
         computed,
         version,
-        debug
+        debug,
+        onError: utils.onError
     };
 
     if (typeof window !== "undefined") {

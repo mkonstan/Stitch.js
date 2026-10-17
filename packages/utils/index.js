@@ -10,6 +10,7 @@ const foreachKeys = require("./src/foreach-keys");
 const foreachRowContext = require("./src/foreach-row-context");
 const reactiveObjectHelpers = require("./src/reactive-object-helpers");
 const { readReactiveStats } = require("./src/reactive-stats");
+const errorHook = require("./src/error-hook");
 
 const debugState = debugConfig.createDebugState(`v${VERSION}`);
 const debug = {
@@ -52,6 +53,7 @@ const debug = {
 
 module.exports = {
     debug,
+    onError: errorHook.onError,
     version: VERSION,
     ...helpers,
     ...debugConfig,

@@ -2,6 +2,7 @@
 
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
+const { reportError } = require("../../utils/src/error-hook");
 
 class MessageBus {
     constructor(options = {}) {
@@ -59,12 +60,14 @@ class MessageBus {
     flush() {
         if (this.isFlushing || this.queue.length === 0) return;
         if (this.flushDepth >= this.MAX_FLUSH_DEPTH) {
-            console.error(
-                `[Stitch.js ${this.version} MessageBus] Maximum flush depth (${this.MAX_FLUSH_DEPTH}) exceeded.\n` +
-                "Possible infinite loop detected. Event queue has been cleared."
-            );
+            const dropped = this.queue.map((e) => e.event);
             this.flushDepth = 0;
             this.queue = [];
+            reportError(new Error(
+                `[Stitch.js ${this.version}] MessageBus stopped an infinite loop: events kept publishing each other for ` +
+                `${this.MAX_FLUSH_DEPTH} rounds; the queued events were dropped (${dropped.join(", ")}). ` +
+                "A subscriber probably publishes an event that leads back to itself."
+            ), { source: "messageBus", event: dropped[0] });
             return;
         }
 
@@ -85,9 +88,6 @@ class MessageBus {
                 "messageBus",
                 `New events queued during flush (${this.queue.length}), scheduling next flush (depth: ${this.flushDepth})`
             );
-            if (this.flushDepth > 5) {
-                console.warn(`[Stitch.js ${this.version} MessageBus] Flush depth > 5. Queued events:`, this.queue.map((e) => e.event).join(", "));
-            }
             Promise.resolve().then(() => this.flush());
         } else {
             this.flushDepth = 0;
@@ -97,7 +97,13 @@ class MessageBus {
     _executeEvent(eventData) {
         let processedData = eventData;
         for (const middlewareFn of this.middleware) {
-            processedData = middlewareFn(processedData) || processedData;
+            try {
+                processedData = middlewareFn(processedData) || processedData;
+            } catch (error) {
+                // A failing middleware drops this one event; the bus keeps working.
+                reportError(error, { source: "messageBus", event: eventData.event, middleware: true });
+                return;
+            }
         }
 
         const event = processedData.event;
@@ -114,7 +120,8 @@ class MessageBus {
                 try {
                     callback(payload);
                 } catch (error) {
-                    console.error(`[Stitch.js ${this.version} MessageBus] Error in subscriber for event "${event}":`, error);
+                    // A subscriber error must not stop delivery to the other subscribers.
+                    reportError(error, { source: "messageBus", event });
                 }
             });
         }
@@ -125,7 +132,7 @@ class MessageBus {
                 try {
                     callback({ event, payload });
                 } catch (error) {
-                    console.error(`[Stitch.js ${this.version} MessageBus] Error in wildcard subscriber:`, error);
+                    reportError(error, { source: "messageBus", event, wildcard: true });
                 }
             });
         }

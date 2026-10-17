@@ -125,7 +125,8 @@ class Observable {
                     previousValue = currentValue;
                 }
             }, {
-                batch: options.batch !== undefined ? options.batch : false  // Immediate by default
+                batch: options.batch !== undefined ? options.batch : false,  // Immediate by default
+                errorContext: { source: "watch", property }
             });
         });
 

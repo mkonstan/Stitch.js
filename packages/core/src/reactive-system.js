@@ -4,6 +4,28 @@ const { MessageBus, NOOP_DEBUG } = require("./message-bus");
 const { BatchScheduler } = require("./batch-scheduler");
 const { VERSION } = require("../../utils/src/version");
 const { REACTIVE_TOTALS } = require("../../utils/src/reactive-stats");
+const { reportError } = require("../../utils/src/error-hook");
+
+// Effect ids: a counter (an id is only a label; it needs no randomness).
+let nextEffectId = 0;
+
+/**
+ * Calls every change handler of target (model.on()). A handler that throws goes to
+ * Stitch.onError; it does not stop the other handlers or the write that caused the change.
+ */
+function notifyChangeHandlers(target, change) {
+    const handlers = target && target._changeHandlers;
+    if (!handlers || handlers.size === 0) {
+        return;
+    }
+    Array.from(handlers).forEach((handler) => {
+        try {
+            handler(change);
+        } catch (error) {
+            reportError(error, { source: "change-handler", field: change.field, target });
+        }
+    });
+}
 
 class ReactiveSystem {
     constructor(bubbleChangeUp = null, options = {}) {
@@ -23,7 +45,8 @@ class ReactiveSystem {
 
         this.batchScheduler = new BatchSchedulerCtor({
             version: this.version,
-            debug: this.debug
+            debug: this.debug,
+            runEffect: (effect) => this._rerun(effect)
         });
         this.messageBus = new MessageBusCtor({
             version: this.version,
@@ -36,17 +59,13 @@ class ReactiveSystem {
             const fullPath = payload.fullPath;
             const oldValue = payload.oldValue;
             const newValue = payload.newValue;
-            if (parent._changeHandlers && parent._changeHandlers.size > 0) {
-                parent._changeHandlers.forEach((handler) => {
-                    handler({
-                        field: fullPath,
-                        oldValue,
-                        newValue,
-                        target: parent,
-                        nestedChange: true
-                    });
-                });
-            }
+            notifyChangeHandlers(parent, {
+                field: fullPath,
+                oldValue,
+                newValue,
+                target: parent,
+                nestedChange: true
+            });
         });
 
         this.messageBus.subscribe("array-mutation", (payload) => {
@@ -56,16 +75,12 @@ class ReactiveSystem {
             const oldLength = payload.oldLength;
             const newLength = payload.newLength;
 
-            if (target._changeHandlers) {
-                target._changeHandlers.forEach((handler) => {
-                    handler({
-                        field: "items",
-                        action: method,
-                        args,
-                        target
-                    });
-                });
-            }
+            notifyChangeHandlers(target, {
+                field: "items",
+                action: method,
+                args,
+                target
+            });
 
             if (this.bubbleChangeUp) {
                 this.bubbleChangeUp(target, "items", oldLength, newLength);
@@ -123,39 +138,50 @@ class ReactiveSystem {
         const deps = this.depsMap.get(target);
         const dep = deps?.get(key);
 
-        if (!dep || dep.size === 0) {
-            this.debug.enabled && this.debug.log("reactivity", `TRIGGER SKIPPED (no deps): ${this._getObjectId(target)}.${String(key)}`);
-            return;
+        if (dep && dep.size > 0) {
+            this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+                oldValue,
+                newValue
+            });
+
+            const effectsToRun = new Set(dep);
+            effectsToRun.forEach((dependent) => {
+                if (dependent.disposed) {
+                    return;
+                }
+                if (dependent.isComputedRef) {
+                    dependent.markDirty();
+                } else if (dependent.options && dependent.options.batch) {
+                    this.batchScheduler.queue(dependent);
+                } else {
+                    this._rerun(dependent);
+                }
+            });
         }
 
-        this.debug.enabled && this.debug.log("reactivity", `TRIGGER: ${this._getObjectId(target)}.${String(key)} (${dep.size} dependents)`, {
+        // Change handlers (model.on()) fire for every write, whether or not anything
+        // reactive reads the property.
+        notifyChangeHandlers(target, {
+            field: key,
             oldValue,
-            newValue
+            newValue,
+            target
         });
+    }
 
-        const effectsToRun = new Set(dep);
-        effectsToRun.forEach((dependent) => {
-            if (dependent.disposed) {
-                return;
-            }
-            if (dependent.isComputedRef) {
-                dependent.markDirty();
-            } else if (dependent.options && dependent.options.batch) {
-                this.batchScheduler.queue(dependent);
-            } else {
-                dependent();
-            }
-        });
-
-        if (target._changeHandlers) {
-            target._changeHandlers.forEach((handler) => {
-                handler({
-                    field: key,
-                    oldValue,
-                    newValue,
-                    target
-                });
-            });
+    /**
+     * Re-runs an effect because something it read changed. This is never on the stack of
+     * the code that created the effect, so an error goes to Stitch.onError (or is re-thrown
+     * uncaught) instead of breaking the write that triggered it.
+     * @private
+     */
+    _rerun(effect) {
+        try {
+            effect();
+        } catch (error) {
+            reportError(error, effect.options && effect.options.errorContext
+                ? effect.options.errorContext
+                : { source: "effect" });
         }
     }
 
@@ -168,7 +194,7 @@ class ReactiveSystem {
         if (this.disposed) {
             throw new Error(`[Stitch.js ${this.version}] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
         }
-        const effectId = Math.random().toString(36).substr(2, 9);
+        const effectId = ++nextEffectId;
 
         const effect = () => {
             if (effect.disposed || this.disposed) {

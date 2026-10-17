@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js error routing tests</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Error routing</h1>
+    <p>
+        An error inside a reactive update (an effect re-run, a list re-render, a change handler,
+        a MessageBus subscriber) is not on the caller's stack. It goes to
+        <code>Stitch.onError(fn)</code>; with no handler it is re-thrown uncaught, so it reaches
+        <code>window.onerror</code>. The DOM keeps its last good state. Errors on the synchronous
+        <code>bind()</code> stack still throw to the caller.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'effect-error-goes-to-on-error',
+            'no-handler-rethrows-uncaught',
+            'list-rerender-error-keeps-the-list',
+            'sync-effect-error-does-not-abort-the-change',
+            'a-throwing-handler-is-rethrown-uncaught',
+            'message-bus-subscriber-error',
+            'model-on-fires-without-readers',
+            'change-handler-error-goes-to-on-error',
+            'bind-errors-throw-to-the-caller',
+            'flush-overflow-is-reported',
+            'cleanup-errors-throw-after-every-cleanup',
+            'on-error-rejects-a-non-function'
+        ]);
+
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
+        const systemOf = model => model._factory.reactiveSystem;
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        // Installs Stitch.onError for the duration of fn and returns every (error, context) it got.
+        async function withOnError(fn) {
+            const calls = [];
+            Stitch.onError((error, context) => { calls.push({ error, context }); });
+            try {
+                await fn(calls);
+            } finally {
+                Stitch.onError(null);
+            }
+            return calls;
+        }
+
+        // Captures uncaught errors for which accept(error) is true, and stops them from failing
+        // the page (they are the subject of the test); any other uncaught error still fails it.
+        async function captureUncaught(accept, fn) {
+            const caught = [];
+            const listener = (event) => {
+                if (event.error && accept(event.error)) {
+                    caught.push(event.error);
+                    event.preventDefault();
+                }
+            };
+            window.addEventListener('error', listener);
+            try {
+                await fn(caught);
+                await tick(50);
+            } finally {
+                window.removeEventListener('error', listener);
+            }
+            return caught;
+        }
+
+        // Registered before any bind(): a binding whose two cleanups record their runs; the first throws.
+        const cleanupRuns = [];
+        Stitch.DataBinder.registerBinding('cleanupprobe', {
+            bind(element, viewModel, path, context) {
+                context.binder._trackCleanup(element, () => { cleanupRuns.push('first'); throw new Error('cleanup one failed'); });
+                context.binder._trackCleanup(element, () => { cleanupRuns.push('second'); });
+            }
+        });
+
+        (async () => {
+            await StitchTest.test('effect-error-goes-to-on-error', async (t) => {
+                const host = mount('<span id="er-text" data-text="label"></span>');
+                const boom = new Error('label exploded');
+                const model = Stitch.Observable.create({
+                    broken: false,
+                    n: 1,
+                    label: Stitch.computed(function () { if (this.broken) throw boom; return 'fine ' + this.n; })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                t.equal(host.textContent, 'fine 1', 'precondition: the binding renders');
+                const span = document.getElementById('er-text');
+                const calls = await withOnError(async () => {
+                    model.broken = true;
+                    await tick();
+                });
+                t.equal(calls.length, 1, 'onError was called once');
+                t.ok(calls[0] && calls[0].error === boom, 'onError received the thrown error itself');
+                t.ok(calls[0] && calls[0].context && calls[0].context.element === span, 'the context names the element');
+                t.equal(calls[0] && calls[0].context && calls[0].context.binding, 'data-text="label"', 'the context names the binding');
+                t.equal(host.textContent, 'fine 1', 'the DOM keeps its last good state');
+                model.broken = false;
+                await tick();
+                model.n = 2;
+                await tick();
+                t.equal(host.textContent, 'fine 2', 'the binding recovers when the error goes away');
+            });
+
+            await StitchTest.test('no-handler-rethrows-uncaught', async (t) => {
+                const host = mount('<span data-text="label"></span>');
+                const boom = new Error('uncaught label error');
+                const model = Stitch.Observable.create({
+                    broken: false,
+                    n: 1,
+                    label: Stitch.computed(function () { if (this.broken) throw boom; return 'n=' + this.n; })
+                });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                const caught = await captureUncaught(error => error === boom, async () => {
+                    model.broken = true;
+                    await tick();
+                });
+                t.equal(caught.length, 1, 'with no onError handler the error reaches window.onerror, once');
+                t.equal(host.textContent, 'n=1', 'the DOM keeps its last good state');
+                model.broken = false;
+                model.n = 2;
+                await tick();
+                t.equal(host.textContent, 'n=2', 'the binding still follows the model afterwards');
+            });
+
+            await StitchTest.test('list-rerender-error-keeps-the-list', async (t) => {
+                const host = mount('<ul data-foreach="rows"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }] });
+                new Stitch.DataBinder().bind(host, model);
+                await tick();
+                const calls = await withOnError(async () => {
+                    model.rows = [{ id: 1, name: 'x' }, { id: 1, name: 'y' }];
+                    await tick();
+                });
+                t.equal(calls.length, 1, 'onError was called once for the duplicate key');
+                t.match(calls[0] ? calls[0].error.message : '', /\brows\b/, 'the error names the list');
+                t.equal(calls[0] && calls[0].context && calls[0].context.binding, 'data-foreach="rows"', 'the context names the list binding');
+                t.deepEqual(Array.from(host.querySelectorAll('li')).map(li => li.textContent), ['a', 'b'], 'the list keeps its last good rows');
+                model.rows = [{ id: 3, name: 'c' }];
+                await tick();
+                t.deepEqual(Array.from(host.querySelectorAll('li')).map(li => li.textContent), ['c'], 'a valid list renders afterwards');
+            });
+
+            // $watch effects run synchronously inside the setter. One throwing must not abort
+            // the setter or the other subscribers of the same change.
+            await StitchTest.test('sync-effect-error-does-not-abort-the-change', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 }, { isolated: true });
+                const boom = new Error('watcher failed');
+                const seen = [];
+                model.$watch('n', () => { throw boom; });
+                model.$watch('n', value => { seen.push(value); });
+                let setterError = null;
+                const calls = await withOnError(async () => {
+                    try { model.n = 2; } catch (error) { setterError = error; }
+                    await tick();
+                });
+                t.equal(setterError, null, 'the setter does not throw');
+                t.deepEqual(seen, [2], 'the other watcher of the same change ran');
+                t.ok(calls.length === 1 && calls[0].error === boom, 'onError received the watcher error');
+            });
+
+            await StitchTest.test('a-throwing-handler-is-rethrown-uncaught', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 }, { isolated: true });
+                const original = new Error('the original error');
+                const handlerError = new Error('the onError handler itself failed');
+                model.$watch('n', () => { throw original; });
+                let received = null;
+                const caught = await captureUncaught(error => error === handlerError, async () => {
+                    Stitch.onError(error => { received = error; throw handlerError; });
+                    try {
+                        model.n = 2;
+                        await tick();
+                    } finally {
+                        Stitch.onError(null);
+                    }
+                });
+                t.ok(received === original, 'the handler received the original error');
+                t.equal(caught.length, 1, 'the handler\'s own error reaches window.onerror');
+            });
+
+            await StitchTest.test('message-bus-subscriber-error', async (t) => {
+                const bus = new Stitch.MessageBus();
+                const boom = new Error('subscriber failed');
+                const delivered = [];
+                bus.subscribe('saved', () => { throw boom; });
+                bus.subscribe('saved', payload => { delivered.push(payload); });
+                const calls = await withOnError(async () => {
+                    bus.publish('saved', 7);
+                    await tick();
+                });
+                t.deepEqual(delivered, [7], 'the other subscriber received the event');
+                t.ok(calls.length === 1 && calls[0].error === boom, 'onError received the subscriber error');
+                t.equal(calls[0] && calls[0].context && calls[0].context.event, 'saved', 'the context names the event');
+            });
+
+            await StitchTest.test('model-on-fires-without-readers', async (t) => {
+                for (const isolated of [false, true]) {
+                    const model = Stitch.Observable.create({ n: 1, list: [1] }, isolated ? { isolated: true } : {});
+                    const fields = [];
+                    model.on(change => fields.push(change.field));
+                    model.n = 2;
+                    model.list = [1, 2];
+                    await tick();
+                    t.deepEqual(fields, ['n', 'list'], `model.on() fires for direct writes on an unbound ${isolated ? 'isolated' : 'shared'} model`);
+                }
+            });
+
+            await StitchTest.test('change-handler-error-goes-to-on-error', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 }, { isolated: true });
+                const boom = new Error('change handler failed');
+                const seen = [];
+                model.on(() => { throw boom; });
+                model.on(change => seen.push(change.newValue));
+                let setterError = null;
+                const calls = await withOnError(async () => {
+                    try { model.n = 5; } catch (error) { setterError = error; }
+                    await tick();
+                });
+                t.equal(setterError, null, 'the setter does not throw');
+                t.deepEqual(seen, [5], 'the other change handler ran');
+                t.ok(calls.length === 1 && calls[0].error === boom, 'onError received the change handler error');
+            });
+
+            await StitchTest.test('bind-errors-throw-to-the-caller', async (t) => {
+                let thrown = null;
+                const calls = await withOnError(async () => {
+                    const host = mount('<span data-text="label"></span>');
+                    const model = Stitch.Observable.create({ label: Stitch.computed(function () { throw new Error('broken at bind'); }) });
+                    try { new Stitch.DataBinder().bind(host, model); } catch (error) { thrown = error; }
+                    await tick();
+                });
+                t.match(thrown ? thrown.message : '', /broken at bind/, 'an error in the first render throws from bind()');
+                t.equal(calls.length, 0, 'it is not also sent to onError');
+            });
+
+            await StitchTest.test('flush-overflow-is-reported', async (t) => {
+                const model = Stitch.Observable.create({ n: 0 }, { isolated: true });
+                const system = systemOf(model);
+                let effect = null;
+                const calls = await withOnError(async () => {
+                    // A batched effect that writes what it reads re-queues itself forever.
+                    effect = system.effect(() => { model.n = model.n + 1; }, { batch: true });
+                    await tick(200);
+                });
+                system.cleanup(effect);
+                t.equal(calls.length, 1, 'onError was called once');
+                t.match(calls[0] ? calls[0].error.message : '', /infinite loop/i, 'the error says an update loop was stopped');
+            });
+
+            await StitchTest.test('cleanup-errors-throw-after-every-cleanup', async (t) => {
+                for (const how of ['unbind', 'dispose']) {
+                    cleanupRuns.length = 0;
+                    const host = mount('<span data-cleanupprobe="n"></span>');
+                    const binder = new Stitch.DataBinder();
+                    binder.bind(host, Stitch.Observable.create({ n: 1 }));
+                    let thrown = null;
+                    try {
+                        if (how === 'unbind') binder.unbind(host); else binder.dispose();
+                    } catch (error) {
+                        thrown = error;
+                    }
+                    t.match(thrown ? thrown.message : '', /cleanup one failed/, `${how}() throws the cleanup error`);
+                    t.deepEqual(cleanupRuns.slice().sort(), ['first', 'second'], `${how}() ran every cleanup before throwing`);
+                }
+            });
+
+            await StitchTest.test('on-error-rejects-a-non-function', async (t) => {
+                let thrown = null;
+                try { Stitch.onError('not a function'); } catch (error) { thrown = error; }
+                t.match(thrown ? thrown.message : '', /onError/, 'Stitch.onError throws for a non-function');
+            });
+        })();
+    </script>
+</body>
+</html>

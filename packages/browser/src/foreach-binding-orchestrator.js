@@ -183,16 +183,30 @@ function bindForeach(element, viewModel, path, context, deps) {
             // their own effects, not to the list (a row change must not re-render the list).
             reactiveSystem.untracked(() => binder._bindElement(el, itemContext, []));
         } catch (error) {
-            binder._unbindTree(el);
+            releaseAfterFailure(el);
             throw error;
         }
         return row;
     }
 
+    // Releases rows built by a render that is failing. The render's own error is the one
+    // thrown; a cleanup error on the way is reported separately, not lost.
+    function releaseAfterFailure(el) {
+        try {
+            binder._unbindTree(el);
+        } catch (cleanupError) {
+            deps.reportError(cleanupError, { source: "unbind", element: el });
+        }
+    }
+
     function releaseRow(row) {
-        binder._unbindTree(row.el);
-        if (row.el.parentNode === element) {
-            element.removeChild(row.el);
+        try {
+            binder._unbindTree(row.el);
+        } finally {
+            // Even if a cleanup threw, the row leaves the list.
+            if (row.el.parentNode === element) {
+                element.removeChild(row.el);
+            }
         }
     }
 
@@ -234,16 +248,24 @@ function bindForeach(element, viewModel, path, context, deps) {
                 next.set(keys[index], row);
             }
         } catch (error) {
-            created.forEach(row => binder._unbindTree(row.el));
+            created.forEach(row => releaseAfterFailure(row.el));
             throw error;
         }
 
-        // 3. Release every old row that is not reused (key gone, or a new object).
+        // 3. Release every old row that is not reused (key gone, or a new object). A cleanup
+        //    that throws does not stop the render; its error is thrown once the list is done.
+        const releases = [];
         rows.forEach((row, key) => {
             if (next.get(key) !== row) {
-                releaseRow(row);
+                releases.push(() => releaseRow(row));
             }
         });
+        let releaseError = null;
+        try {
+            deps.runAllThenThrow(releases, { source: "binding", element, binding: `data-foreach="${path}"` });
+        } catch (error) {
+            releaseError = { error };
+        }
 
         // 4. Put rows in order after the placeholder (if any).
         let cursor = placeholder ? placeholder.nextSibling : element.firstChild;
@@ -260,6 +282,9 @@ function bindForeach(element, viewModel, path, context, deps) {
             ordered[index].setIndex(index);
         }
         rows = next;
+        if (releaseError) {
+            throw releaseError.error;
+        }
     }
 
     function restoreSelectValue() {
@@ -290,7 +315,7 @@ function bindForeach(element, viewModel, path, context, deps) {
             if (isSelect) {
                 restoreSelectValue();
             }
-        }, { batch: true });
+        }, { batch: true, errorContext: { source: "binding", element, binding: `data-foreach="${path}"` } });
     } catch (error) {
         // The first render threw (effect() has released the effect, and reconcile has
         // released any rows it built): restore the element as it was before bind().
@@ -303,8 +328,10 @@ function bindForeach(element, viewModel, path, context, deps) {
 
     binder._trackCleanup(element, () => {
         reactiveSystem.cleanup(effect);
-        rows.forEach(row => binder._unbindTree(row.el));
+        const released = rows;
         rows = new Map();
+        deps.runAllThenThrow(Array.from(released.values(), row => () => binder._unbindTree(row.el)),
+            { source: "unbind", element });
     });
     return effect;
 }

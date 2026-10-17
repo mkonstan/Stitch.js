@@ -73,15 +73,15 @@
 
         const texts = (host, selector) => Array.from(host.querySelectorAll(selector)).map(el => el.textContent);
 
-        // Collects console.error lines while fn runs (a re-render error is reported there).
+        // Collects the messages of errors sent to Stitch.onError while fn runs (a re-render
+        // error is not on the caller's stack, so it is reported there).
         async function captureErrors(fn) {
-            const original = console.error;
             const lines = [];
-            console.error = (...args) => { lines.push(args.map(a => a instanceof Error ? a.message : String(a)).join(' ')); };
+            Stitch.onError(error => { lines.push(error && error.message ? error.message : String(error)); });
             try {
                 await fn();
             } finally {
-                console.error = original;
+                Stitch.onError(null);
             }
             return lines;
         }
@@ -138,8 +138,8 @@
             }
 
             // The rule holds when the list changes after binding, and null / undefined
-            // mean "no rows". A re-render error cannot reach bind(), so it is reported on
-            // the console, and the list stays as it was.
+            // mean "no rows". A re-render error cannot reach bind(), so it goes to
+            // Stitch.onError, and the list stays as it was.
             await StitchTest.test('key-rule-on-rerender-and-null-lists', async (t) => {
                 const host = mount('<ul data-foreach="rows"><li data-text="name"></li></ul>');
                 const model = Stitch.Observable.create({ rows: null });

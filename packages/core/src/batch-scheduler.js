@@ -2,11 +2,24 @@
 
 const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
+const { reportError } = require("../../utils/src/error-hook");
+
+/** Runs a queued effect; an error goes to Stitch.onError (a flush is on no caller's stack). */
+function runReportingErrors(effect) {
+    try {
+        effect();
+    } catch (error) {
+        reportError(error, effect.options && effect.options.errorContext
+            ? effect.options.errorContext
+            : { source: "effect" });
+    }
+}
 
 class BatchScheduler {
     constructor(options = {}) {
         this.version = options.version || `v${VERSION}`;
         this.debug = options.debug || NOOP_DEBUG;
+        this._runEffect = options.runEffect || runReportingErrors;
         this._pendingEffects = new Set();
         this.flushing = false;
         this.flushScheduled = false;
@@ -35,13 +48,16 @@ class BatchScheduler {
         if (this.flushing) return;
 
         if (this.flushDepth >= this.MAX_FLUSH_DEPTH) {
-            console.error(
-                `[Stitch.js ${this.version} BatchScheduler] Maximum flush depth exceeded.\n` +
-                "Possible infinite loop detected. Queue cleared."
-            );
+            const dropped = this._pendingEffects.size;
             this._pendingEffects.clear();
             this.flushDepth = 0;
             this.flushScheduled = false;
+            reportError(new Error(
+                `[Stitch.js ${this.version}] Stopped an infinite loop of updates: effects kept re-queuing each other ` +
+                `for ${this.MAX_FLUSH_DEPTH} rounds (${dropped} still queued were dropped). An effect, computed or ` +
+                "binding probably writes a value that it, or something it triggers, reads. Move the write out of " +
+                "the effect, or guard it so the value stops changing."
+            ), { source: "scheduler" });
             return;
         }
 
@@ -55,11 +71,7 @@ class BatchScheduler {
         this._pendingEffects.clear();
 
         effectsToRun.forEach((effect) => {
-            try {
-                effect();
-            } catch (error) {
-                console.error(`[Stitch.js ${this.version} BatchScheduler] Error in effect:`, error);
-            }
+            this._runEffect(effect);
         });
 
         this.debug.enabled && this.debug.groupEnd("effects");

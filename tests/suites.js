@@ -34,6 +34,7 @@
         { page: "test-foreach-keys.html", title: "Foreach keys", about: "The key rule (id / data-key / plain values, missing and duplicate keys throw) and the one-root rule, on every list path" },
         { page: "test-foreach-lifecycle.html", title: "Foreach lifecycle", about: "Removed rows release their bindings (filter, hide/show, select, replacement, nested); same key + same object reuses the row" },
         { page: "test-reactive-lifecycle.html", title: "Reactive lifecycle", about: "Released effects stop and drop every subscription (computeds included); ReactiveSystem.dispose(); Stitch.debug.stats()" },
+        { page: "test-error-routing.html", title: "Error routing", about: "Errors in reactive updates go to Stitch.onError or are re-thrown uncaught; the DOM keeps its last good state; model.on() fires without readers" },
         { page: "test-unbind-memory.html", title: "Unbind", about: "An unbound element stops updating" },
         { page: "test-foreach-context.html", title: "Foreach context", about: "Row context ($index, $parent) does not leak between lists" },
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },

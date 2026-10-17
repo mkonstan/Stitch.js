@@ -5,6 +5,9 @@
 // (ReactiveSystem.cleanup) removes it from every computed it read.
 const COMPUTED_VALUE_KEY = "value";
 
+// Ids are labels only: a counter (a label needs no randomness).
+let nextComputedId = 0;
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -13,9 +16,11 @@ class ComputedRef {
         this.explicitDeps = explicitDeps;
         this.value = undefined;
         this.dirty = true;
+        // True after an evaluation threw (the computed stays dirty, see markDirty).
+        this.failed = false;
         this.deps = new Set();
         this._generation = reactiveSystem._generation;
-        this.id = Math.random().toString(36).substr(2, 9);
+        this.id = ++nextComputedId;
         this.isComputedRef = true;
 
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED REF CREATED (id: ${this.id})`, {
@@ -25,9 +30,12 @@ class ComputedRef {
     }
 
     markDirty() {
-        if (this.dirty) {
+        // Already dirty: readers were told. Except after a failed evaluation: then the
+        // readers that saw the error must hear about the change that may fix it.
+        if (this.dirty && !this.failed) {
             return;
         }
+        this.failed = false;
 
         this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED MARKED DIRTY (id: ${this.id})`);
         this.dirty = true;
@@ -69,8 +77,14 @@ class ComputedRef {
                 }
             }
 
-            this.value = this.getter.call(this.context);
+            try {
+                this.value = this.getter.call(this.context);
+            } catch (error) {
+                this.failed = true;
+                throw error;
+            }
             this.dirty = false;
+            this.failed = false;
 
             this.reactiveSystem.debug.enabled && this.reactiveSystem.debug.log("computed", `COMPUTED VALUE (id: ${this.id})`, {
                 value: this.value,

@@ -12,6 +12,7 @@ const valueBindingHelpers = require("../utils/src/value-binding-helpers");
 const typeConverters = require("../utils/src/type-converters");
 const foreachKeys = require("../utils/src/foreach-keys");
 const foreachRowContext = require("../utils/src/foreach-row-context");
+const errorHook = require("../utils/src/error-hook");
 
 const stitchDebugState = debugConfig.createDebugState(`v${VERSION}`);
 const stitchDebug = {
@@ -61,6 +62,8 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
             getValueValidator,
             createItemContext: foreachRowContext.createItemContext,
             resolveRowKeys: foreachKeys.resolveRowKeys,
+            runAllThenThrow: errorHook.runAllThenThrow,
+            reportError: errorHook.reportError,
             version: `v${VERSION}`,
             doc: typeof document !== "undefined" ? document : null
         });

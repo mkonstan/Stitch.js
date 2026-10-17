@@ -35,7 +35,8 @@
         MessageBus,
         computed,
         version,
-        debug
+        debug,
+        onError: utils.onError
     };
 
     if (typeof window !== "undefined") {

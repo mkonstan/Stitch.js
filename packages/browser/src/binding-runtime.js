@@ -16,6 +16,11 @@ function createBindingRuntime(deps = {}) {
     const findSimilarProperty = deps.findSimilarProperty;
     const bindForeach = deps.bindForeach;
 
+/** What onError is told when a binding's update throws: the element and the binding. */
+function bindingErrorContext(element, type, path) {
+    return { source: "binding", element, binding: `data-${type}="${path}"` };
+}
+
 function validateBinding(viewModel, path, bindingType, element) {
     if (!StitchDebug.enabled) return true;
     if (!propertyExists(viewModel, path)) {
@@ -74,7 +79,7 @@ const BINDING_HANDLERS = {
                     console.warn(`[Stitch.js ${Version}] Binding 'text' to a function: "${path}". Did you mean to call it or use a computed property?`);
                 }
                 element.textContent = value != null ? value : "";
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "text", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -94,7 +99,7 @@ const BINDING_HANDLERS = {
                 const value = getProperty(viewModel, path);
                 StitchDebug.enabled && StitchDebug.log("bindings", `VALUE BINDING UPDATE (Model→View): "${path}" = ${value}`);
                 handler.modelToView(element, value, viewModel, path);
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "value", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
             const updateModel = () => {
                 const value = handler.viewToModel(element);
@@ -121,7 +126,7 @@ const BINDING_HANDLERS = {
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
                 element.style.display = value ? "" : "none";
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "visible", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -135,7 +140,7 @@ const BINDING_HANDLERS = {
             const eff = context.reactiveSystem.effect(() => {
                 const value = getProperty(viewModel, path);
                 element.disabled = !value;
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "enabled", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -213,7 +218,7 @@ const BINDING_HANDLERS = {
                         console.warn(`[Stitch.js ${Version}] event: binding handler not found: "${handlerPath}"`);
                     }
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "event", path) });
             context.binder._trackCleanup(element, () => {
                 removeEventListeners();
                 context.reactiveSystem.cleanup(eff);
@@ -290,7 +295,7 @@ const BINDING_HANDLERS = {
                     });
                     StitchDebug.enabled && StitchDebug.log("bindings", `  → Final classList: ${Array.from(element.classList).join(", ")}`);
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "class", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -344,7 +349,7 @@ const BINDING_HANDLERS = {
                 } else {
                     console.warn(`[Stitch.js ${Version}] attr: binding requires an object value. Example: attr: { href: url, target: "_blank" }`);
                 }
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "attr", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     },
@@ -373,7 +378,7 @@ const BINDING_HANDLERS = {
                 element.disabled = isLoading;
                 element.classList.toggle("loading", isLoading);
                 element.setAttribute("aria-busy", isLoading ? "true" : "false");
-            }, { batch: true });
+            }, { batch: true, errorContext: bindingErrorContext(element, "loading", path) });
             context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(eff));
         }
     }

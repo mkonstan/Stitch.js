@@ -8,6 +8,9 @@ const { NOOP_DEBUG } = require("../../utils/src/debug-config");
 const { VERSION } = require("../../utils/src/version");
 const defineHidden = objectHelpers.defineHidden;
 
+// Debug labels for reactive objects: a counter (a label needs no randomness).
+let nextObjectId = 0;
+
 /**
  * Creates a standardized computed property marker.
  * Shared validation/marker-creation logic used by both Observable.computed()
@@ -344,7 +347,7 @@ function createReactiveFactory(options = {}) {
             defineHidden(target, "_changeHandlers", new Set);
         }
         if (StitchDebug.enabled && !target.__stitchId) {
-            defineHidden(target, "__stitchId", `obj_${Math.random().toString(36).substr(2, 9)}`);
+            defineHidden(target, "__stitchId", `obj_${++nextObjectId}`);
         }
         attachParent(target, parent, key);
         defineHidden(target, "__isReactive", true);
