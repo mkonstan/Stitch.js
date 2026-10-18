@@ -26,7 +26,9 @@
             'model-path-arguments',
             'message-bus-arguments',
             'old-helper-names-fail-loudly',
-            'off-removes-a-once-subscription'
+            'off-removes-a-once-subscription',
+            'events-and-change-handlers-do-not-overload',
+            'old-name-assignment-throws'
         ]);
 
         function mount(html) {
@@ -57,14 +59,16 @@
                 const model = Stitch.Observable.create({ n: 1 });
                 const seen = [];
                 const handler = change => seen.push(change.field);
-                t.match(thrown(() => model.$on(42)), /\$on\(handler\): handler must be a function/, 'model.$on() of a non-function throws');
-                model.$on(handler);
-                t.match(thrown(() => model.$off(undefined)), /\$off\(handler\).*undefined/, 'model.$off(undefined) throws instead of removing every handler');
-                t.match(thrown(() => model.$off(() => {})), /not a change handler of this object/, 'model.$off() of a handler that was never added throws');
+                t.match(thrown(() => model.$onChange(42)), /\$onChange\(handler\): handler must be a function/, 'model.$onChange() of a non-function throws');
+                model.$onChange(handler);
+                t.match(thrown(() => model.$offChange(undefined)), /\$offChange\(handler\).*undefined/, 'model.$offChange(undefined) throws');
+                t.match(thrown(() => model.$offChange(() => {})), /not a change handler of this object/, 'model.$offChange() of a handler that was never added throws');
+                t.match(thrown(() => model.$offChange()), /\$offChange\(handler\) needs the handler/, 'model.$offChange() with no argument throws (removing is explicit)');
                 model.n = 2;
                 t.deepEqual(seen, ['n'], 'the real handler is still installed after those mistakes');
-                t.equal(thrown(() => model.$off(handler)), '', 'control: model.$off(handler) removes it');
-                t.equal(thrown(() => model.$off()), '', 'control: model.$off() with no argument removes every change handler (explicit)');
+                t.equal(thrown(() => model.$offChange(handler)), '', 'control: model.$offChange(handler) removes it');
+                model.n = 3;
+                t.deepEqual(seen, ['n'], 'control: and it no longer fires');
             });
 
             await StitchTest.test('model-event-arguments', async (t) => {
@@ -96,11 +100,12 @@
 
             await StitchTest.test('old-helper-names-fail-loudly', async (t) => {
                 const model = Stitch.Observable.create({ n: 1, list: [1], tags: new Set(['a']) });
-                for (const name of ['on', 'off', 'get', 'set']) {
-                    t.match(thrown(() => model[name](() => {})), new RegExp('\\.' + name + '\\(\\) is now \\.\\$' + name + '\\(\\)'), 'model.' + name + '() throws, naming $' + name + '()');
+                const renamed = { on: '$onChange', off: '$offChange', get: '$get', set: '$set' };
+                for (const [name, now] of Object.entries(renamed)) {
+                    t.match(thrown(() => model[name](() => {})), new RegExp('\\.' + name + '\\(\\) is now \\.\\' + now + '\\(\\)'), 'model.' + name + '() throws, naming ' + now + '()');
                 }
-                t.match(thrown(() => model.list.on(() => {})), /\.on\(\) is now \.\$on\(\)/, 'an array .on() throws too');
-                t.match(thrown(() => model.tags.on(() => {})), /\.on\(\) is now \.\$on\(\)/, 'a Set .on() throws too');
+                t.match(thrown(() => model.list.on(() => {})), /\.on\(\) is now \.\$onChange\(\)/, 'an array .on() throws too');
+                t.match(thrown(() => model.tags.on(() => {})), /\.on\(\) is now \.\$onChange\(\)/, 'a Set .on() throws too');
                 const withField = Stitch.Observable.create({ on: true });
                 t.equal(withField.on, true, 'a data field named on reads as data');
                 t.match(thrown(() => withField.on(() => {})), /not a function/, 'calling it as a function throws a TypeError');
@@ -122,6 +127,38 @@
                 await new Promise(resolve => setTimeout(resolve, 20));
                 t.equal(runs, 1, 'a $once runs once');
                 t.match(thrown(() => model.$off('ping', cb)), /is not subscribed to "ping"/, 'after it ran, $off throws: it is no longer subscribed');
+            });
+
+            // R3-1: no overloads. Events and change handlers have their own methods, and every
+            // wrong form throws, naming the right one.
+            await StitchTest.test('events-and-change-handlers-do-not-overload', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 });
+                const fn = () => {};
+                t.match(thrown(() => model.$on(fn)), /\$on\(fn\): \$on needs an event name; for change handlers use \$onChange\(fn\)/, '$on(fn) (a forgotten event name) throws, naming $onChange');
+                t.match(thrown(() => model.$on(fn, 'saved')), /swapped.*\$on\(event, callback\)/, '$on(fn, "saved") (swapped arguments) throws');
+                t.match(thrown(() => model.$off(fn)), /\$off\(event, callback\).*\$offChange\(fn\)/, '$off(fn) without an event name throws, naming both correct forms');
+                t.match(thrown(() => model.$off()), /\$off\(event, callback\).*\$offChange\(fn\)/, '$off() with no arguments throws');
+                t.match(thrown(() => model.$onChange('saved', fn)), /\$onChange\(fn\).*for events use \$on\(event, callback\)/, '$onChange("saved", fn) throws, naming $on');
+                t.match(thrown(() => model.$onChange(fn, fn)), /\$onChange\(fn\) takes one argument/, '$onChange with two arguments throws');
+                let changes = 0;
+                model.$onChange(() => { changes++; });
+                let events = 0;
+                model.$on('saved', () => { events++; });
+                model.n = 2;
+                model.$emit('saved');
+                await new Promise(resolve => setTimeout(resolve, 20));
+                t.equal(changes, 1, 'control: $onChange(fn) fires on a write');
+                t.equal(events, 1, 'control: $on(event, cb) fires on its event only');
+            });
+
+            await StitchTest.test('old-name-assignment-throws', async (t) => {
+                'use strict';
+                const model = Stitch.Observable.create({ n: 1 });
+                const sloppyAssign = new Function('m', 'm.on = function () {}; return m.on;');
+                t.match(thrown(() => sloppyAssign(model)), /\.on\(\) is now \.\$onChange\(\)/, 'assigning model.on (even in sloppy code) throws the migration message');
+                t.match(thrown(() => { Stitch.Observable.create({ list: [] }).list.on = 1; }), /\.on\(\) is now \.\$onChange\(\)/, 'assigning .on on an array throws too');
+                t.equal(thrown(() => model.$set('on', true)), '', 'control: $set("on", value) adds a data field named on');
+                t.equal(model.on, true, 'control: which reads as data');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

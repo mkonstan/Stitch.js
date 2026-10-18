@@ -141,7 +141,7 @@ function memberStatus(holder, key) {
         return inheritedGetter(holder, key) ? "bindable" : "missing";
     }
     if (holder.__isReactive === true) {
-        if (descriptor.get) return "bindable";
+        if (descriptor.get) return descriptor.enumerable ? "bindable" : "missing";
         return descriptor.enumerable ? "not-reactive" : "missing";
     }
     return "bindable";
@@ -174,6 +174,11 @@ function checkWritable(scope, path, describe) {
     if (holder === null || holder === undefined || typeof holder !== "object") return;
     const key = segments[segments.length - 1];
     const own = Object.getOwnPropertyDescriptor(holder, key);
+    if (own && own.set && own.set.stitchReadOnlyComputed) {
+        throw bindingError(describe(),
+            `"${path}" is a computed (read-only), so a two-way binding cannot write it. ` +
+            "Bind it one-way (data-text), or bind the plain property it is computed from.");
+    }
     const descriptor = own || inheritedGetter(holder, key);
     if (descriptor && descriptor.get && !descriptor.set) {
         throw bindingError(describe(),

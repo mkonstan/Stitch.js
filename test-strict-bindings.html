@@ -50,7 +50,8 @@
             'parent-paths-and-event-maps-checked-at-bind',
             'two-way-binding-to-any-context-value-throws',
             'write-through-a-null-step-says-so',
-            'class-instance-getters-stay-bindable'
+            'class-instance-getters-stay-bindable',
+            'two-way-binding-to-a-computed-throws'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -594,6 +595,13 @@
                     /"price\.formatted" is read-only/, 'a two-way binding to a getter without a setter throws');
                 t.match(messageOf(tryBind(mount('<span data-text="price.cents"></span>'), Stitch.Observable.create({ price: new Money(1) }))),
                     /"cents" is not a property of "price"/, 'a missing name on an instance is still missing');
+            });
+
+            await StitchTest.test('two-way-binding-to-a-computed-throws', async (t) => {
+                const model = () => Stitch.Observable.create({ a: 1, total: Stitch.computed(function () { return this.a * 2; }) });
+                t.match(messageOf(tryBind(mount('<input data-value="total">'), model())), /"total" is a computed \(read-only\)/,
+                    'data-value on a computed throws at bind()');
+                t.equal(tryBind(mount('<span data-text="total"></span>'), model()), null, 'control: data-text on a computed binds');
             });
 
             await StitchTest.test('registered-after-bind-throws', async (t) => {

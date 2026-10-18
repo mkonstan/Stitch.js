@@ -266,8 +266,8 @@ class DataBinder {
                 const onChangeHandler = change => {
                     this.hooks.onChange.call(this, change, viewModel, element);
                 };
-                viewModel.$on(onChangeHandler);
-                this._trackCleanup(element, () => viewModel.$off(onChangeHandler));
+                viewModel.$onChange(onChangeHandler);
+                this._trackCleanup(element, () => viewModel.$offChange(onChangeHandler));
             }
             this._bindElement(element, viewModel, []);
         } catch (error) {

@@ -49,7 +49,7 @@ function createReactiveFactory(options = {}) {
     // D28: the helpers Stitch puts on every model object are $-prefixed, so data fields may be
     // named on, off, get or set. toJSON stays reserved (JSON.stringify calls it), and so do
     // the $-names: a data field with one of them would be overwritten by the helper.
-    const RESERVED_NAMES = ["toJSON", "$on", "$off", "$get", "$set", "$emit", "$once", "$use", "$watch"];
+    const RESERVED_NAMES = ["toJSON", "$on", "$off", "$onChange", "$offChange", "$get", "$set", "$emit", "$once", "$use", "$watch"];
     // The v2 helper names: where no data field has the name, calling it throws a pointer to
     // the $-name instead of "undefined is not a function".
     const OLD_HELPERS = ["on", "off", "get", "set"];
@@ -103,13 +103,31 @@ function createReactiveFactory(options = {}) {
         });
     }
 
+    // v2 name -> v3 name (on() registered a change handler in v2).
+    const NEW_NAMES = { on: "$onChange", off: "$offChange", get: "$get", set: "$set" };
+
+    function migrationError(name) {
+        return new TypeError(
+            `[Stitch.js ${Version}] .${name}() is now .${NEW_NAMES[name]}() in Stitch v3: the helpers are $-prefixed, so that ` +
+            "data fields can be named on, off, get or set. Events: $on(event, callback) / $off(event, callback)."
+        );
+    }
+
     function oldHelperStub(name) {
         return function () {
-            throw new TypeError(
-                `[Stitch.js ${Version}] .${name}() is now .$${name}() in Stitch v3: the helpers are $-prefixed, so that data ` +
-                "fields can be named on, off, get or set."
-            );
+            throw migrationError(name);
         };
+    }
+
+    /** A hidden accessor: calling it, or assigning to it, throws the migration message. */
+    function defineOldHelperStub(target, name) {
+        const stub = oldHelperStub(name);
+        Object.defineProperty(target, name, {
+            enumerable: false,
+            configurable: true,
+            get() { return stub; },
+            set() { throw migrationError(name); }
+        });
     }
 
     function eventBusOf(target) {
@@ -119,45 +137,76 @@ function createReactiveFactory(options = {}) {
         return target._eventBus;
     }
 
+    function helperError(message) {
+        return new TypeError(`[Stitch.js ${Version}] ${message}`);
+    }
+
     /**
-     * $on / $off / $emit / $once / $use for one model object (or collection).
-     * $on(handler): a change handler (every write); $on(event, callback): an event.
-     * $off(handler) / $off(event, callback) remove them (removing what is not there throws);
-     * $off() with no argument removes every change handler. $off(event, callback) also removes
-     * a pending $once(event, callback).
+     * The helpers of one model object (or collection). No overloads (R3-1):
+     * - $onChange(fn) / $offChange(fn): change handlers (every write);
+     * - $on(event, callback) / $off(event, callback): events; $off also removes a pending
+     *   $once(event, callback);
+     * - $emit / $once / $use: events.
+     * Every wrong arity or argument type throws and names the right method. Removing is
+     * always explicit (no "remove all").
      */
     function createHelpers(target) {
         const pendingOnce = new Map(); // event -> Map(callback -> unsubscribe)
         return {
-            $on(eventOrHandler, callback) {
-                if (typeof eventOrHandler === "string") {
-                    return eventBusOf(target).subscribe(eventOrHandler, callback);
+            $onChange(...args) {
+                if (typeof args[0] === "string") {
+                    throw helperError("$onChange(fn) registers a change handler; for events use $on(event, callback).");
                 }
-                return addChangeHandler.call(target, eventOrHandler);
+                if (args.length !== 1) {
+                    throw helperError(`$onChange(fn) takes one argument (the change handler), got ${args.length}.`);
+                }
+                return addChangeHandler.call(target, args[0]);
+            },
+            $offChange(...args) {
+                if (typeof args[0] === "string") {
+                    throw helperError("$offChange(fn) removes a change handler; for events use $off(event, callback).");
+                }
+                return removeChangeHandler.apply(target, args);
+            },
+            $on(...args) {
+                const [event, callback] = args;
+                if (typeof event === "function" && typeof callback === "string") {
+                    throw helperError("$on(fn, event): the arguments are swapped. Use $on(event, callback).");
+                }
+                if (typeof event === "function") {
+                    throw helperError("$on(fn): $on needs an event name; for change handlers use $onChange(fn).");
+                }
+                if (args.length !== 2) {
+                    throw helperError(`$on(event, callback) takes two arguments, got ${args.length}; for change handlers use $onChange(fn).`);
+                }
+                return eventBusOf(target).subscribe(event, callback);
             },
             $off(...args) {
-                if (args.length === 0) {
-                    return removeChangeHandler.call(target);
+                const [event, callback] = args;
+                if (args.length !== 2 || typeof event !== "string") {
+                    throw helperError(
+                        "$off needs an event name and the callback: $off(event, callback) for events, " +
+                        "$offChange(fn) for change handlers."
+                    );
                 }
-                const [eventOrHandler, callback] = args;
-                if (typeof eventOrHandler === "string") {
-                    const once = pendingOnce.get(eventOrHandler);
-                    if (once && once.has(callback)) {
-                        const unsubscribe = once.get(callback);
-                        once.delete(callback);
-                        unsubscribe();
-                        return undefined;
-                    }
-                    return eventBusOf(target).unsubscribe(eventOrHandler, callback);
+                const once = pendingOnce.get(event);
+                if (once && once.has(callback)) {
+                    const unsubscribe = once.get(callback);
+                    once.delete(callback);
+                    unsubscribe();
+                    return undefined;
                 }
-                return removeChangeHandler.call(target, eventOrHandler);
+                return eventBusOf(target).unsubscribe(event, callback);
             },
             $emit(event, payload) {
                 eventBusOf(target).publish(event, payload);
             },
             $once(event, callback) {
+                if (typeof event === "function") {
+                    throw helperError("$once(fn): $once needs an event name: $once(event, callback).");
+                }
                 if (typeof callback !== "function") {
-                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
+                    throw helperError(`$once(event, callback): callback must be a function, got ${typeof callback}.`);
                 }
                 const bus = eventBusOf(target);
                 if (!pendingOnce.has(event)) pendingOnce.set(event, new Map());
@@ -320,6 +369,10 @@ function createReactiveFactory(options = {}) {
         } else {
         }
 
+        const computedSetter = function () {
+            throw new Error(`[Stitch.js ${Version}] Cannot set computed property '${String(key)}'`);
+        };
+        computedSetter.stitchReadOnlyComputed = true;
         return {
             enumerable: true,
             configurable: false,
@@ -327,9 +380,7 @@ function createReactiveFactory(options = {}) {
                 // Delegate to ComputedRef
                 return computedRef.get();
             },
-            set() {
-                throw new Error(`[Stitch.js ${Version}] Cannot set computed property '${String(key)}'`);
-            }
+            set: computedSetter
         };
     }
 
@@ -523,7 +574,9 @@ function createReactiveFactory(options = {}) {
             }
             if (path.indexOf(".") === -1) {
                 const descriptor = Object.getOwnPropertyDescriptor(target, path);
-                if (descriptor && descriptor.get) {
+                // An enumerable accessor is a reactive (or computed) property; a hidden one is
+                // an old-name stub, which a new data field replaces.
+                if (descriptor && descriptor.get && descriptor.enumerable) {
                     target[path] = value;
                 } else {
                     if (RESERVED_NAMES.indexOf(path) !== -1) throw reservedError(pathParts(target).concat(path));
@@ -537,7 +590,7 @@ function createReactiveFactory(options = {}) {
         });
         for (const name of OLD_HELPERS) {
             if (!Object.prototype.hasOwnProperty.call(target, name)) {
-                Object.defineProperty(target, name, { value: oldHelperStub(name), enumerable: false, configurable: true, writable: false });
+                defineOldHelperStub(target, name);
             }
         }
 
@@ -577,6 +630,12 @@ function createReactiveFactory(options = {}) {
         const helpers = createHelpers(target);
 
         const proxy = new Proxy(target, {
+            set(target, prop, value) {
+                if (prop === "on" || prop === "off") {
+                    throw migrationError(prop);
+                }
+                return Reflect.set(target, prop, value);
+            },
             get(target, prop, receiver) {
                 if (prop === "__isReactive") return true;
                 if (prop === "_changeHandlers") return target._changeHandlers;
@@ -820,6 +879,9 @@ function createReactiveFactory(options = {}) {
                 return value;
             },
             set(target, key, value, receiver) {
+                if (key === "on" || key === "off" || key === "get" || key === "set") {
+                    throw migrationError(key);
+                }
                 const oldValue = target[key];
                 if (value && typeof value === "object" && !value.__isReactive) {
                     value = reactive(value, new WeakSet, receiver, key);

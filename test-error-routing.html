@@ -217,11 +217,11 @@
                 for (const isolated of [false, true]) {
                     const model = Stitch.Observable.create({ n: 1, list: [1] }, isolated ? { isolated: true } : {});
                     const fields = [];
-                    model.$on(change => fields.push(change.field));
+                    model.$onChange(change => fields.push(change.field));
                     model.n = 2;
                     model.list = [1, 2];
                     await tick();
-                    t.deepEqual(fields, ['n', 'list'], `model.$on() fires for direct writes on an unbound ${isolated ? 'isolated' : 'shared'} model`);
+                    t.deepEqual(fields, ['n', 'list'], `model.$onChange() fires for direct writes on an unbound ${isolated ? 'isolated' : 'shared'} model`);
                 }
             });
 
@@ -229,8 +229,8 @@
                 const model = Stitch.Observable.create({ n: 1 }, { isolated: true });
                 const boom = new Error('change handler failed');
                 const seen = [];
-                model.$on(() => { throw boom; });
-                model.$on(change => seen.push(change.newValue));
+                model.$onChange(() => { throw boom; });
+                model.$onChange(change => seen.push(change.newValue));
                 let setterError = null;
                 const calls = await withOnError(async () => {
                     try { model.n = 5; } catch (error) { setterError = error; }
