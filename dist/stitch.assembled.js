@@ -425,6 +425,21 @@ function createReactiveFactory(options = {}) {
     }
 
     /**
+     * D29: events live on the root model only (the object Observable.create / createArray /
+     * reactive returned; it alone carries _factory). Nested objects, list rows, arrays, Maps
+     * and Sets have no event bus: their event methods throw.
+     */
+    function requireRoot(target, method, event) {
+        if (!Object.prototype.hasOwnProperty.call(target, "_factory")) {
+            const name = typeof event === "string" && event ? event : "saved";
+            throw helperError(
+                `${method}(): events live on the root model: use model.$emit('${name}') / model.$on('${name}', callback). ` +
+                "From a list row, call a root handler with $root.handler (data-click / data-event)."
+            );
+        }
+    }
+
+    /**
      * The helpers of one model object (or collection). No overloads (R3-1):
      * - $onChange(fn) / $offChange(fn): change handlers (every write);
      * - $on(event, callback) / $off(event, callback): events; $off also removes a pending
@@ -453,6 +468,7 @@ function createReactiveFactory(options = {}) {
             },
             $on(...args) {
                 const [event, callback] = args;
+                requireRoot(target, "$on", event);
                 if (typeof event === "function" && typeof callback === "string") {
                     throw helperError("$on(fn, event): the arguments are swapped. Use $on(event, callback).");
                 }
@@ -466,6 +482,7 @@ function createReactiveFactory(options = {}) {
             },
             $off(...args) {
                 const [event, callback] = args;
+                requireRoot(target, "$off", event);
                 if (args.length !== 2 || typeof event !== "string") {
                     throw helperError(
                         "$off needs an event name and the callback: $off(event, callback) for events, " +
@@ -482,9 +499,11 @@ function createReactiveFactory(options = {}) {
                 return eventBusOf(target).unsubscribe(event, callback);
             },
             $emit(event, payload) {
+                requireRoot(target, "$emit", event);
                 eventBusOf(target).publish(event, payload);
             },
             $once(event, callback) {
+                requireRoot(target, "$once", event);
                 if (typeof event === "function") {
                     throw helperError("$once(fn): $once needs an event name: $once(event, callback).");
                 }
@@ -507,6 +526,7 @@ function createReactiveFactory(options = {}) {
                 };
             },
             $use(middleware) {
+                requireRoot(target, "$use");
                 return eventBusOf(target).use(middleware);
             }
         };
@@ -1530,6 +1550,11 @@ function checkWritable(scope, path, describe) {
     }
     if (holder === null || holder === undefined || typeof holder !== "object") return;
     const key = segments[segments.length - 1];
+    // A bare name in a row is the row item's property (the context inherits it).
+    if (isRowContext(holder) && ROW_NAMES.indexOf(key) === -1) {
+        holder = holder.$data;
+        if (holder === null || typeof holder !== "object") return;
+    }
     const own = Object.getOwnPropertyDescriptor(holder, key);
     if (own && own.set && own.set.stitchReadOnlyComputed) {
         throw bindingError(describe(),

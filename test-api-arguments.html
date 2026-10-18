@@ -28,7 +28,8 @@
             'old-helper-names-fail-loudly',
             'off-removes-a-once-subscription',
             'events-and-change-handlers-do-not-overload',
-            'old-name-assignment-throws'
+            'old-name-assignment-throws',
+            'events-live-on-the-root-model'
         ]);
 
         function mount(html) {
@@ -159,6 +160,37 @@
                 t.match(thrown(() => { Stitch.Observable.create({ list: [] }).list.on = 1; }), /\.on\(\) is now \.\$onChange\(\)/, 'assigning .on on an array throws too');
                 t.equal(thrown(() => model.$set('on', true)), '', 'control: $set("on", value) adds a data field named on');
                 t.equal(model.on, true, 'control: which reads as data');
+            });
+
+            // D29: events live on the root model only. Nested objects (and rows, arrays, Maps,
+            // Sets) keep change handlers ($onChange / $offChange) but have no event methods.
+            await StitchTest.test('events-live-on-the-root-model', async (t) => {
+                const model = Stitch.Observable.create({ user: { name: 'a' }, rows: [{ id: 1 }], tags: new Set(['x']), prices: new Map([['a', 1]]) });
+                const row = model.rows[0];
+                const nested = [
+                    ['row.$emit', () => row.$emit('saved')],
+                    ['model.user.$emit', () => model.user.$emit('saved')],
+                    ['model.user.$on', () => model.user.$on('saved', () => {})],
+                    ['model.rows.$on', () => model.rows.$on('saved', () => {})],
+                    ['model.tags.$once', () => model.tags.$once('saved', () => {})],
+                    ['model.prices.$off', () => model.prices.$off('saved', () => {})]
+                ];
+                for (const [what, fn] of nested) {
+                    t.match(thrown(fn), /events live on the root model: use model\.\$emit\('saved'\)/, what + ' throws: events live on the root model');
+                }
+                let received = 0;
+                model.$on('saved', () => { received++; });
+                model.$emit('saved');
+                await new Promise(resolve => setTimeout(resolve, 20));
+                t.equal(received, 1, 'model.$emit still reaches model.$on');
+                const changes = [];
+                const watcher = change => changes.push(change.field);
+                model.user.$onChange(watcher);
+                model.user.name = 'b';
+                t.deepEqual(changes, ['name'], 'a nested object keeps $onChange (decision: change handlers stay on nested objects)');
+                model.user.$offChange(watcher);
+                model.user.name = 'c';
+                t.deepEqual(changes, ['name'], 'and $offChange removes it');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

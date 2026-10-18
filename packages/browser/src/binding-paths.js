@@ -173,6 +173,11 @@ function checkWritable(scope, path, describe) {
     }
     if (holder === null || holder === undefined || typeof holder !== "object") return;
     const key = segments[segments.length - 1];
+    // A bare name in a row is the row item's property (the context inherits it).
+    if (isRowContext(holder) && ROW_NAMES.indexOf(key) === -1) {
+        holder = holder.$data;
+        if (holder === null || typeof holder !== "object") return;
+    }
     const own = Object.getOwnPropertyDescriptor(holder, key);
     if (own && own.set && own.set.stitchReadOnlyComputed) {
         throw bindingError(describe(),

@@ -51,7 +51,8 @@
             'two-way-binding-to-any-context-value-throws',
             'write-through-a-null-step-says-so',
             'class-instance-getters-stay-bindable',
-            'two-way-binding-to-a-computed-throws'
+            'two-way-binding-to-a-computed-throws',
+            'two-way-binding-to-a-row-computed-throws'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -602,6 +603,26 @@
                 t.match(messageOf(tryBind(mount('<input data-value="total">'), model())), /"total" is a computed \(read-only\)/,
                     'data-value on a computed throws at bind()');
                 t.equal(tryBind(mount('<span data-text="total"></span>'), model()), null, 'control: data-text on a computed binds');
+            });
+
+            await StitchTest.test('two-way-binding-to-a-row-computed-throws', async (t) => {
+                const row = id => ({ id, a: id, label: Stitch.computed(function () { return 'r' + this.a; }) });
+                const html = '<ul data-foreach="rows"><li><input data-value="label"></li></ul>';
+                t.match(messageOf(tryBind(mount(html), Stitch.Observable.create({ rows: [row(1)] }))), /"label" is a computed \(read-only\)/,
+                    'data-value on a row\'s own computed throws at bind() when the row exists');
+                const host = mount(html);
+                const model = Stitch.Observable.create({ rows: [] });
+                t.equal(tryBind(host, model), null, 'precondition: the empty list binds');
+                const calls = [];
+                Stitch.onError(error => calls.push(error));
+                try {
+                    model.rows = [row(2)];
+                    await tick();
+                } finally {
+                    Stitch.onError(null);
+                }
+                t.match(messageOf(calls[0]), /"label" is a computed \(read-only\)/, 'when the row arrives later, the first row render reports it to onError');
+                t.equal(host.querySelectorAll('input').length, 0, 'and no broken row is rendered');
             });
 
             await StitchTest.test('registered-after-bind-throws', async (t) => {
