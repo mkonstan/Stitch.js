@@ -121,7 +121,7 @@
                     '<i data-probe="$parent.suffix"></i><b data-class="flags"></b></li></ul>');
                 const base = stats();
                 const model = Stitch.Observable.create({
-                    items: makeItems(4).map(item => Object.assign(item, { flags: { active: true } })), hide: false, suffix: '',
+                    items: makeItems(4).map(item => Object.assign(item, { flags: { on: true, active: false } })), hide: false, suffix: '',
                     shown: Stitch.computed(function () { return this.hide ? [] : this.items.slice(); })
                 });
                 new Stitch.DataBinder().bind(host, model);

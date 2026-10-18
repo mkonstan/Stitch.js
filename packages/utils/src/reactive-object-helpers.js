@@ -13,7 +13,7 @@ const { VERSION } = require("./version");
 
 function addChangeHandler(handler) {
     if (typeof handler !== "function") {
-        throw new TypeError(`[Stitch.js v${VERSION}] on(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
+        throw new TypeError(`[Stitch.js v${VERSION}] $on(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
     }
     this._changeHandlers.add(handler);
 }
@@ -30,12 +30,12 @@ function removeChangeHandler(handler) {
     }
     if (typeof handler !== "function") {
         throw new TypeError(
-            `[Stitch.js v${VERSION}] off(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
-            "Pass the handler given to on(); to remove every handler, call off() with no argument."
+            `[Stitch.js v${VERSION}] $off(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
+            "Pass the handler given to $on(); to remove every handler, call $off() with no argument."
         );
     }
     if (!this._changeHandlers.delete(handler)) {
-        throw new Error(`[Stitch.js v${VERSION}] off(handler): that function is not a change handler of this object. Pass the function given to on().`);
+        throw new Error(`[Stitch.js v${VERSION}] $off(handler): that function is not a change handler of this object. Pass the function given to $on().`);
     }
 }
 

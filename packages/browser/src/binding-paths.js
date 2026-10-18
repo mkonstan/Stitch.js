@@ -136,13 +136,50 @@ function memberStatus(holder, key) {
     }
     const descriptor = Object.getOwnPropertyDescriptor(holder, key);
     if (!descriptor) {
-        return "missing";
+        // A class instance: a getter its class defines (on the prototype chain, not
+        // Object.prototype) was bindable in v2 and stays bindable, read-only.
+        return inheritedGetter(holder, key) ? "bindable" : "missing";
     }
     if (holder.__isReactive === true) {
         if (descriptor.get) return "bindable";
         return descriptor.enumerable ? "not-reactive" : "missing";
     }
     return "bindable";
+}
+
+/** A getter defined by holder's class (anywhere on its prototype chain above Object.prototype). */
+function inheritedGetter(holder, key) {
+    let proto = Object.getPrototypeOf(holder);
+    while (proto && proto !== Object.prototype && proto !== Array.prototype) {
+        const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+        if (descriptor) {
+            return descriptor.get ? descriptor : null;
+        }
+        proto = Object.getPrototypeOf(proto);
+    }
+    return null;
+}
+
+/**
+ * Throws when a two-way binding's path ends on something that cannot be written: a getter
+ * without a setter (a class's computed-like property). A null step is checked on write.
+ */
+function checkWritable(scope, path, describe) {
+    const segments = path.split(".");
+    let holder = scope;
+    for (let i = 0; i < segments.length - 1; i++) {
+        if (holder === null || holder === undefined) return;
+        holder = holder[segments[i]];
+    }
+    if (holder === null || holder === undefined || typeof holder !== "object") return;
+    const key = segments[segments.length - 1];
+    const own = Object.getOwnPropertyDescriptor(holder, key);
+    const descriptor = own || inheritedGetter(holder, key);
+    if (descriptor && descriptor.get && !descriptor.set) {
+        throw bindingError(describe(),
+            `"${path}" is read-only (a getter without a setter), so a two-way binding cannot write it. ` +
+            "Bind it one-way (data-text) or bind a writable property.");
+    }
 }
 
 /** The names a binding can follow on holder, and the declared names it cannot. */
@@ -400,6 +437,7 @@ function resolveHandler(scope, ref, where) {
 
 module.exports = {
     memberStatus,
+    checkWritable,
     lookUp,
     describeBinding,
     checkPathSyntax,

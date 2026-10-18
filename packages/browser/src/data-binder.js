@@ -162,7 +162,8 @@ function createDataBinderClass(deps = {}) {
             const path = paths.checkPathSyntax(element, binding.attributeName, binding.path);
             if (binding.type === "value") {
                 const segments = path.split(".");
-                if ((segments.length === 1 && ROW_NAMES.indexOf(path) !== -1) || segments[0] === "$index") {
+                // Any read-only context value, at any depth: $parent.$index, $root.$data, ...
+                if (ROW_NAMES.indexOf(segments[segments.length - 1]) !== -1 || segments.indexOf("$index") !== -1) {
                     throw new Error(
                         `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)}: ` +
                         `a two-way binding cannot write to ${path} (it is the row's own context value, so writing it ` +
@@ -265,8 +266,8 @@ class DataBinder {
                 const onChangeHandler = change => {
                     this.hooks.onChange.call(this, change, viewModel, element);
                 };
-                viewModel.on(onChangeHandler);
-                this._trackCleanup(element, () => viewModel.off(onChangeHandler));
+                viewModel.$on(onChangeHandler);
+                this._trackCleanup(element, () => viewModel.$off(onChangeHandler));
             }
             this._bindElement(element, viewModel, []);
         } catch (error) {
@@ -335,6 +336,19 @@ class DataBinder {
         if (userHooks.properties !== undefined && (userHooks.properties === null || typeof userHooks.properties !== "object")) {
             throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`);
         }
+        for (const [property, hooks] of Object.entries(userHooks.properties || {})) {
+            if (hooks === null || typeof hooks !== "object") {
+                throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property} must be an object of { onBind, onChange }.`);
+            }
+            for (const name of Object.keys(hooks)) {
+                if (name !== "onBind" && name !== "onChange") {
+                    throw new Error(`[Stitch.js ${Version}] new DataBinder(hooks): unknown hook "properties.${property}.${name}". Known: onBind, onChange.`);
+                }
+                if (typeof hooks[name] !== "function") {
+                    throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property}.${name} must be a function.`);
+                }
+            }
+        }
         return {
             onBind: userHooks.onBind || null,
             onChange: userHooks.onChange || null,
@@ -396,15 +410,44 @@ class DataBinder {
     _checkTemplate(template, listScope) {
         const root = paths.rootOf(listScope);
         const names = bindingNames();
+        // $parent of a row of this list is listScope (the model, for a top-level list); inside
+        // a nested list it is that list's row, which does not exist yet.
+        const parentData = paths.rowItemOf(listScope);
         const elements = (template.matches(selector()) ? [template] : []).concat(Array.from(template.querySelectorAll(selector())));
+        const insideNestedList = element => {
+            let current = element === template ? null : element.parentElement;
+            while (current) {
+                if (current.hasAttribute("data-foreach")) return true;
+                if (current === template) return false;
+                current = current.parentElement;
+            }
+            return false;
+        };
+        const checkHandlerName = (ref, where, ownLevel) => {
+            const data = ref.level === "root" ? root : ref.level === "parent" && ownLevel ? parentData : undefined;
+            if (data === undefined) return;
+            const label = ref.level === "root" ? "the root model" : (paths.rowItemOf(listScope) === root ? "the model ($parent of a top-level row)" : "the parent row");
+            const hit = paths.lookUp(data, ref.segments);
+            if (!hit.found) {
+                throw new Error(`[Stitch.js ${Version}] ${where}: handler "${ref.text}" was not found on ${label}. ` +
+                    "If it is a method of each row, use the bare name; if it is on the root model, use $root.name.");
+            }
+            if (typeof hit.value !== "function") {
+                throw new Error(`[Stitch.js ${Version}] ${where}: "${ref.text}" on ${label} is ${hit.value === null ? "null" : typeof hit.value}, not a function.`);
+            }
+        };
         for (const element of elements) {
             const bindings = discovery.readElementBindings(element, names);
             checkStatically(element, bindings);
+            const ownLevel = !insideNestedList(element);
             for (const binding of bindings) {
                 if (isLiteralBinding(binding.type)) continue;
                 const where = paths.describeBinding(element, binding.attributeName, binding.path);
                 if (isHandlerBinding(binding.type)) {
                     const ref = paths.parseHandlerRef(where, binding.path);
+                    if (ref.level === "parent" && ownLevel) {
+                        checkHandlerName(ref, where, ownLevel);
+                    }
                     if (ref.level === "root") {
                         // No row exists yet, so only the root model can be asked.
                         const hit = paths.lookUp(root, ref.segments);
@@ -420,8 +463,25 @@ class DataBinder {
                     continue;
                 }
                 const path = binding.path.trim();
+                let scopeData;
+                let rest = null;
                 if (path.indexOf("$root.") === 0) {
-                    paths.readPath(root, path.slice("$root.".length), () => where);
+                    scopeData = root;
+                    rest = path.slice("$root.".length);
+                } else if (path.indexOf("$parent.") === 0 && ownLevel) {
+                    scopeData = listScope;
+                    rest = path.slice("$parent.".length);
+                }
+                if (rest === null) continue;
+                const value = paths.readPath(scopeData, rest, () => where);
+                if (binding.type === "event" && value && typeof value === "object") {
+                    // The handler names inside the map: $root. ones (and $parent. ones at this
+                    // level) can be checked now; bare names belong to the row.
+                    for (const eventName of Object.keys(value)) {
+                        if (typeof value[eventName] !== "string") continue;
+                        const entryWhere = `${where} (event "${eventName}")`;
+                        checkHandlerName(paths.parseHandlerRef(entryWhere, value[eventName]), entryWhere, ownLevel);
+                    }
                 }
             }
         }
@@ -483,6 +543,9 @@ class DataBinder {
         } else {
             path = paths.checkPathSyntax(element, attribute, rawPath);
             value = paths.readPath(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            if (type === "value") {
+                paths.checkWritable(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            }
         }
 
         // Construct full path from context

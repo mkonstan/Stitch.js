@@ -1,7 +1,6 @@
 "use strict";
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = require("./reactive-factory");
-const { MessageBus } = require("../../core/src/message-bus");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
 const { defineHidden } = require("../../utils/src/reactive-object-helpers");
 
@@ -91,41 +90,8 @@ class Observable {
         // Add factory reference
         defineHidden(reactiveData, "_factory", factory);
 
-        // Per-model MessageBus for user-facing event API ($on/$emit/$off/$once/$use).
-        // Each model gets its own bus so events don't leak across unrelated observables.
-        // The shared factory's reactiveSystem.messageBus handles internal framework events
-        // (nested-change, array-mutation) which are already payload-scoped.
-        const modelBus = new MessageBus({ version: Version });
-
-        // Add Message Bus API
-        const messageBusMethods = {
-            $on: function (event, callback) {
-                return modelBus.subscribe(event, callback);
-            },
-            $use: function (middleware) {
-                return modelBus.use(middleware);
-            },
-            $off: function (event, callback) {
-                modelBus.unsubscribe(event, callback);
-            },
-            $emit: function (event, payload) {
-                modelBus.publish(event, payload);
-            },
-            $once: function (event, callback) {
-                if (typeof callback !== "function") {
-                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
-                }
-                const unsubscribe = modelBus.subscribe(event, payload => {
-                    // Unsubscribe first: "once" holds even when the callback throws.
-                    unsubscribe();
-                    callback(payload);
-                });
-                return unsubscribe;
-            }
-        };
-        for (const [name, fn] of Object.entries(messageBusMethods)) {
-            defineHidden(reactiveData, name, fn);
-        }
+        // $on / $off / $emit / $once / $use / $get / $set come from the factory: every model
+        // object has them (D28), each with its own event bus, created on first use.
 
         // $watch remains separate due to closure over previousValue
         defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {

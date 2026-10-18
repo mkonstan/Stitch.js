@@ -44,7 +44,13 @@
             'content-replacing-binding-over-bound-children-throws',
             'empty-list-template-is-checked-at-bind',
             'two-way-binding-to-a-row-value-throws',
-            'non-reactive-names-throw'
+            'non-reactive-names-throw',
+            'helper-names-are-data-fields',
+            'tojson-field-throws-with-its-path',
+            'parent-paths-and-event-maps-checked-at-bind',
+            'two-way-binding-to-any-context-value-throws',
+            'write-through-a-null-step-says-so',
+            'class-instance-getters-stay-bindable'
         ]);
 
         const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
@@ -311,7 +317,7 @@
                 t.match(messageOf(attempt(() => model.$watch('user.mail', () => {}))), /"mail" is not a property of "user"/,
                     '$watch of a missing nested property throws');
                 t.match(messageOf(attempt(() => model.$watch('name'))), /callback must be a function/, '$watch without a callback throws');
-                t.match(messageOf(attempt(() => model.get('{ a: 1 }'))), /not a property path/, 'model.get with an inline object throws');
+                t.match(messageOf(attempt(() => model.$get('{ a: 1 }'))), /not a property path/, 'model.$get with an inline object throws');
             });
 
             // D27: a custom binding declares how its value is read. value: 'literal' passes the
@@ -468,6 +474,126 @@
                     Stitch.Observable.create({ tags: new Set(['a']), list: ['x'] })), null, 'control: size of a Set, length and an index of an array bind');
                 t.equal(tryBind(mount('<span data-text="name.length"></span>'), Stitch.Observable.create({ name: 'abc' })), null,
                     'control: the length of a string binds');
+            });
+
+            // D28: helpers are $-prefixed, so on / off / get / set are ordinary data fields:
+            // on models, on list rows from API data, and as class-map keys.
+            await StitchTest.test('helper-names-are-data-fields', async (t) => {
+                const host = mount('<ul data-foreach="rows"><li data-class="flags"><span data-text="get"></span><i data-text="set"></i><b data-visible="on"></b><u data-visible="off"></u></li></ul>');
+                const model = Stitch.Observable.create({ rows: [] });
+                t.equal(tryBind(host, model), null, 'an empty list binds');
+                const calls = [];
+                Stitch.onError(error => calls.push(error));
+                try {
+                    // A later fetch: rows whose fields are named like the old helpers.
+                    model.rows = [{ id: 1, get: 'g1', set: 's1', on: true, off: false, flags: { on: true, off: false } }];
+                    await tick();
+                } finally {
+                    Stitch.onError(null);
+                }
+                t.deepEqual(calls.map(messageOf), [], 'nothing is reported');
+                const li = host.querySelector('li');
+                t.ok(!!li, 'the row renders');
+                t.equal(li && li.querySelector('span').textContent, 'g1', 'a field named get renders');
+                t.equal(li && li.querySelector('i').textContent, 's1', 'a field named set renders');
+                t.equal(li && li.querySelector('b').style.display, '', 'a field named on is read as data (true: visible)');
+                t.equal(li && li.querySelector('u').style.display, 'none', 'a field named off is read as data (false: hidden)');
+                t.ok(li && li.classList.contains('on') && !li.classList.contains('off'), 'class map { on: true, off: false } toggles class "on"');
+                model.rows[0].flags.on = false;
+                model.rows[0].on = false;
+                await tick();
+                t.ok(li && !li.classList.contains('on'), 'the class follows flags.on');
+                t.equal(li && li.querySelector('b').style.display, 'none', 'the binding follows the on field (it is reactive)');
+                const row = model.rows[0];
+                let callError = null;
+                try { row.on(() => {}); } catch (error) { callError = error; }
+                t.ok(callError instanceof TypeError && /not a function/.test(messageOf(callError)),
+                    'calling the data field on as if it were a function throws a TypeError (not a function)');
+            });
+
+            await StitchTest.test('tojson-field-throws-with-its-path', async (t) => {
+                const attempt = fn => { try { fn(); return null; } catch (error) { return error; } };
+                const rows = () => [{ id: 0 }, { id: 1 }, { id: 2 }];
+                const withBad = () => rows().concat([{ id: 3, toJSON: 1 }]);
+                t.match(messageOf(attempt(() => Stitch.Observable.create({ rows: withBad() }))), /"rows\[3\]\.toJSON" is reserved/,
+                    'at create: the error names rows[3].toJSON');
+                const model = Stitch.Observable.create({ rows: [], info: { a: 1 } });
+                t.match(messageOf(attempt(() => { model.rows = withBad(); })), /"rows\[3\]\.toJSON" is reserved/,
+                    'a later fetch assigned to the list throws on the assignment, naming rows[3].toJSON');
+                t.equal(model.rows.length, 0, 'and the list keeps its previous value');
+                model.rows = rows();
+                t.match(messageOf(attempt(() => model.rows.push({ id: 9, toJSON: 1 }))), /"rows\[3\]\.toJSON" is reserved/,
+                    'push names the index the row would take');
+                t.match(messageOf(attempt(() => { model.info = { nested: { toJSON: 1 } }; })), /"info\.nested\.toJSON" is reserved/,
+                    'a nested object names its full path');
+                t.match(messageOf(attempt(() => Stitch.Observable.create({ toJSON: 1 }))), /"toJSON" is reserved.*JSON\.stringify/,
+                    'on the model itself, the error says why (JSON.stringify)');
+            });
+
+            // B3 residuals: in a top-level list, $parent IS the model, so $parent. is checkable at
+            // bind(); so are $root. / $parent. handler names inside an event map.
+            await StitchTest.test('parent-paths-and-event-maps-checked-at-bind', async (t) => {
+                const model = () => Stitch.Observable.create({ items: [], rootEv: { focus: '$root.nope' }, okEv: { focus: '$root.save' }, save() {} });
+                const cases = [
+                    ['<ul data-foreach="items"><li data-text="$parent.nmae"></li></ul>', /"nmae" is not a property of the model/, 'a missing $parent. path in a top-level list'],
+                    ['<ul data-foreach="items"><li><button data-click="$parent.nope"></button></li></ul>', /handler "\$parent\.nope" was not found/, 'a missing $parent. handler in a top-level list'],
+                    ['<ul data-foreach="items"><li><input data-event="$root.rootEv"></li></ul>', /\(event "focus"\): handler "\$root\.nope" was not found/, 'a missing $root. handler inside an event map']
+                ];
+                for (const [html, expected, what] of cases) {
+                    t.match(messageOf(tryBind(mount(html), model())), expected, `empty list: ${what} throws at bind()`);
+                }
+                t.equal(tryBind(mount('<ul data-foreach="items"><li><input data-event="$root.okEv"><b data-text="$parent.okEv.focus"></b></li></ul>'), model()), null,
+                    'control: valid $root. map entries and $parent. paths bind');
+                t.equal(tryBind(mount('<ul data-foreach="items"><li><ol data-foreach="sub"><li data-text="$parent.anything"></li></ol></li></ul>'), model()), null,
+                    'control: $parent. inside a nested list names the outer row, which cannot be checked before a row exists');
+            });
+
+            await StitchTest.test('two-way-binding-to-any-context-value-throws', async (t) => {
+                for (const path of ['$parent.$index', '$parent.$data', '$root.$index', '$data.$index']) {
+                    const message = messageOf(tryBind(mount(`<ul data-foreach="groups"><li><ol data-foreach="items"><li><input data-value="${path}"></li></ol></li></ul>`),
+                        Stitch.Observable.create({ groups: [{ id: 1, items: [{ id: 2 }] }] })));
+                    t.match(message, /cannot write/, `data-value="${path}" throws`);
+                }
+            });
+
+            await StitchTest.test('write-through-a-null-step-says-so', async (t) => {
+                const host = mount('<input data-value="selected.name"><span data-text="selected.name"></span>');
+                const model = Stitch.Observable.create({ selected: null });
+                t.equal(tryBind(host, model), null, 'a path through null binds');
+                const calls = [];
+                Stitch.onError(error => calls.push(error));
+                try {
+                    const input = host.querySelector('input');
+                    input.value = 'typed';
+                    input.dispatchEvent(new Event('input'));
+                    await tick();
+                } finally {
+                    Stitch.onError(null);
+                }
+                t.equal(calls.length, 1, 'the write is reported once');
+                t.match(messageOf(calls[0]), /cannot write "selected\.name": "selected" is null/, 'the error says the path step is null');
+                t.ok(!/added after/.test(messageOf(calls[0])), 'it does not blame a property added later');
+                t.equal(model.selected, null, 'nothing was created on the model');
+            });
+
+            // Class instances: inherited getters were bindable in v2 (and round 1), so they stay
+            // bindable, read-only; a two-way binding to one throws.
+            await StitchTest.test('class-instance-getters-stay-bindable', async (t) => {
+                class Money {
+                    constructor(v) { this.v = v; }
+                    get formatted() { return '$' + this.v.toFixed(2); }
+                }
+                const host = mount('<span data-text="price.formatted"></span>');
+                const model = Stitch.Observable.create({ price: new Money(3) });
+                t.equal(tryBind(host, model), null, 'an inherited getter binds');
+                t.equal(host.textContent, '$3.00', 'and renders');
+                model.price = new Money(4);
+                await tick();
+                t.equal(host.textContent, '$4.00', 'it follows when the instance is replaced');
+                t.match(messageOf(tryBind(mount('<input data-value="price.formatted">'), Stitch.Observable.create({ price: new Money(1) }))),
+                    /"price\.formatted" is read-only/, 'a two-way binding to a getter without a setter throws');
+                t.match(messageOf(tryBind(mount('<span data-text="price.cents"></span>'), Stitch.Observable.create({ price: new Money(1) }))),
+                    /"cents" is not a property of "price"/, 'a missing name on an instance is still missing');
             });
 
             await StitchTest.test('registered-after-bind-throws', async (t) => {

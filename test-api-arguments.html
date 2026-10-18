@@ -24,7 +24,9 @@
             'model-change-handler-arguments',
             'model-event-arguments',
             'model-path-arguments',
-            'message-bus-arguments'
+            'message-bus-arguments',
+            'old-helper-names-fail-loudly',
+            'off-removes-a-once-subscription'
         ]);
 
         function mount(html) {
@@ -55,14 +57,14 @@
                 const model = Stitch.Observable.create({ n: 1 });
                 const seen = [];
                 const handler = change => seen.push(change.field);
-                t.match(thrown(() => model.on(42)), /on\(handler\): handler must be a function/, 'model.on() of a non-function throws');
-                model.on(handler);
-                t.match(thrown(() => model.off(undefined)), /off\(handler\).*undefined/, 'model.off(undefined) throws instead of removing every handler');
-                t.match(thrown(() => model.off(() => {})), /not a change handler of this object/, 'model.off() of a handler that was never added throws');
+                t.match(thrown(() => model.$on(42)), /\$on\(handler\): handler must be a function/, 'model.$on() of a non-function throws');
+                model.$on(handler);
+                t.match(thrown(() => model.$off(undefined)), /\$off\(handler\).*undefined/, 'model.$off(undefined) throws instead of removing every handler');
+                t.match(thrown(() => model.$off(() => {})), /not a change handler of this object/, 'model.$off() of a handler that was never added throws');
                 model.n = 2;
                 t.deepEqual(seen, ['n'], 'the real handler is still installed after those mistakes');
-                t.equal(thrown(() => model.off(handler)), '', 'control: model.off(handler) removes it');
-                t.equal(thrown(() => model.off()), '', 'control: model.off() with no argument removes every handler (explicit)');
+                t.equal(thrown(() => model.$off(handler)), '', 'control: model.$off(handler) removes it');
+                t.equal(thrown(() => model.$off()), '', 'control: model.$off() with no argument removes every change handler (explicit)');
             });
 
             await StitchTest.test('model-event-arguments', async (t) => {
@@ -80,12 +82,46 @@
 
             await StitchTest.test('model-path-arguments', async (t) => {
                 const model = Stitch.Observable.create({ name: 'Ann', user: { email: 'a@x' } });
-                t.match(thrown(() => model.get('nmae')), /"nmae" is not a property of the model/, 'model.get() of a missing property throws');
-                t.match(thrown(() => model.set('nmae', 1)), /"nmae" is not a property of the model/, 'model.set() of a missing property throws (it would add a non-reactive property)');
-                t.equal(model.get('user.email'), 'a@x', 'control: model.get() of a real path works');
+                t.match(thrown(() => model.$get('nmae')), /"nmae" is not a property of the model/, 'model.$get() of a missing property throws');
+                t.match(thrown(() => model.$set('user.nmae', 1)), /"nmae" is not a property of "user"/, 'model.$set() of a missing nested property throws (it would add a non-reactive property)');
+                t.equal(model.$get('user.email'), 'a@x', 'control: model.$get() of a real path works');
+                model.$set('user.email', 'b@x');
+                t.equal(model.user.email, 'b@x', 'control: model.$set() of a real path writes');
+                model.$set('added', 1);
+                t.equal(Object.getOwnPropertyDescriptor(model, 'added').get !== undefined, true, 'control: model.$set() of a new top-level key adds a reactive property');
                 t.match(thrown(() => model.$set(42, 1)), /\$set\(key, value\): key must be a non-empty string/, '$set with a non-string key throws');
-                t.match(thrown(() => Stitch.Observable.create({ on: true })), /"on" is reserved/, 'a model property named like a built-in helper (on) throws');
+                t.equal(thrown(() => Stitch.Observable.create({ on: true, off: 1, get: 'g', set: 's' })), '', 'fields named on, off, get, set are allowed (D28)');
                 t.match(thrown(() => Stitch.Observable.create({ toJSON: 1 })), /"toJSON" is reserved/, 'a model property named toJSON throws');
+            });
+
+            await StitchTest.test('old-helper-names-fail-loudly', async (t) => {
+                const model = Stitch.Observable.create({ n: 1, list: [1], tags: new Set(['a']) });
+                for (const name of ['on', 'off', 'get', 'set']) {
+                    t.match(thrown(() => model[name](() => {})), new RegExp('\\.' + name + '\\(\\) is now \\.\\$' + name + '\\(\\)'), 'model.' + name + '() throws, naming $' + name + '()');
+                }
+                t.match(thrown(() => model.list.on(() => {})), /\.on\(\) is now \.\$on\(\)/, 'an array .on() throws too');
+                t.match(thrown(() => model.tags.on(() => {})), /\.on\(\) is now \.\$on\(\)/, 'a Set .on() throws too');
+                const withField = Stitch.Observable.create({ on: true });
+                t.equal(withField.on, true, 'a data field named on reads as data');
+                t.match(thrown(() => withField.on(() => {})), /not a function/, 'calling it as a function throws a TypeError');
+            });
+
+            // $off(event, cb) removes cb whether it was added with $on or $once; after a $once fired,
+            // cb is no longer subscribed and $off throws.
+            await StitchTest.test('off-removes-a-once-subscription', async (t) => {
+                const model = Stitch.Observable.create({ n: 1 });
+                let runs = 0;
+                const cb = () => { runs++; };
+                model.$once('ping', cb);
+                t.equal(thrown(() => model.$off('ping', cb)), '', '$off(event, cb) removes a pending $once subscription of cb');
+                model.$emit('ping');
+                await new Promise(resolve => setTimeout(resolve, 20));
+                t.equal(runs, 0, 'so it never runs');
+                model.$once('ping', cb);
+                model.$emit('ping');
+                await new Promise(resolve => setTimeout(resolve, 20));
+                t.equal(runs, 1, 'a $once runs once');
+                t.match(thrown(() => model.$off('ping', cb)), /is not subscribed to "ping"/, 'after it ran, $off throws: it is no longer subscribed');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

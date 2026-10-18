@@ -37,10 +37,16 @@ function setProperty(target, path, value) {
     const keys = path.split(".");
     let current = target;
     for (let i = 0; i < keys.length - 1; i++) {
-        if (!current[keys[i]] || typeof current[keys[i]] !== "object") {
-            current[keys[i]] = {};
+        const next = current[keys[i]];
+        if (next === null || next === undefined || typeof next !== "object") {
+            // Creating the missing object here would make a non-reactive property: refuse.
+            const step = keys.slice(0, i + 1).join(".");
+            throw new Error(
+                `[Stitch.js v${VERSION}] cannot write "${path}": "${step}" is ${next === null ? "null" : next === undefined ? "undefined" : typeof next}. ` +
+                `Give "${step}" an object first (e.g. ${step}: { ${keys[i + 1]}: "" }), or hide the input while it is empty (data-visible).`
+            );
         }
-        current = current[keys[i]];
+        current = next;
     }
     current[keys[keys.length - 1]] = value;
 }
@@ -91,6 +97,15 @@ function assertPathExists(target, path, where) {
         }
         const own = Object.prototype.hasOwnProperty.call(Object(current), keys[i]) ||
             (keys[i] === "size" && (current instanceof Map || current instanceof Set));
+        if (own && current.__isReactive === true && typeof current === "object" && !Array.isArray(current)) {
+            const descriptor = Object.getOwnPropertyDescriptor(current, keys[i]);
+            if (descriptor && !descriptor.get && descriptor.enumerable) {
+                throw new Error(
+                    `[Stitch.js v${VERSION}] ${where}: "${keys.slice(0, i + 1).join(".")}" is not reactive (${keys[i][0] === "_"
+                        ? "names starting with _ are never made reactive" : "it was added after Observable.create()"}), so it could never be followed.`
+                );
+            }
+        }
         if (!own) {
             const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
             const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;

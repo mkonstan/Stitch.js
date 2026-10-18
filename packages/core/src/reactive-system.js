@@ -141,7 +141,7 @@ class ReactiveSystem {
             });
         }
 
-        // Change handlers (model.on()) fire for every write, whether or not anything
+        // Change handlers (model.$on(handler)) fire for every write, whether or not anything
         // reactive reads the property.
         notifyChangeHandlers(target, {
             field: key,

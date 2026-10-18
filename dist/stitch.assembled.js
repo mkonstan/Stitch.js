@@ -25,7 +25,6 @@ module.exports = {
 "use strict";
 
 const { createReactiveFactory, createComputedMarker, getDefaultFactory, resetDefaultFactory } = __stitchRequire(2);
-const { MessageBus } = __stitchRequire(12);
 const runtimeHelpers = __stitchRequire(22);
 const { defineHidden } = __stitchRequire(20);
 
@@ -115,41 +114,8 @@ class Observable {
         // Add factory reference
         defineHidden(reactiveData, "_factory", factory);
 
-        // Per-model MessageBus for user-facing event API ($on/$emit/$off/$once/$use).
-        // Each model gets its own bus so events don't leak across unrelated observables.
-        // The shared factory's reactiveSystem.messageBus handles internal framework events
-        // (nested-change, array-mutation) which are already payload-scoped.
-        const modelBus = new MessageBus({ version: Version });
-
-        // Add Message Bus API
-        const messageBusMethods = {
-            $on: function (event, callback) {
-                return modelBus.subscribe(event, callback);
-            },
-            $use: function (middleware) {
-                return modelBus.use(middleware);
-            },
-            $off: function (event, callback) {
-                modelBus.unsubscribe(event, callback);
-            },
-            $emit: function (event, payload) {
-                modelBus.publish(event, payload);
-            },
-            $once: function (event, callback) {
-                if (typeof callback !== "function") {
-                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
-                }
-                const unsubscribe = modelBus.subscribe(event, payload => {
-                    // Unsubscribe first: "once" holds even when the callback throws.
-                    unsubscribe();
-                    callback(payload);
-                });
-                return unsubscribe;
-            }
-        };
-        for (const [name, fn] of Object.entries(messageBusMethods)) {
-            defineHidden(reactiveData, name, fn);
-        }
+        // $on / $off / $emit / $once / $use / $get / $set come from the factory: every model
+        // object has them (D28), each with its own event bus, created on first use.
 
         // $watch remains separate due to closure over previousValue
         defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
@@ -319,6 +285,7 @@ module.exports = {
 
 const { ReactiveSystem } = __stitchRequire(13);
 const { ComputedRef } = __stitchRequire(11);
+const { MessageBus } = __stitchRequire(12);
 const runtimeHelpers = __stitchRequire(22);
 const objectHelpers = __stitchRequire(20);
 const { VERSION } = __stitchRequire(25);
@@ -362,7 +329,139 @@ function createReactiveFactory(options = {}) {
     const setProperty = options.setProperty || runtimeHelpers.setProperty;
     const getProperty = options.getProperty || runtimeHelpers.getProperty;
     const assertPathExists = runtimeHelpers.assertPathExists;
-    const RESERVED_NAMES = ["on", "off", "get", "set", "toJSON", "$set", "$watch", "$on", "$off", "$emit", "$once", "$use"];
+    // D28: the helpers Stitch puts on every model object are $-prefixed, so data fields may be
+    // named on, off, get or set. toJSON stays reserved (JSON.stringify calls it), and so do
+    // the $-names: a data field with one of them would be overwritten by the helper.
+    const RESERVED_NAMES = ["toJSON", "$on", "$off", "$get", "$set", "$emit", "$once", "$use", "$watch"];
+    // The v2 helper names: where no data field has the name, calling it throws a pointer to
+    // the $-name instead of "undefined is not a function".
+    const OLD_HELPERS = ["on", "off", "get", "set"];
+
+    /** The keys from the model down to obj (array indexes as numbers). */
+    function pathParts(obj) {
+        const parts = [];
+        const seen = new Set();
+        let current = obj;
+        while (current && current._parent && current._parent.obj && !seen.has(current)) {
+            seen.add(current);
+            parts.unshift(current._parent.key);
+            current = current._parent.obj;
+        }
+        return parts;
+    }
+
+    function formatPath(parts) {
+        return parts.reduce((text, part) => {
+            if (typeof part === "number" || /^\d+$/.test(String(part))) return `${text}[${part}]`;
+            return text ? `${text}.${part}` : String(part);
+        }, "");
+    }
+
+    function reservedError(parts) {
+        const name = String(parts[parts.length - 1]);
+        const why = name === "toJSON"
+            ? "JSON.stringify calls a property named toJSON, and Stitch defines toJSON() on every model object to serialise it"
+            : `Stitch defines ${name}() on every model object`;
+        return new Error(
+            `[Stitch.js ${Version}] "${formatPath(parts)}" is reserved: ${why}, so a data field with that name would be ` +
+            `overwritten. Rename the field when the data arrives (e.g. to "${name.replace(/^\$/, "")}Value").`
+        );
+    }
+
+    function checkReservedKeys(obj, parts) {
+        for (const name of Object.keys(obj)) {
+            if (RESERVED_NAMES.indexOf(name) !== -1) {
+                throw reservedError(parts.concat(name));
+            }
+        }
+    }
+
+    /** Array items are made reactive when first read; their keys are checked when they arrive. */
+    function checkArrayItems(items, arrayParts, firstIndex) {
+        items.forEach((item, i) => {
+            if (item && typeof item === "object" && !item.__isReactive && !Array.isArray(item)
+                && !(item instanceof Map) && !(item instanceof Set)) {
+                checkReservedKeys(item, arrayParts.concat(firstIndex + i));
+            }
+        });
+    }
+
+    function oldHelperStub(name) {
+        return function () {
+            throw new TypeError(
+                `[Stitch.js ${Version}] .${name}() is now .$${name}() in Stitch v3: the helpers are $-prefixed, so that data ` +
+                "fields can be named on, off, get or set."
+            );
+        };
+    }
+
+    function eventBusOf(target) {
+        if (!target._eventBus) {
+            defineHidden(target, "_eventBus", new MessageBus({ version: Version }));
+        }
+        return target._eventBus;
+    }
+
+    /**
+     * $on / $off / $emit / $once / $use for one model object (or collection).
+     * $on(handler): a change handler (every write); $on(event, callback): an event.
+     * $off(handler) / $off(event, callback) remove them (removing what is not there throws);
+     * $off() with no argument removes every change handler. $off(event, callback) also removes
+     * a pending $once(event, callback).
+     */
+    function createHelpers(target) {
+        const pendingOnce = new Map(); // event -> Map(callback -> unsubscribe)
+        return {
+            $on(eventOrHandler, callback) {
+                if (typeof eventOrHandler === "string") {
+                    return eventBusOf(target).subscribe(eventOrHandler, callback);
+                }
+                return addChangeHandler.call(target, eventOrHandler);
+            },
+            $off(...args) {
+                if (args.length === 0) {
+                    return removeChangeHandler.call(target);
+                }
+                const [eventOrHandler, callback] = args;
+                if (typeof eventOrHandler === "string") {
+                    const once = pendingOnce.get(eventOrHandler);
+                    if (once && once.has(callback)) {
+                        const unsubscribe = once.get(callback);
+                        once.delete(callback);
+                        unsubscribe();
+                        return undefined;
+                    }
+                    return eventBusOf(target).unsubscribe(eventOrHandler, callback);
+                }
+                return removeChangeHandler.call(target, eventOrHandler);
+            },
+            $emit(event, payload) {
+                eventBusOf(target).publish(event, payload);
+            },
+            $once(event, callback) {
+                if (typeof callback !== "function") {
+                    throw new TypeError(`[Stitch.js ${Version}] $once(event, callback): callback must be a function, got ${typeof callback}.`);
+                }
+                const bus = eventBusOf(target);
+                if (!pendingOnce.has(event)) pendingOnce.set(event, new Map());
+                const once = pendingOnce.get(event);
+                const unsubscribe = bus.subscribe(event, payload => {
+                    // Unsubscribe first: "once" holds even when the callback throws.
+                    unsubscribe();
+                    once.delete(callback);
+                    callback(payload);
+                });
+                once.set(callback, unsubscribe);
+                return () => {
+                    once.delete(callback);
+                    unsubscribe();
+                };
+            },
+            $use(middleware) {
+                return eventBusOf(target).use(middleware);
+            }
+        };
+    }
     const addChangeHandler = options.addChangeHandler || objectHelpers.addChangeHandler;
     const removeChangeHandler = options.removeChangeHandler || objectHelpers.removeChangeHandler;
     const toJSON = options.toJSON || objectHelpers.toJSON;
@@ -572,6 +671,8 @@ function createReactiveFactory(options = {}) {
             return obj;
         }
         seen.add(obj);
+        // Known before the children are converted, so a nested error can name its full path.
+        attachParent(obj, parent, key);
         
         if (obj instanceof Map) {
             return createReactiveMap(obj, parent, key);
@@ -639,16 +740,13 @@ function createReactiveFactory(options = {}) {
      * @returns {Object} Reactive object with descriptors
      */
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
-        // Names Stitch defines on every model object: a property with one of them would be
+        // Names Stitch defines on every model object: a field with one of them would be
         // overwritten by the helper, silently.
-        for (const name of Object.keys(target).concat(Array.from(computedProps.keys()))) {
-            if (RESERVED_NAMES.indexOf(name) !== -1) {
-                throw new Error(
-                    `[Stitch.js ${Version}] "${name}" is reserved: Stitch defines ${name}() on every model object, so a property ` +
-                    `with that name would be overwritten. Rename the property (e.g. "${name}Value"). Reserved: ${RESERVED_NAMES.join(", ")}.`
-                );
-            }
-        }
+        const ownParts = parent ? pathParts(parent).concat([key]) : [];
+        checkReservedKeys(target, ownParts);
+        computedProps.forEach((_marker, name) => {
+            if (RESERVED_NAMES.indexOf(name) !== -1) throw reservedError(ownParts.concat(name));
+        });
         // Add metadata
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
@@ -663,7 +761,7 @@ function createReactiveFactory(options = {}) {
         const keys = Object.keys(target).filter(k => !computedProps.has(k));
         keys.forEach(propKey => {
             const value = target[propKey];
-            if (propKey.startsWith("_") || propKey === "on" || propKey === "off") {
+            if (propKey.startsWith("_")) {
                 return;
             }
             
@@ -691,29 +789,40 @@ function createReactiveFactory(options = {}) {
         Object.defineProperties(target, propertyDescriptors);
 
         // Add helper methods
-        defineHidden(target, "on", addChangeHandler.bind(target));
-        defineHidden(target, "off", removeChangeHandler.bind(target));
-        defineHidden(target, "set", function (path, value) {
-            assertPathExists(target, path, `set("${path}")`);
-            setProperty(target, path, value);
-        });
-        defineHidden(target, "get", function (path) {
-            assertPathExists(target, path, `get("${path}")`);
+        const helpers = createHelpers(target);
+        for (const name of Object.keys(helpers)) {
+            defineHidden(target, name, helpers[name]);
+        }
+        defineHidden(target, "$get", function (path) {
+            assertPathExists(target, path, `$get("${path}")`);
             return getProperty(target, path);
         });
         defineHidden(target, "toJSON", toJSON.bind(target));
-        defineHidden(target, "$set", function (key, value) {
-            if (typeof key !== "string" || key === "") {
-                throw new TypeError(`[Stitch.js ${Version}] $set(key, value): key must be a non-empty string, got ${typeof key}.`);
+        // $set(path, value): writes an existing path; a single new key becomes a new reactive
+        // property (the way to add one after create).
+        defineHidden(target, "$set", function (path, value) {
+            if (typeof path !== "string" || path === "") {
+                throw new TypeError(`[Stitch.js ${Version}] $set(key, value): key must be a non-empty string, got ${typeof path}.`);
             }
-            if (this.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(this, key).get) {
-                this[key] = value;
-            } else {
-                const descriptor = createReactiveDescriptor(this, key, internal);
-                Object.defineProperty(this, key, descriptor);
-                this[key] = value;
+            if (path.indexOf(".") === -1) {
+                const descriptor = Object.getOwnPropertyDescriptor(target, path);
+                if (descriptor && descriptor.get) {
+                    target[path] = value;
+                } else {
+                    if (RESERVED_NAMES.indexOf(path) !== -1) throw reservedError(pathParts(target).concat(path));
+                    Object.defineProperty(target, path, createReactiveDescriptor(target, path, internal));
+                    target[path] = value;
+                }
+                return;
             }
+            assertPathExists(target, path, `$set("${path}")`);
+            setProperty(target, path, value);
         });
+        for (const name of OLD_HELPERS) {
+            if (!Object.prototype.hasOwnProperty.call(target, name)) {
+                Object.defineProperty(target, name, { value: oldHelperStub(name), enumerable: false, configurable: true, writable: false });
+            }
+        }
 
         return target;
     }
@@ -748,14 +857,15 @@ function createReactiveFactory(options = {}) {
         attachParent(target, parent, key);
 
         const overrides = methodOverrides(target);
+        const helpers = createHelpers(target);
 
         const proxy = new Proxy(target, {
             get(target, prop, receiver) {
                 if (prop === "__isReactive") return true;
                 if (prop === "_changeHandlers") return target._changeHandlers;
                 if (prop === "_parent") return target._parent;
-                if (prop === "on") return addChangeHandler.bind(target);
-                if (prop === "off") return removeChangeHandler.bind(target);
+                if (Object.prototype.hasOwnProperty.call(helpers, prop)) return helpers[prop];
+                if (prop === "on" || prop === "off") return oldHelperStub(prop);
 
                 // Track size dependency
                 if (prop === "size") {
@@ -919,21 +1029,31 @@ function createReactiveFactory(options = {}) {
         }
 
         const arrayMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill"];
+        checkArrayItems(target, parent ? pathParts(parent).concat([key]) : [], 0);
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
+        const helpers = createHelpers(target);
 
         const proxy = new Proxy(target, {
             get(target, key, receiver) {
                 if (key === "__isReactive") return true;
                 if (key === "_changeHandlers") return target._changeHandlers;
                 if (key === "_parent") return target._parent;
-                if (key === "on") return addChangeHandler.bind(target);
-                if (key === "off") return removeChangeHandler.bind(target);
+                if (typeof key === "string" && Object.prototype.hasOwnProperty.call(helpers, key)) return helpers[key];
+                if (key === "on" || key === "off" || key === "get" || key === "set") return oldHelperStub(key);
                 reactiveSystem.track(target, key);
                 if (arrayMethods.includes(key)) {
                     return function (...args) {
+                        // New items: their keys are checked now, with the index they will take.
+                        const arrayParts = pathParts(target);
+                        if (key === "push") checkArrayItems(args, arrayParts, target.length);
+                        else if (key === "unshift") checkArrayItems(args, arrayParts, 0);
+                        else if (key === "splice") {
+                            const start = args[0] < 0 ? Math.max(target.length + args[0], 0) : Math.min(args[0] || 0, target.length);
+                            checkArrayItems(args.slice(2), arrayParts, start);
+                        } else if (key === "fill") checkArrayItems([args[0]], arrayParts, 0);
                         // Only snapshot when indexed deps are actually being tracked.
                         const deps = reactiveSystem.depsMap.get(target);
                         const trackedIndexKeys = [];
@@ -1311,13 +1431,50 @@ function memberStatus(holder, key) {
     }
     const descriptor = Object.getOwnPropertyDescriptor(holder, key);
     if (!descriptor) {
-        return "missing";
+        // A class instance: a getter its class defines (on the prototype chain, not
+        // Object.prototype) was bindable in v2 and stays bindable, read-only.
+        return inheritedGetter(holder, key) ? "bindable" : "missing";
     }
     if (holder.__isReactive === true) {
         if (descriptor.get) return "bindable";
         return descriptor.enumerable ? "not-reactive" : "missing";
     }
     return "bindable";
+}
+
+/** A getter defined by holder's class (anywhere on its prototype chain above Object.prototype). */
+function inheritedGetter(holder, key) {
+    let proto = Object.getPrototypeOf(holder);
+    while (proto && proto !== Object.prototype && proto !== Array.prototype) {
+        const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+        if (descriptor) {
+            return descriptor.get ? descriptor : null;
+        }
+        proto = Object.getPrototypeOf(proto);
+    }
+    return null;
+}
+
+/**
+ * Throws when a two-way binding's path ends on something that cannot be written: a getter
+ * without a setter (a class's computed-like property). A null step is checked on write.
+ */
+function checkWritable(scope, path, describe) {
+    const segments = path.split(".");
+    let holder = scope;
+    for (let i = 0; i < segments.length - 1; i++) {
+        if (holder === null || holder === undefined) return;
+        holder = holder[segments[i]];
+    }
+    if (holder === null || holder === undefined || typeof holder !== "object") return;
+    const key = segments[segments.length - 1];
+    const own = Object.getOwnPropertyDescriptor(holder, key);
+    const descriptor = own || inheritedGetter(holder, key);
+    if (descriptor && descriptor.get && !descriptor.set) {
+        throw bindingError(describe(),
+            `"${path}" is read-only (a getter without a setter), so a two-way binding cannot write it. ` +
+            "Bind it one-way (data-text) or bind a writable property.");
+    }
 }
 
 /** The names a binding can follow on holder, and the declared names it cannot. */
@@ -1575,6 +1732,7 @@ function resolveHandler(scope, ref, where) {
 
 module.exports = {
     memberStatus,
+    checkWritable,
     lookUp,
     describeBinding,
     checkPathSyntax,
@@ -1702,12 +1860,12 @@ const BINDING_HANDLERS = {
             valueEffect(element, viewModel, "value", path, context, value => {
                 handler.modelToView(element, value, viewModel, path);
             });
-            const updateModel = () => {
+            const updateModel = () => runHandler(element, "value", path, () => {
                 const value = handler.viewToModel(element);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
-            };
+            });
             element.addEventListener("input", updateModel);
             element.addEventListener("change", updateModel);
             context.binder._trackCleanup(element, () => {
@@ -2179,7 +2337,8 @@ function createDataBinderClass(deps = {}) {
             const path = paths.checkPathSyntax(element, binding.attributeName, binding.path);
             if (binding.type === "value") {
                 const segments = path.split(".");
-                if ((segments.length === 1 && ROW_NAMES.indexOf(path) !== -1) || segments[0] === "$index") {
+                // Any read-only context value, at any depth: $parent.$index, $root.$data, ...
+                if (ROW_NAMES.indexOf(segments[segments.length - 1]) !== -1 || segments.indexOf("$index") !== -1) {
                     throw new Error(
                         `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)}: ` +
                         `a two-way binding cannot write to ${path} (it is the row's own context value, so writing it ` +
@@ -2282,8 +2441,8 @@ class DataBinder {
                 const onChangeHandler = change => {
                     this.hooks.onChange.call(this, change, viewModel, element);
                 };
-                viewModel.on(onChangeHandler);
-                this._trackCleanup(element, () => viewModel.off(onChangeHandler));
+                viewModel.$on(onChangeHandler);
+                this._trackCleanup(element, () => viewModel.$off(onChangeHandler));
             }
             this._bindElement(element, viewModel, []);
         } catch (error) {
@@ -2352,6 +2511,19 @@ class DataBinder {
         if (userHooks.properties !== undefined && (userHooks.properties === null || typeof userHooks.properties !== "object")) {
             throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`);
         }
+        for (const [property, hooks] of Object.entries(userHooks.properties || {})) {
+            if (hooks === null || typeof hooks !== "object") {
+                throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property} must be an object of { onBind, onChange }.`);
+            }
+            for (const name of Object.keys(hooks)) {
+                if (name !== "onBind" && name !== "onChange") {
+                    throw new Error(`[Stitch.js ${Version}] new DataBinder(hooks): unknown hook "properties.${property}.${name}". Known: onBind, onChange.`);
+                }
+                if (typeof hooks[name] !== "function") {
+                    throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property}.${name} must be a function.`);
+                }
+            }
+        }
         return {
             onBind: userHooks.onBind || null,
             onChange: userHooks.onChange || null,
@@ -2413,15 +2585,44 @@ class DataBinder {
     _checkTemplate(template, listScope) {
         const root = paths.rootOf(listScope);
         const names = bindingNames();
+        // $parent of a row of this list is listScope (the model, for a top-level list); inside
+        // a nested list it is that list's row, which does not exist yet.
+        const parentData = paths.rowItemOf(listScope);
         const elements = (template.matches(selector()) ? [template] : []).concat(Array.from(template.querySelectorAll(selector())));
+        const insideNestedList = element => {
+            let current = element === template ? null : element.parentElement;
+            while (current) {
+                if (current.hasAttribute("data-foreach")) return true;
+                if (current === template) return false;
+                current = current.parentElement;
+            }
+            return false;
+        };
+        const checkHandlerName = (ref, where, ownLevel) => {
+            const data = ref.level === "root" ? root : ref.level === "parent" && ownLevel ? parentData : undefined;
+            if (data === undefined) return;
+            const label = ref.level === "root" ? "the root model" : (paths.rowItemOf(listScope) === root ? "the model ($parent of a top-level row)" : "the parent row");
+            const hit = paths.lookUp(data, ref.segments);
+            if (!hit.found) {
+                throw new Error(`[Stitch.js ${Version}] ${where}: handler "${ref.text}" was not found on ${label}. ` +
+                    "If it is a method of each row, use the bare name; if it is on the root model, use $root.name.");
+            }
+            if (typeof hit.value !== "function") {
+                throw new Error(`[Stitch.js ${Version}] ${where}: "${ref.text}" on ${label} is ${hit.value === null ? "null" : typeof hit.value}, not a function.`);
+            }
+        };
         for (const element of elements) {
             const bindings = discovery.readElementBindings(element, names);
             checkStatically(element, bindings);
+            const ownLevel = !insideNestedList(element);
             for (const binding of bindings) {
                 if (isLiteralBinding(binding.type)) continue;
                 const where = paths.describeBinding(element, binding.attributeName, binding.path);
                 if (isHandlerBinding(binding.type)) {
                     const ref = paths.parseHandlerRef(where, binding.path);
+                    if (ref.level === "parent" && ownLevel) {
+                        checkHandlerName(ref, where, ownLevel);
+                    }
                     if (ref.level === "root") {
                         // No row exists yet, so only the root model can be asked.
                         const hit = paths.lookUp(root, ref.segments);
@@ -2437,8 +2638,25 @@ class DataBinder {
                     continue;
                 }
                 const path = binding.path.trim();
+                let scopeData;
+                let rest = null;
                 if (path.indexOf("$root.") === 0) {
-                    paths.readPath(root, path.slice("$root.".length), () => where);
+                    scopeData = root;
+                    rest = path.slice("$root.".length);
+                } else if (path.indexOf("$parent.") === 0 && ownLevel) {
+                    scopeData = listScope;
+                    rest = path.slice("$parent.".length);
+                }
+                if (rest === null) continue;
+                const value = paths.readPath(scopeData, rest, () => where);
+                if (binding.type === "event" && value && typeof value === "object") {
+                    // The handler names inside the map: $root. ones (and $parent. ones at this
+                    // level) can be checked now; bare names belong to the row.
+                    for (const eventName of Object.keys(value)) {
+                        if (typeof value[eventName] !== "string") continue;
+                        const entryWhere = `${where} (event "${eventName}")`;
+                        checkHandlerName(paths.parseHandlerRef(entryWhere, value[eventName]), entryWhere, ownLevel);
+                    }
                 }
             }
         }
@@ -2500,6 +2718,9 @@ class DataBinder {
         } else {
             path = paths.checkPathSyntax(element, attribute, rawPath);
             value = paths.readPath(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            if (type === "value") {
+                paths.checkWritable(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            }
         }
 
         // Construct full path from context
@@ -3657,7 +3878,7 @@ class ReactiveSystem {
             });
         }
 
-        // Change handlers (model.on()) fire for every write, whether or not anything
+        // Change handlers (model.$on(handler)) fire for every write, whether or not anything
         // reactive reads the property.
         notifyChangeHandlers(target, {
             field: key,
@@ -4311,7 +4532,7 @@ const { VERSION } = __stitchRequire(25);
 
 function addChangeHandler(handler) {
     if (typeof handler !== "function") {
-        throw new TypeError(`[Stitch.js v${VERSION}] on(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
+        throw new TypeError(`[Stitch.js v${VERSION}] $on(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
     }
     this._changeHandlers.add(handler);
 }
@@ -4328,12 +4549,12 @@ function removeChangeHandler(handler) {
     }
     if (typeof handler !== "function") {
         throw new TypeError(
-            `[Stitch.js v${VERSION}] off(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
-            "Pass the handler given to on(); to remove every handler, call off() with no argument."
+            `[Stitch.js v${VERSION}] $off(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
+            "Pass the handler given to $on(); to remove every handler, call $off() with no argument."
         );
     }
     if (!this._changeHandlers.delete(handler)) {
-        throw new Error(`[Stitch.js v${VERSION}] off(handler): that function is not a change handler of this object. Pass the function given to on().`);
+        throw new Error(`[Stitch.js v${VERSION}] $off(handler): that function is not a change handler of this object. Pass the function given to $on().`);
     }
 }
 
@@ -4430,10 +4651,16 @@ function setProperty(target, path, value) {
     const keys = path.split(".");
     let current = target;
     for (let i = 0; i < keys.length - 1; i++) {
-        if (!current[keys[i]] || typeof current[keys[i]] !== "object") {
-            current[keys[i]] = {};
+        const next = current[keys[i]];
+        if (next === null || next === undefined || typeof next !== "object") {
+            // Creating the missing object here would make a non-reactive property: refuse.
+            const step = keys.slice(0, i + 1).join(".");
+            throw new Error(
+                `[Stitch.js v${VERSION}] cannot write "${path}": "${step}" is ${next === null ? "null" : next === undefined ? "undefined" : typeof next}. ` +
+                `Give "${step}" an object first (e.g. ${step}: { ${keys[i + 1]}: "" }), or hide the input while it is empty (data-visible).`
+            );
         }
-        current = current[keys[i]];
+        current = next;
     }
     current[keys[keys.length - 1]] = value;
 }
@@ -4484,6 +4711,15 @@ function assertPathExists(target, path, where) {
         }
         const own = Object.prototype.hasOwnProperty.call(Object(current), keys[i]) ||
             (keys[i] === "size" && (current instanceof Map || current instanceof Set));
+        if (own && current.__isReactive === true && typeof current === "object" && !Array.isArray(current)) {
+            const descriptor = Object.getOwnPropertyDescriptor(current, keys[i]);
+            if (descriptor && !descriptor.get && descriptor.enumerable) {
+                throw new Error(
+                    `[Stitch.js v${VERSION}] ${where}: "${keys.slice(0, i + 1).join(".")}" is not reactive (${keys[i][0] === "_"
+                        ? "names starting with _ are never made reactive" : "it was added after Observable.create()"}), so it could never be followed.`
+                );
+            }
+        }
         if (!own) {
             const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
             const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;

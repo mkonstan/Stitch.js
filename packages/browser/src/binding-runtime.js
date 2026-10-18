@@ -111,12 +111,12 @@ const BINDING_HANDLERS = {
             valueEffect(element, viewModel, "value", path, context, value => {
                 handler.modelToView(element, value, viewModel, path);
             });
-            const updateModel = () => {
+            const updateModel = () => runHandler(element, "value", path, () => {
                 const value = handler.viewToModel(element);
                 const validator = getValueValidator(element);
                 const validValue = validator.validate(element, value, viewModel, path, "user-input");
                 setProperty(viewModel, path, validValue);
-            };
+            });
             element.addEventListener("input", updateModel);
             element.addEventListener("change", updateModel);
             context.binder._trackCleanup(element, () => {
