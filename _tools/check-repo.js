@@ -9,7 +9,10 @@
  *                     by build-match) and npm's own lock-file fields (compared).
  *   stale-version     No OTHER version is named either (x.y.z after "v" or "Version "):
  *                     a stale version on a page or in a doc is a false claim. Archived
- *                     history docs (ARCHIVE_PATHS) are exempt.
+ *                     history docs (ARCHIVE_PATHS) are exempt, and so is the history
+ *                     section at the end of a file in HISTORY_SECTIONS (below its
+ *                     "<!-- history: ... -->" line; without the line the whole file is
+ *                     checked).
  *   local-path        No absolute local path (Windows drive paths, /Users/<name>/,
  *                     /home/<name>/, file URLs) in any file.
  *   missing-reference Every file a doc or page points to exists, and every
@@ -22,6 +25,10 @@
  *   no-random-ids     No Math.random in packages/: ids are counters (triage #14).
  *   bundle-require    The generated bundles call no require(): every module is inlined, so
  *                     the browser bundle never reaches for a file system (triage #9).
+ *   doc-snippets,     The documentation checks (_tools/doc-checks.js): every html/js block
+ *   api-coverage,     in the docs has a mode and is run by test-doc-snippets.html; docs/API.md
+ *   error-coverage,   and the code name the same API; docs/ERRORS.md and packages/ name the
+ *   doc-hygiene       same error messages; public docs carry no private references.
  *
  * Usage: node _tools/check-repo.js [--root <dir>] [--only <check>[,<check>]]
  * --root points the checks at another tree (the gate self-tests use this).
@@ -35,9 +42,11 @@ const { execFileSync } = require("child_process");
 const REPO_ROOT = path.resolve(__dirname, "..");
 const GENERATED_BUNDLES = ["stitch.js", "stitch.min.js", "dist/stitch.assembled.js"];
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
-// History documents that legitimately name old versions. PLAN.md, V2-TEST-REPORT.md and
-// MIGRATION.md (the v1 -> v2 guide) are due to move to docs/history/; drop them here then.
-const ARCHIVE_PATHS = ["PLAN.md", "V2-TEST-REPORT.md", "MIGRATION.md", "docs/history/"];
+// History documents that legitimately name old versions.
+const ARCHIVE_PATHS = ["docs/history/"];
+// Files whose END is history (old-version text below a "<!-- history: ... -->" line).
+const { HISTORY_SECTIONS, historyStart } = require("../tests/doc-snippets.js");
+const docChecks = require("./doc-checks.js");
 
 // ---------------------------------------------------------------------------
 // File listing
@@ -137,7 +146,12 @@ function checkStaleVersions(root, files) {
     for (const rel of files) {
         if (rel === "package.json" || rel === "package-lock.json" || GENERATED_BUNDLES.includes(rel)) continue;
         if (ARCHIVE_PATHS.some((archived) => rel === archived || (archived.endsWith("/") && rel.startsWith(archived)))) continue;
-        const text = readText(root, rel);
+        let text = readText(root, rel);
+        if (HISTORY_SECTIONS.indexOf(rel) !== -1) {
+            const lines = text.split(/\r?\n/);
+            const start = historyStart(lines);
+            if (start !== -1) text = lines.slice(0, start).join("\n");
+        }
         let match;
         while ((match = mention.exec(text)) !== null) {
             if (match[1] === version) continue; // reported by version-literal
@@ -398,7 +412,11 @@ const CHECKS = {
     "build-match": (root) => checkBuildMatch(root),
     "no-console": (root, files) => checkNoConsole(root, files),
     "no-random-ids": (root, files) => checkNoRandomIds(root, files),
-    "bundle-require": (root, files) => checkBundleRequire(root, files)
+    "bundle-require": (root, files) => checkBundleRequire(root, files),
+    "doc-snippets": (root, files) => docChecks.checkDocSnippets(root, files),
+    "api-coverage": (root, files) => docChecks.checkApiCoverage(root, files),
+    "error-coverage": (root, files) => docChecks.checkErrorCoverage(root, files),
+    "doc-hygiene": (root, files) => docChecks.checkDocHygiene(root, files)
 };
 
 async function runChecks(options = {}) {

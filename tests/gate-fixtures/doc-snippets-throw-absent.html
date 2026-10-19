@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: doc snippets</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js): runs the code blocks of the
+     markdown file with this page's name through the doc-snippet runner. -->
+<script src="../../stitch.js"></script>
+<script src="../harness.js"></script>
+<script src="../doc-snippets.js"></script>
+<script>
+var doc = location.pathname.split('/').pop().replace(/\.html$/, '.md');
+StitchDocSnippets.run([doc]).catch(function (error) { setTimeout(function () { throw error; }, 0); });
+</script>
+</body>
+</html>

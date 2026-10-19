@@ -144,10 +144,13 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `_tools/build-stitch-assembly.js` | assembly builder: module discovery, reachability graph, inline prelude, version stamping, metadata |
 | `minify.js` | terser minification of `stitch.js` into `stitch.min.js` |
 | `_tools/run-tests.js` | `npm test`: static checks, browser suites on both builds, gate self-tests |
-| `_tools/check-repo.js` | static checks: version literal, local paths, missing references, build-match |
+| `_tools/check-repo.js` | static checks: version literal, stale version, local paths, missing references, build-match, no console, no random ids, bundle require, and the documentation checks |
+| `_tools/doc-checks.js` | the documentation checks: doc-snippets, api-coverage, error-coverage, doc-hygiene |
+| `tests/doc-snippets.js` | the doc-snippet parser and browser runner; `DOC_SET` lists the documents whose code blocks run |
+| `test-doc-snippets.html` | the suite page that runs every runnable code block of `DOC_SET` |
 | `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`) |
 | `tests/harness.js` | in-page reporting protocol every suite uses |
-| `tests/known-failing.json` | tests that fail today because of a known defect, with the defect and the sprint that fixes it |
+| `tests/known-failing.json` | tests that fail today because of a known defect, with the defect and the planned fix |
 | `tests/gate-fixtures/` | gate self-test fixtures (pages plus `fixtures.js`) |
 | `run-tests.html` | the suite list as links, for running pages by hand |
 
@@ -215,10 +218,15 @@ npm run build:assembly:all
 
 1. **Static checks** (`_tools/check-repo.js`, also `npm run test:static`):
    - version-literal: the `package.json` version string appears nowhere else (the generated bundles and npm's lock-file root fields are excepted, and checked);
-   - stale-version: no other version is named as a Stitch version (`v` or `Version ` before x.y.z); history docs listed in `ARCHIVE_PATHS` are exempt;
+   - stale-version: no other version is named as a Stitch version (`v` or `Version ` before x.y.z); history docs (`docs/history/`) are exempt, and so is the end of `MIGRATION.md` below its `<!-- history: ... -->` line;
    - local-path: no absolute local path (drive letters, home directories, file URLs) in any file;
    - missing-reference: every file a doc or page points to exists, and every `npm run` script mentioned exists;
-   - build-match: see 6.4.
+   - build-match: see 6.4;
+   - no-console, no-random-ids, bundle-require: the library never logs, ids are counters, the bundle never calls `require()`;
+   - doc-snippets: every ```` ```html ```` / ```` ```js ```` block of a public markdown document carries a mode (`run`, `page`, `throws`, `fragment`), and every such document is in `DOC_SET` (see 7.1);
+   - api-coverage: the public surface read from the code (`window.Stitch` and what hangs off it, the model helpers, the bindings and the attributes Stitch reads, the row-context names) and the `###` headings of `docs/API.md` match in both directions; code spans in the guides that name an API must name a real one;
+   - error-coverage: the error messages built in `packages/` (static text, with `…` for the parts filled in at run time) and the `**Message:**` lines of `docs/ERRORS.md` match in both directions, and each entry has a Cause and a Fix;
+   - doc-hygiene: public documents state rules, not private project history: no decision numbers, triage numbers or paths into private notes.
 2. **Browser suites**: every page in `tests/suites.js`, in headless Chromium, served over a local HTTP server.
    Each page's `stitch.js` request is answered with the build under test: first `stitch.js`, then `stitch.min.js`.
 3. **Gate self-tests**: each fixture in `tests/gate-fixtures/fixtures.js` re-runs the gate on a deliberately broken
@@ -241,6 +249,24 @@ Per test, against `tests/known-failing.json`:
 The summary prints `passed / known-failing / failed / skipped` per build. The full report is `_scratch/test-report.json`.
 
 CI (`.github/workflows/test.yml`) runs `npm run build`, `git diff --exit-code`, then `npm test`.
+
+### 7.1 Executable documentation
+
+The public documents (README, AGENTS.md, CHANGELOG.md, MIGRATION.md, docs/GUIDE.md, docs/API.md,
+docs/ERRORS.md: `DOC_SET` in `tests/doc-snippets.js`) are tests. `test-doc-snippets.html` runs every
+`run` and `throws` block in its own iframe against the build under test:
+
+- `run`: must not throw (now or in a later update) and must not log a console error;
+- `page`: markup only, used as the page of the next `js` block;
+- `throws`: must throw an error whose message contains the first code span of the `Throws:` line
+  after the block;
+- `fragment`: not run (signatures, partial lines), counted per document;
+- hidden `<!-- check: expression -->` comments after a block must evaluate to `true` in the
+  snippet's page (helpers: `text`, `texts`, `count`, `visible`, `checked`, `attr`, `click`,
+  `type`, `tick`).
+
+Gate fixtures prove that a snippet that throws, a `throws` block that does not throw or throws
+another message, a false check, and an error raised later in an update each fail the run.
 
 ## 8. Common Change Workflows
 
@@ -275,7 +301,14 @@ npm test
 2. Remove its entry; `npm test` fails until you do.
 3. Update `KNOWN-ISSUES.md`.
 
-### 8.5 Release a New Version
+### 8.5 Change the Public API or an Error Message
+
+`npm test` fails until the documentation follows: a new or removed public name needs its heading in
+`docs/API.md`; a new or changed error message needs its `**Message:**` line in `docs/ERRORS.md` (the
+check prints the line to add). Rules that change also belong in `docs/GUIDE.md`, `AGENTS.md` and,
+when they break existing pages, `MIGRATION.md` and `CHANGELOG.md`.
+
+### 8.6 Release a New Version
 
 Change `version` in the root `package.json` only, run `npm install` (for the lock file) and `npm run build`, then `npm test`.
 
@@ -300,7 +333,11 @@ Change `version` in the root `package.json` only, run `npm install` (for the loc
 
 ## 11. Related Docs
 
-- User-facing API and usage guide: `stitch_documentation.md`
-- API reference: `STITCH_API.md`
-- Migration details: `MIGRATION.md`
+- Quick start: `README.md`
+- Guide: `docs/GUIDE.md`
+- API reference: `docs/API.md`
+- Error reference: `docs/ERRORS.md`
+- Rules for AI agents: `AGENTS.md`
+- Migration details: `MIGRATION.md`; changes: `CHANGELOG.md`
+- The v2 documents, archived: `docs/history/`
 - Known defects and their tests: `KNOWN-ISSUES.md`

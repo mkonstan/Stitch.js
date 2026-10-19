@@ -43,7 +43,8 @@
         { page: "test-bubble-perf.html", title: "Deep bubbling", about: "Change bubbling through 100 nesting levels stays correct and bounded" },
         { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
         { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
-        { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" }
+        { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" },
+        { page: "test-doc-snippets.html", title: "Executable docs", about: "Every html/js code block in the docs runs; mistakes throw their documented message" }
     ];
     // Every public example page (example*.html at the root). The runner fails if one is missing.
     var examples = [

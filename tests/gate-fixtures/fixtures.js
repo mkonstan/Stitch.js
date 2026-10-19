@@ -119,7 +119,30 @@ const browser = {
         discoverDir: `${F}orphan-example/`,
         expect: FAIL(`example page not in tests/suites.js examples: ${F}orphan-example/example-orphan.html`)
     },
-    "listed-example-missing": { suites: [`${F}pass.html`], examples: [`${F}example-does-not-exist.html`], expect: FAIL("listed example does not exist") }
+    "listed-example-missing": { suites: [`${F}pass.html`], examples: [`${F}example-does-not-exist.html`], expect: FAIL("listed example does not exist") },
+
+    // Executable documentation (tests/doc-snippets.js): a broken snippet must fail the run.
+    "control-doc-snippets": { suites: [`${F}doc-snippets-control.html`], expect: PASS },
+    "doc-snippet-run-throws": {
+        suites: [`${F}doc-snippets-run-throws.html`],
+        expect: FAIL(`FAILED  ${F}doc-snippets-run-throws.html#doc-snippets-run-throws.md:3 [stitch.js]: the snippet threw`)
+    },
+    "doc-snippet-throw-absent": {
+        suites: [`${F}doc-snippets-throw-absent.html`],
+        expect: FAIL("but nothing was thrown")
+    },
+    "doc-snippet-wrong-message": {
+        suites: [`${F}doc-snippets-wrong-message.html`],
+        expect: FAIL("does not contain the documented text")
+    },
+    "doc-snippet-check-false": {
+        suites: [`${F}doc-snippets-check-false.html`],
+        expect: FAIL("check is not true: text('#out') === 'Grace'")
+    },
+    "doc-snippet-async-error": {
+        suites: [`${F}doc-snippets-async-error.html`],
+        expect: FAIL("the snippet threw: fixture: late failure")
+    }
 };
 
 function write(dir, files) {
@@ -156,11 +179,26 @@ const staticFixtures = {
         check: "stale-version",
         create: (dir) => write(dir, {
             "package.json": PKG,
-            // Bare triplets are not Stitch versions; archived history docs may name old versions.
+            // Bare triplets are not Stitch versions; archived history docs may name old versions,
+            // and so may the history section at the end of MIGRATION.md.
             "notes.md": "Uses jquery-3.6.0.min.js on 127.0.0.1; devDependency ^1.58.2.\n",
-            "MIGRATION.md": "Upgrading from " + OLD + " is described here.\n"
+            "docs/history/old.md": "Upgrading from " + OLD + " is described here.\n",
+            "MIGRATION.md": "# Migration\n\nCurrent guide.\n\n<!-- history: older guides -->\n\nUpgrading from " + OLD + " is described here.\n"
         }),
         expect: PASS
+    },
+    "stale-version-above-history": {
+        check: "stale-version",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "MIGRATION.md": "# Migration\n\nUpgrading from " + OLD + " is described here.\n\n<!-- history: older guides -->\n"
+        }),
+        expect: FAIL('MIGRATION.md:3: stale version "' + OLD + '"')
+    },
+    "stale-version-no-history-marker": {
+        check: "stale-version",
+        create: (dir) => write(dir, { "package.json": PKG, "MIGRATION.md": "# Migration\n\nUpgrading from " + OLD + " is described here.\n" }),
+        expect: FAIL('MIGRATION.md:3: stale version "' + OLD + '"')
     },
     "stale-version": {
         check: "stale-version",
@@ -293,7 +331,140 @@ const staticFixtures = {
             fs.appendFileSync(path.join(dir, "packages/core/src/reactive-system.js"), "\n// changed without rebuilding\n");
         },
         expect: FAIL("stitch.js differs from a fresh assembly of packages/*")
+    },
+
+    // doc-snippets: every html/js block in the docs has a mode, and every doc with such
+    // blocks is executed (DOC_SET in tests/doc-snippets.js).
+    "doc-snippets-control": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({
+            "README.md": "# Readme\n\n```html run\n<p>hi</p>\n```\n\n```bash\nnpm test\n```\n",
+            "MIGRATION.md": "# Migration\n\n```js run\nvar a = 1;\n```\n\n<!-- history: old -->\n\n```javascript\nmodel.on(fn);\n```\n",
+            "docs/history/old.md": "```js\nold();\n```\n"
+        }))),
+        expect: PASS
+    },
+    "doc-snippets-untagged": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({ "README.md": "# Readme\n\n```js\nvar a = 1;\n```\n" }))),
+        expect: FAIL("README.md:3: ```js block needs a mode after the language")
+    },
+    "doc-snippets-not-in-doc-set": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({ "docs/EXTRA.md": "```html run\n<p>hi</p>\n```\n" }))),
+        expect: FAIL("docs/EXTRA.md: has html/js code blocks but is not in DOC_SET")
+    },
+    "doc-snippets-throws-without-message": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({ "README.md": "# Readme\n\n```js throws\nx();\n```\n\nIt fails.\n" }))),
+        expect: FAIL("README.md:3: a throws block must be followed by a line")
+    },
+    "doc-snippets-indented": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({ "README.md": "# Readme\n\n1. Step\n   ```js run\n   var a = 1;\n   ```\n" }))),
+        expect: FAIL("README.md:4: an html/js code block must start at column 0")
+    },
+    "doc-snippets-history-elsewhere": {
+        check: "doc-snippets",
+        create: (dir) => write(dir, Object.assign({ "package.json": PKG }, docSetFiles({ "README.md": "# Readme\n\n<!-- history: hide -->\n\n```js\nx();\n```\n" }))),
+        expect: FAIL("README.md:3: a history marker is only allowed in MIGRATION.md")
+    },
+
+    // api-coverage: docs/API.md and the code name the same public API, both ways.
+    "api-coverage-control": {
+        check: "api-coverage",
+        create: (dir, { copyTree }) => API_TREE.forEach((rel) => copyTree(rel, dir)),
+        expect: PASS
+    },
+    "api-coverage-undocumented-export": {
+        check: "api-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "stitch.js"), "\nmodule.exports.undocumentedExport = function () {};\n");
+        },
+        expect: FAIL("Stitch.undocumentedExport exists in the code but has no heading")
+    },
+    "api-coverage-documents-missing-api": {
+        check: "api-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "docs/API.md"), "\n### `Stitch.Observable.freeze(model)`\n\nFreezes a model.\n");
+        },
+        expect: FAIL("names Stitch.Observable.freeze, which does not exist in the code")
+    },
+    "api-coverage-guide-names-missing-api": {
+        check: "api-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "docs/GUIDE.md"), "\nTurn on logging with `Stitch.debug.enable()`.\n");
+        },
+        expect: FAIL("names Stitch.debug.enable, which is not part of the API")
+    },
+
+    // error-coverage: docs/ERRORS.md and packages/ name the same error messages, both ways.
+    "error-coverage-control": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => API_TREE.forEach((rel) => copyTree(rel, dir)),
+        expect: PASS
+    },
+    "error-coverage-undocumented-error": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "packages/core/src/batch-scheduler.js"),
+                "\nfunction fixture() { throw new Error(`[Stitch.js v${VERSION}] a brand new mistake nobody documented`); }\n");
+        },
+        expect: FAIL("error message not in docs/ERRORS.md (add **Message:** `a brand new mistake nobody documented`)")
+    },
+    "error-coverage-documents-missing-error": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "docs/ERRORS.md"),
+                "\n### A mistake the code never reports\n\n**Message:** `a message no code throws`\n\n**Cause:** none.\n\n**Fix:** none.\n");
+        },
+        expect: FAIL("no error in packages/ has this message: a message no code throws")
+    },
+    "error-coverage-entry-without-fix": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            const file = path.join(dir, "docs/ERRORS.md");
+            fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/^\*\*Fix:\*\*.*$/m, "(fix removed)"));
+        },
+        expect: FAIL("needs a **Cause:** line and a **Fix:** line")
+    },
+    "error-coverage-unreadable-message": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "packages/core/src/batch-scheduler.js"),
+                "\nfunction fixture(text) { throw new Error(text); }\n");
+        },
+        expect: FAIL("cannot read the message of this error")
+    },
+
+    // doc-hygiene: public docs state rules, not private history.
+    "doc-hygiene-control": {
+        check: "doc-hygiene",
+        create: (dir) => write(dir, { "package.json": PKG, "README.md": "Keys are required.\n", "docs/history/old.md": "Decided in " + "D" + "12.\n" }),
+        expect: PASS
+    },
+    "doc-hygiene-decision-number": {
+        check: "doc-hygiene",
+        create: (dir) => write(dir, { "package.json": PKG, "docs/GUIDE.md": "Keys are required (" + "D" + "10).\n" }),
+        expect: FAIL('docs/GUIDE.md:1: "' + "D" + '10" is a decision number')
     }
 };
+
+// A tree in which every DOC_SET file exists (empty), plus the given files.
+function docSetFiles(files) {
+    const out = {};
+    for (const rel of require("../doc-snippets.js").DOC_SET) out[rel] = "# " + rel + "\n";
+    return Object.assign(out, files);
+}
+
+// What api-coverage and error-coverage read: the bundle, the packages and the docs.
+const API_TREE = BUILD_TREE.concat(["docs/API.md", "docs/ERRORS.md", "docs/GUIDE.md", "README.md", "AGENTS.md"]);
 
 module.exports = { browser, static: staticFixtures };
