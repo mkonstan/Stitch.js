@@ -1,0 +1,1133 @@
+# Stitch.js error reference
+
+Every error Stitch.js v3 throws, with its cause and its fix. The test suite checks this page against
+the code in both directions: every error message in the library has an entry here, and every
+message here is one the library produces. The examples marked to throw are executed.
+
+**How to read a message.** Every message starts with `[Stitch.js v<version>]`. Errors about a
+binding then name the element and the attribute, for example
+`[Stitch.js v3.x.y] <span id="total" data-text="totl">: "totl" is not a property of the model. ...`.
+The **Message** lines below leave out that prefix and write `…` for every part that is filled in
+at run time (a name, a value, a list). Search this page for a few words of the message you got.
+
+**When a message appears.** Mistakes found by a call you make (`bind()`, `Observable.create()`,
+`$on()`, ...) are thrown to your code. Mistakes found later, inside an update (a list re-rendering,
+a computed, a change handler, an event subscriber, a click handler), go to the handler installed
+with `Stitch.onError(fn)`; with none installed they are re-thrown as uncaught errors. See
+[Errors in the Guide](GUIDE.md#errors).
+
+Two errors come from the browser, not from Stitch:
+
+- `TypeError: Cannot delete property '…' of #<Object>` from `delete model.x` in strict-mode code.
+  Model properties cannot be deleted; set them to `null` instead.
+- `TypeError: Cannot delete property …` or `Cannot define property …, object is not extensible`
+  from `Observable.create()` (or an assignment) with frozen or sealed data. Stitch converts data
+  in place, so copy frozen data first (`structuredClone(data)`).
+
+## Contents
+
+- [Binding syntax](#binding-syntax)
+- [Missing and non-reactive properties](#missing-and-non-reactive-properties)
+- [Binding values of the wrong kind](#binding-values-of-the-wrong-kind)
+- [Two-way bindings](#two-way-bindings)
+- [Handlers](#handlers)
+- [Lists: keys](#lists-keys)
+- [Lists: templates and values](#lists-templates-and-values)
+- [Where an attribute may be used](#where-an-attribute-may-be-used)
+- [DataBinder usage](#databinder-usage)
+- [Custom bindings](#custom-bindings)
+- [Models](#models)
+- [Computed properties](#computed-properties)
+- [Model helpers and events](#model-helpers-and-events)
+- [Message bus](#message-bus)
+- [Updates and handlers](#updates-and-handlers)
+- [Internal errors](#internal-errors)
+
+## Binding syntax
+
+A binding attribute names one property path (or, for `data-click`, one handler). These are thrown by `bind()`, naming the element and the attribute: `<span data-text="!done">: ...`.
+
+### Empty binding value
+
+**Message:** `the value is empty. Give the name of a model property, e.g. data-text="name".`
+
+**Cause:** The attribute has no value (`data-text=""`).
+
+**Fix:** Write the name of a model property, or remove the attribute.
+
+### Expression in a binding
+
+**Message:** `an expression is not supported; a binding names a property. Put the expression in a computed, e.g. isOpen: Stitch.computed(function () { return !this.closed; }), and bind data-visible="isOpen".`
+
+**Cause:** The value is an expression (`!done`, `a + b`, `x ? y : z`, `count > 0`). Bindings name properties; they do not evaluate code.
+
+**Fix:** Make a computed property that returns the value and bind its name.
+
+```html page
+<p id="app" data-visible="!done">Working</p>
+```
+
+```js throws
+const model = Stitch.Observable.create({ done: false });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `an expression is not supported`
+
+### Object literal in a binding
+
+**Message:** `an inline object is not supported; a binding names a property. Put the object on the model (a computed if it changes), e.g. rowClasses: Stitch.computed(function () { return { active: this.on }; }), and bind its name: data-class="rowClasses".`
+
+**Cause:** The value is an object literal (`data-class="{ active: isActive }"`).
+
+**Fix:** Put the object on the model, as a computed if it changes, and bind its name: `data-class="rowClasses"`.
+
+### Function call in a binding
+
+**Message:** `a call is not supported; a binding names a property. Make the value a computed and bind its name.`
+
+**Cause:** The value calls a function (`data-text="format(price)"`).
+
+**Fix:** Make a computed that returns the formatted value and bind its name.
+
+### Several bindings in one attribute
+
+**Message:** `an attribute holds exactly one binding with no options. Split it into separate attributes, e.g. data-value="city" data-visible="hasCity".`
+
+**Cause:** The value holds options or more bindings (`data-value="city, visible: hasCity"`), a v2 style.
+
+**Fix:** Use one attribute per binding: `data-value="city" data-visible="hasCity"`.
+
+### Not a property path
+
+**Message:** `this is not a property path. Use names of letters, digits, _ and $ joined by dots, e.g. user.name or items.0.title.`
+
+**Cause:** The value contains characters a path cannot have (`user..name`, `items[0]`).
+
+**Fix:** Use names of letters, digits, `_` and `$` joined by dots: `items.0.title`.
+
+### Not a property path (model helpers)
+
+**Message:** `"…" is not a property path. Use a dot-separated name such as "user.name"; an inline object is not supported.`
+
+**Cause:** `$get()`, `$set()` or `$watch()` received something that is not a property path, such as an object literal.
+
+**Fix:** Pass a dotted name such as `"user.name"`.
+
+## Missing and non-reactive properties
+
+Every property a binding reads must exist on the model (or row) when it is bound. A property added later by plain assignment is not reactive, so a binding could never follow it.
+
+### A binding names a property the model does not have
+
+**Message:** `"…" is not a property of …. … has: …. …Declare every bound property in Observable.create() with a starting value (null is fine): a property added later is not reactive. Or fix the binding.`
+
+**Cause:** The path names a property that the model (or the object the path walks through, or the current row) does not have. Often a typo, or a field that some data rows lack. The message lists the names that do exist and suggests a close one.
+
+**Fix:** Fix the name, or declare the property in `Observable.create()` with a starting value (`null` is fine). For rows from a server, add missing fields before creating the model.
+
+```html page
+<span id="app" data-text="nmae"></span>
+```
+
+```js throws
+const model = Stitch.Observable.create({ name: 'Ada' });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `"nmae" is not a property of the model. The model has: name. Did you mean "name"?`
+
+### A path walks through a plain value
+
+**Message:** `"…" is not a property of …, which is …. Fix the path, or make that value an object.`
+
+**Cause:** A step of the path is a string, number or boolean, so it has no properties (`data-text="name.first"` where `name` is a string).
+
+**Fix:** Fix the path, or make that value an object.
+
+### A binding names a property that is not reactive
+
+**Message:** `"…" is not reactive: …`
+
+**Cause:** The property exists but has no reactive accessor: its name starts with `_` (never made reactive), or it was added after `Observable.create()` by plain assignment.
+
+**Fix:** Rename it without the `_`, or declare it in `Observable.create()`, or add it with `model.$set(name, value)`.
+
+### $watch, $get or $set names a property the model does not have
+
+**Message:** `…: "…" is not a property of … (it has: …). Declare it in Observable.create() with a starting value (a property added later is not reactive), or fix the name.`
+
+**Cause:** The path given to `$watch()`, `$get()` or `$set()` (dotted form) names a property that does not exist.
+
+**Fix:** Fix the name, or declare the property in `Observable.create()`. To add a new property, call `$set(name, value)` with a single name.
+
+### $watch names a property that is not reactive
+
+**Message:** `…: "…" is not reactive (…), so it could never be followed.`
+
+**Cause:** `$watch()` names a property that starts with `_` or was added after `Observable.create()`; the watch would never fire.
+
+**Fix:** Declare the property in `Observable.create()` (or add it with `$set`), without a leading `_`.
+
+## Binding values of the wrong kind
+
+These are thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state).
+
+### data-text bound to a function
+
+**Message:** `"…" is a function; data-text shows a value. Make it a computed (Stitch.computed(function () { ... })) and bind that, or bind the property it returns.`
+
+**Cause:** `data-text` names a method. It shows values, it does not call functions.
+
+**Fix:** Make the value a computed (`Stitch.computed(function () { ... })`) and bind that.
+
+### data-class value of the wrong kind
+
+**Message:** `the value must be a class string or an object of { className: boolean }; got ….`
+
+**Cause:** The bound value is neither a string, an object of `{ className: boolean }`, `null` nor `undefined` (for example an array or a number).
+
+**Fix:** Return a class string or an object from a computed.
+
+### data-attr value of the wrong kind
+
+**Message:** `the value must be an object of { attributeName: value }, e.g. { href: url, target: "_blank" }; got ….`
+
+**Cause:** The bound value is not an object of attributes (for example a string).
+
+**Fix:** Bind an object such as `{ href: url, target: "_blank" }`, usually a computed.
+
+### data-event value of the wrong kind
+
+**Message:** `the value must be an object that maps event names to handlers, e.g. { input: "validate" }; got ….`
+
+**Cause:** `data-event` names a property that is not an object of `{ eventName: handler }`.
+
+**Fix:** Put an object such as `{ input: "validate", blur: "$root.save" }` on the model and bind its name.
+
+### data-event entry of the wrong kind
+
+**Message:** `… (event "…"): the handler must be a handler name (e.g. "validate" or "$root.save") or a function; got ….`
+
+**Cause:** An entry of the `data-event` object is neither a handler name (string) nor a function.
+
+**Fix:** Map each event to a handler name or a function.
+
+## Two-way bindings
+
+`data-value` writes the user's input back to the model, so its path must be writable.
+
+### data-value on a computed
+
+**Message:** `"…" is a computed (read-only), so a two-way binding cannot write it. Bind it one-way (data-text), or bind the plain property it is computed from.`
+
+**Cause:** A computed is read-only; the input could not write to it.
+
+**Fix:** Bind the computed one-way (`data-text`), or bind `data-value` to the plain property it is computed from.
+
+### data-value on a read-only getter
+
+**Message:** `"…" is read-only (a getter without a setter), so a two-way binding cannot write it. Bind it one-way (data-text) or bind a writable property.`
+
+**Cause:** The path ends on a getter with no setter (for example a class getter).
+
+**Fix:** Bind it one-way, or bind a writable property.
+
+### data-value on a row-context value
+
+**Message:** `…: a two-way binding cannot write to … (it is the row's own context value, so writing it would not change the list); bind a property instead, e.g. data-value="$data.name" with a list of objects, or data-value="$root.selected".`
+
+**Cause:** The path ends on `$data`, `$index`, `$parent` or `$root` (or passes through `$index`). Writing those would not change the list.
+
+**Fix:** Bind a property of the row (`data-value="name"` or `data-value="$data.name"` in a list of objects) or of the model (`data-value="$root.selected"`).
+
+### Writing through a null object
+
+**Message:** `cannot write "…": "…" is …. Give "…" an object first (e.g. …: { …: "" }), or hide the input while it is empty (data-visible).`
+
+**Cause:** The user typed into an input bound to `a.b` while `a` is `null` or not an object. Stitch does not create the missing object (it would not be reactive). Reported to `Stitch.onError` (or uncaught).
+
+**Fix:** Give the object a value first (`address: { city: "" }`), or hide the input while it is `null` (`data-visible="address"`).
+
+## Handlers
+
+A handler is a bare name (looked up on the current row; outside a list, the model), `$parent.name` (one level up) or `$root.name` (the root model). It is called with `(item, event)`.
+
+### Handler not found
+
+**Message:** `handler "…" was not found on ….…`
+
+**Cause:** The name does not exist where it was looked up. The most common case: a bare name inside a list row, where it is looked up on the row's item, while the method is on the model. The message says where the name does exist.
+
+**Fix:** Use the prefix the message suggests, usually `$root.name` (or `$parent.name` in a top-level list). For a method more than one level up, move it to the root model.
+
+```html page
+<ul id="app" data-foreach="items"><li><button data-click="remove">x</button></li></ul>
+```
+
+```js throws
+const model = Stitch.Observable.create({
+    items: [{ id: 1 }],
+    remove(item) { this.items.splice(this.items.indexOf(item), 1); }
+});
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `It exists as $parent.remove (on the model) and as $root.remove (on the root model): did you mean "$parent.remove"?`
+
+### Handler is not a function
+
+**Message:** `"…" on … is …, not a function. A handler must be a method of the model or row.`
+
+**Cause:** The name exists but holds data, not a method.
+
+**Fix:** Name a method, or turn the property into one.
+
+### Handler in a row template not found (checked at bind)
+
+**Message:** `…: handler "…" was not found on …. If it is a method of each row, use the bare name; if it is on the root model, use $root.name.`
+
+**Cause:** A `$parent.` handler in a list's row template does not exist one level up. This is checked when the list is bound, even if it has no rows yet.
+
+**Fix:** Use the bare name if it is a method of each row, `$root.name` if it is on the root model.
+
+### Root handler in a row template not found (checked at bind)
+
+**Message:** `…: handler "…" was not found on the root model. If it is a method of each row, use the bare name; if it is on the enclosing row, use $parent.name.`
+
+**Cause:** A `$root.` handler in a list's row template is not on the root model. This is checked when the list is bound, even if it has no rows yet.
+
+**Fix:** Add the method to the root model, or use the bare name if it is a method of each row, `$parent.name` if it is on the enclosing row.
+
+### $parent. handler in a row template is not a function
+
+**Message:** `…: "…" on … is …, not a function.`
+
+**Cause:** The name exists one level up but is not a method.
+
+**Fix:** Name a method.
+
+### $root. handler in a row template is not a function
+
+**Message:** `…: "…" on the root model is …, not a function.`
+
+**Cause:** The name exists on the root model but is not a method.
+
+**Fix:** Name a method.
+
+### $parent. outside a list
+
+**Message:** `"$parent." is only available inside a foreach row; here the handler is on the model itself. Use data-… with the bare name "…".`
+
+**Cause:** A handler outside any list uses `$parent.`; there is no level above the model.
+
+**Fix:** Use the bare name.
+
+### Handler prefix without a name
+
+**Message:** `"…" names a scope but no handler. A handler is a bare name (on the current row; the model outside a list), $parent.name or $root.name; it is called with the row item and the event.`
+
+**Cause:** The value is only `$parent` or `$root`.
+
+**Fix:** Add the method name: `$root.save`.
+
+### Two scope prefixes in a handler
+
+**Message:** `"…": only one scope prefix is allowed, and only $parent. or $root. For a handler more than one level up, put it on the root model and use $root.name. A handler is a bare name (on the current row; the model outside a list), $parent.name or $root.name; it is called with the row item and the event.`
+
+**Cause:** The handler uses `$parent.$parent.name`, `$data.name` or another `$` name after the prefix. Only one `$parent.` or `$root.` is allowed.
+
+**Fix:** Put the method on the root model and use `$root.name`.
+
+### Handler is not a name
+
+**Message:** `…. A handler is a bare name (on the current row; the model outside a list), $parent.name or $root.name; it is called with the row item and the event.`
+
+**Cause:** The handler value is an expression, a call or an object (`data-click="save()"`, `data-click="remove(item)"`), so the first sentence of the message names the syntax problem.
+
+**Fix:** Name the method only: `data-click="save"`. It is called with `(item, event)`, so it does not need arguments in the attribute.
+
+## Lists: keys
+
+Every row of a `data-foreach` list has a key: an object row its `id` (or the field named by `data-key`), a plain value itself. A list that breaks the rule throws before the list changes (from `bind()`, or to `Stitch.onError` on a later update).
+
+### A row has no key
+
+**Message:** `…: row … has no "…" (…). Every row of a list needs a unique key. …`
+
+**Cause:** An object row has no `id` (or no value for the `data-key` field). If the row has a field that looks like a key (`sku`, `code`, `userId`, ...) the message suggests it.
+
+**Fix:** Add `data-key="field"` naming the field that identifies a row, or give every row an `id`.
+
+```html page
+<ul id="app" data-foreach="products"><li data-text="name"></li></ul>
+```
+
+```js throws
+const model = Stitch.Observable.create({ products: [{ sku: 'A1', name: 'Pen' }] });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `add data-key="sku"`
+
+### Two rows have the same key
+
+**Message:** `…: rows … and … have …. Keys must be unique within a list: remove the duplicate, or key the rows by a field that is unique.`
+
+**Cause:** Two rows share a key (two objects with the same `id`, or the same plain value twice).
+
+**Fix:** Remove the duplicate, or key the rows by a field that is unique (`data-key`). For plain values that repeat, use objects with an `id`.
+
+```html page
+<ul id="app" data-foreach="tags"><li data-text="$data"></li></ul>
+```
+
+```js throws
+const model = Stitch.Observable.create({ tags: ['a', 'b', 'a'] });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `rows 0 and 2 have the same value "a"`
+
+### A row is null or undefined
+
+**Message:** `…: row … is …. A list row must be an object with a key, or a plain value (string, number, boolean). Remove the empty row from the list.`
+
+**Cause:** The list contains `null` or `undefined`.
+
+**Fix:** Remove empty entries before you assign the list.
+
+### data-key on a list of plain values
+
+**Message:** `…: row … is a plain … (…), so it has no "…" field. data-key is for lists of objects; remove data-key and each plain value is its own key.`
+
+**Cause:** The list has `data-key` but its rows are strings, numbers or booleans.
+
+**Fix:** Remove `data-key`: each plain value is its own key.
+
+### Empty data-key
+
+**Message:** `…: data-key is empty. Set it to the field that identifies a row (e.g. data-key="sku"), or remove it to use "id".`
+
+**Cause:** `data-key=""`.
+
+**Fix:** Name the key field (`data-key="sku"`), or remove the attribute to use `id`.
+
+## Lists: templates and values
+
+### Row template with several root elements
+
+**Message:** `…: … has … (…), but a row must be exactly one element. Wrap them in one element, e.g. <div>...</div>.`
+
+**Cause:** The row template has two or more top-level elements (or text next to an element). A row must be exactly one element.
+
+**Fix:** Wrap them in one element (a `<div>`, `<li>` or `<tr>`).
+
+```html page
+<div id="app" data-foreach="groups"><h4 data-text="title"></h4><p data-text="note"></p></div>
+```
+
+```js throws
+const model = Stitch.Observable.create({ groups: [{ id: 1, title: 'A', note: 'n' }] });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `has 2 root elements (<h4>, <p>)`
+
+### Empty row template
+
+**Message:** `…: … is empty. …`
+
+**Cause:** The list element (or its `<template>`) has no element to use as a row.
+
+**Fix:** Put one row element inside the list element, or inside the `<template>` named by `data-template`.
+
+### Row template is only text
+
+**Message:** `…: … is …, but a row must be one element. Wrap it in an element, e.g. <span data-text="$data"></span>.`
+
+**Cause:** The row template is text, not an element.
+
+**Fix:** Wrap it in an element, for example `<span data-text="$data"></span>`.
+
+### data-template names no element
+
+**Message:** `…: data-template="…" names no element. Add <template id="…"> with one row element inside.`
+
+**Cause:** No element has the id given in `data-template`.
+
+**Fix:** Add `<template id="...">` with one row element inside, or fix the id.
+
+### data-template names an element that is not a template
+
+**Message:** `…: data-template="…" must name a <template> element, got <…>.`
+
+**Cause:** The id belongs to a `<div>` or another element.
+
+**Fix:** Use a `<template>` element.
+
+### data-template list with content inside
+
+**Message:** `…: the list takes its rows from the <template>, so the elements written inside it (…) would be discarded. Remove them, or remove data-template to use them as the row template.`
+
+**Cause:** The list has `data-template` and also elements inside it, which would be discarded.
+
+**Fix:** Remove the inner elements, or remove `data-template` to use them as the template.
+
+### data-foreach bound to something that is not an array
+
+**Message:** `…: "…" must be an array (or null/undefined for no rows), got …. Bind data-foreach to an array.`
+
+**Cause:** The bound value is an object, a string or a number. (`null` and `undefined` render no rows.)
+
+**Fix:** Bind an array. For an object of rows, bind a computed that returns `Object.values(...)` with keys.
+
+```html page
+<ul id="app" data-foreach="people"><li data-text="name"></li></ul>
+```
+
+```js throws
+const model = Stitch.Observable.create({ people: { a: { id: 1, name: 'Ann' } } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `must be an array (or null/undefined for no rows), got object`
+
+## Where an attribute may be used
+
+### data-key or data-template without data-foreach
+
+**Message:** `…: … only works on an element with data-foreach (it configures the list's rows). Add data-foreach to this element, or remove ….`
+
+**Cause:** The attribute configures a list, but the element has no `data-foreach`.
+
+**Fix:** Add `data-foreach` to the element, or remove the attribute.
+
+### data-default-text or data-default-value outside a select list
+
+**Message:** `…: … only works on a <select> with data-foreach (it adds a placeholder option). Move it to the <select data-foreach>, or remove it.`
+
+**Cause:** The placeholder attributes only work on a `<select data-foreach>`.
+
+**Fix:** Move them to the `<select data-foreach>`, or remove them.
+
+### data-default-value without data-default-text
+
+**Message:** `…: data-default-value is the value of the placeholder option, which data-default-text creates. Add data-default-text="Choose..." or remove data-default-value.`
+
+**Cause:** There is no placeholder option to give a value to.
+
+**Fix:** Add `data-default-text="Choose..."`, or remove `data-default-value`.
+
+### data-text and data-foreach on one element
+
+**Message:** `… has data-foreach="…" and data-text="…": data-text would replace the list's rows. Put the text on another element (e.g. a heading before the list).`
+
+**Cause:** The text would replace the list's rows.
+
+**Fix:** Put the text on another element, such as a heading before the list.
+
+### data-text on an element that contains bound elements
+
+**Message:** `… contains …: … would replace the element's content, destroying the binding inside it. Put the text in its own element (e.g. a <span>) next to the bound elements.`
+
+**Cause:** `data-text` replaces the element's whole content, which would destroy the bindings inside it.
+
+**Fix:** Put the text in its own element (a `<span>`) next to the bound elements.
+
+```html page
+<p id="app" data-text="title"><b data-text="name"></b></p>
+```
+
+```js throws
+const model = Stitch.Observable.create({ title: 'T', name: 'N' });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `data-text would replace the element's content`
+
+## DataBinder usage
+
+### Element already bound
+
+**Message:** `… is already bound by …. Binding it again would leave it on the first model or bind it twice. Call unbind() on the root that bound it first (or dispose() that binder), then bind again.`
+
+**Cause:** The root (or an element inside it) was already bound, by this binder or another one. Binding twice would leave it on the first model or bind it twice.
+
+**Fix:** Call `unbind()` on the root that bound it (or `dispose()` that binder) first, then bind again.
+
+```html page
+<span id="app" data-text="a"></span>
+```
+
+```js throws
+const binder = new Stitch.DataBinder();
+binder.bind('#app', Stitch.Observable.create({ a: 1 }));
+binder.bind('#app', Stitch.Observable.create({ a: 2 }));
+```
+Throws: `is already bound by this DataBinder`
+
+### Selector matches nothing
+
+**Message:** `…("…"): no element matches that selector.`
+
+**Cause:** `bind()` or `unbind()` got a selector that matches no element (often: the script runs before the element exists).
+
+**Fix:** Fix the selector, or run the script after the element is in the page (at the end of `<body>`, or on `DOMContentLoaded`).
+
+### Not an element
+
+**Message:** `…(element): element must be a DOM element or a selector, got ….`
+
+**Cause:** `bind()` or `unbind()` got something that is neither an element nor a selector string.
+
+**Fix:** Pass an element or a CSS selector.
+
+### bind() without a model
+
+**Message:** `bind(element, model): model must be created with Stitch.Observable.create().`
+
+**Cause:** The second argument of `bind()` is a plain object or missing.
+
+**Fix:** Create it with `Stitch.Observable.create(data)`.
+
+### bind() after dispose()
+
+**Message:** `bind(): this DataBinder was disposed. Create a new DataBinder to bind again.`
+
+**Cause:** The binder was disposed.
+
+**Fix:** Create a new `Stitch.DataBinder()`.
+
+### unbind() after dispose()
+
+**Message:** `unbind(): this DataBinder was disposed; everything it bound is already released.`
+
+**Cause:** The binder was disposed; everything it bound is already released.
+
+**Fix:** Remove the call.
+
+### unbind() of an element with nothing bound
+
+**Message:** `unbind(…): nothing is bound by this DataBinder in that element. Pass the element (or an ancestor of the elements) given to bind(), with the binder that bound it.`
+
+**Cause:** Nothing inside that element was bound by this binder (wrong element, wrong binder, or already unbound).
+
+**Fix:** Pass the element given to `bind()` (or an ancestor), with the binder that bound it.
+
+### Hooks are not an object
+
+**Message:** `new DataBinder(hooks): hooks must be an object, got ….`
+
+**Cause:** `new Stitch.DataBinder(hooks)` got something other than an object.
+
+**Fix:** Pass `{ onBind, onChange, properties }` or nothing.
+
+### Unknown hook
+
+**Message:** `new DataBinder(hooks): unknown hook "…". Known hooks: ….`
+
+**Cause:** The hooks object has a name other than `onBind`, `onChange`, `properties`.
+
+**Fix:** Fix the name.
+
+### Hook is not a function
+
+**Message:** `new DataBinder(hooks): … must be a function, got ….`
+
+**Cause:** `onBind` or `onChange` is not a function.
+
+**Fix:** Pass a function.
+
+### properties hook is not an object
+
+**Message:** `new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`
+
+**Cause:** `hooks.properties` is not an object.
+
+**Fix:** Pass `{ propertyName: { onBind, onChange } }`.
+
+### Property hooks are not an object
+
+**Message:** `new DataBinder(hooks): properties.… must be an object of { onBind, onChange }.`
+
+**Cause:** An entry of `hooks.properties` is not an object.
+
+**Fix:** Pass `{ onBind, onChange }` for each property.
+
+### Unknown property hook
+
+**Message:** `new DataBinder(hooks): unknown hook "properties.….…". Known: onBind, onChange.`
+
+**Cause:** A property hook has a name other than `onBind` or `onChange` (names are case-sensitive).
+
+**Fix:** Fix the name.
+
+### Property hook is not a function
+
+**Message:** `new DataBinder(hooks): properties.….… must be a function.`
+
+**Cause:** A property hook is not a function.
+
+**Fix:** Pass a function.
+
+## Custom bindings
+
+### registerBinding() after bind()
+
+**Message:** `registerBinding("…") was called after bind(): elements bound before it would not get the binding. Register every custom binding before the first bind() on the page.`
+
+**Cause:** A custom binding was registered after the first `bind()` on the page; elements bound earlier would not get it.
+
+**Fix:** Register every custom binding before the first `bind()`, for example at the top of your page script.
+
+```html page
+<span id="app" data-text="a"></span>
+```
+
+```js throws
+new Stitch.DataBinder().bind('#app', Stitch.Observable.create({ a: 1 }));
+Stitch.DataBinder.registerBinding('tooltip', { bind() {} });
+```
+Throws: `was called after bind()`
+
+### Binding name is not a string
+
+**Message:** `registerBinding: name must be a string`
+
+**Cause:** The first argument is not a string.
+
+**Fix:** Pass the name as a string: `registerBinding("tooltip", ...)`.
+
+### Invalid binding name
+
+**Message:** `registerBinding("…"): a binding name must be lowercase letters, digits and dashes (e.g. "tooltip" or "date-format"): it becomes the attribute data-…, and HTML lowercases attribute names.`
+
+**Cause:** HTML lowercases attribute names, so a name with capitals (`myBinding`) could never match.
+
+**Fix:** Use lowercase letters, digits and dashes: `my-binding`.
+
+### Binding name reserved
+
+**Message:** `registerBinding("…"): data-… is reserved by Stitch (it configures foreach lists). Choose another name.`
+
+**Cause:** `key`, `template`, `default-text` and `default-value` configure lists.
+
+**Fix:** Choose another name.
+
+### Binding handler without bind()
+
+**Message:** `registerBinding: handler must have a bind() method`
+
+**Cause:** The handler object has no `bind` function.
+
+**Fix:** Pass `{ bind(element, model, value, context) { ... } }`.
+
+### Invalid value kind
+
+**Message:** `registerBinding("…"): value must be "path" or "literal": "path" (the default) when the attribute names a model property, "literal" when the attribute text is passed as is. Got ….`
+
+**Cause:** `handler.value` is something other than `"path"` or `"literal"`.
+
+**Fix:** Use `"path"` (the attribute names a model property) or `"literal"` (the attribute text is passed as is).
+
+### Binding name taken
+
+**Message:** `registerBinding("…"): data-… is already registered…. Choose another name.`
+
+**Cause:** A built-in or an earlier custom binding has that name.
+
+**Fix:** Choose another name.
+
+## Models
+
+### create() without an object
+
+**Message:** `Observable.create() requires an object as input`
+
+**Cause:** `Observable.create()` got a value that is not an object.
+
+**Fix:** Pass a plain object. For an array, use `Observable.createArray()`.
+
+### createArray() without an array
+
+**Message:** `Observable.createArray() requires an array as input`
+
+**Cause:** `Observable.createArray()` got a value that is not an array.
+
+**Fix:** Pass an array.
+
+### create() of a model
+
+**Message:** `Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.`
+
+**Cause:** The object is already a model.
+
+**Fix:** Use the model you have, or pass a plain copy (`Stitch.Observable.toRaw(model)`).
+
+### create() or reactive() of an object inside a model
+
+**Message:** `…(): "…" already belongs to a model; use the root model (events, change handlers and bindings live there), or Observable.toRaw() it to make a separate model from a copy.`
+
+**Cause:** The object is part of another model (for example `model.user`).
+
+**Fix:** Use the root model, or make a separate model from a copy: `Observable.create(Observable.toRaw(model.user))`.
+
+### Options are not an object
+
+**Message:** `…(data, options): options must be an object, got ….`
+
+**Cause:** The second argument of `create`, `createArray` or `reactive` is not an object.
+
+**Fix:** Pass `{ isolated: true }` or nothing.
+
+### Unknown option
+
+**Message:** `…(): unknown option "…". Known options: ….…`
+
+**Cause:** An option other than `isolated` was passed. There is no `debug` option: Stitch has no debug mode.
+
+**Fix:** Remove the option.
+
+```js throws
+Stitch.Observable.create({ a: 1 }, { debug: true });
+```
+Throws: `unknown option "debug". Known options: isolated. There is no debug mode in v3`
+
+### Arrow function as a method
+
+**Message:** `Arrow function detected in property '…' Arrow functions cannot access reactive properties via 'this'. They use lexical 'this' binding which cannot be changed. Convert to regular function or ES6 method shorthand: ❌ …: () => { return this.someValue; } ✅ …() { return this.someValue; } ✅ …: function() { return this.someValue; } Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`
+
+**Cause:** A method of the data is an arrow function. Arrow functions cannot see the model through `this`.
+
+**Fix:** Write `name() { ... }` or `name: function () { ... }`.
+
+### Arrow function assigned to a property
+
+**Message:** `Cannot set arrow function on property '…' Arrow functions cannot access reactive properties via 'this'. Use regular function or ES6 method shorthand instead.`
+
+**Cause:** An arrow function was assigned to a model property.
+
+**Fix:** Assign a regular function or method.
+
+### Reserved field name
+
+**Message:** `"…" is reserved: …, so a data field with that name would be overwritten. Rename the field when the data arrives (e.g. to "…Value").`
+
+**Cause:** A data field is named `toJSON` or like a model helper (`$on`, `$set`, `$watch`, ...). The message names the path (`rows[3].toJSON`).
+
+**Fix:** Rename the field when the data arrives, for example to `jsonValue`.
+
+### A model inside another model
+
+**Message:** `cannot put … at "…": A model cannot be nested in another model: assign plain data, or Observable.toRaw(…). One page model is one root; events, change handlers and bindings follow that root only.`
+
+**Cause:** A model (or an object of another model) was assigned, pushed or set into a model. One model is one root: events, change handlers and bindings follow that root only.
+
+**Fix:** Assign plain data, or a copy: `app.cart = Stitch.Observable.toRaw(cart)`.
+
+```js throws
+const app = Stitch.Observable.create({ cart: null });
+const cart = Stitch.Observable.create({ items: [] });
+app.cart = cart;
+```
+Throws: `cannot put a model at "cart": A model cannot be nested in another model`
+
+### One array, Map or Set in two models
+
+**Message:** `"…" already belongs to a model; give each model its own copy (…). The same array, Map or Set in two models would be one live object with two owners: it belongs to a different model.`
+
+**Cause:** The same array, `Map` or `Set` was given to a second model (often a shared lookup list such as countries).
+
+**Fix:** Give each model its own copy: `[...countries]`, `new Map(rates)`, `new Set(codes)`.
+
+```js throws
+const countries = [{ code: 'FR' }];
+const a = Stitch.Observable.create({ countries });
+const b = Stitch.Observable.create({ countries });
+```
+Throws: `give each model its own copy ([...countries])`
+
+### delete on a list, Map or Set
+
+**Message:** `delete …: …. Model data cannot be deleted (it would leave a hole the screen does not see; set it to null instead).`
+
+**Cause:** `delete` on a model list, `Map` or `Set` would leave a hole the page does not see.
+
+**Fix:** Use `list.splice(index, 1)`, `map.delete(key)` or `set.delete(value)`. On objects, set the property to `null` (deleting a model object's property fails: in strict mode with the browser's own `TypeError`, in sloppy mode silently returning `false`).
+
+### Assignment to a computed
+
+**Message:** `Cannot set computed property '…'`
+
+**Cause:** Computed properties are read-only.
+
+**Fix:** Change the properties it is computed from.
+
+## Computed properties
+
+### computed() of the wrong kind
+
+**Message:** `Stitch.computed() expects either: - A function: Stitch.computed(function() { ... }) - An object: Stitch.computed({ get() { ... }, deps: [...] })`
+
+**Cause:** `Stitch.computed()` got neither a function nor `{ get }`.
+
+**Fix:** Pass `function () { return ...; }` or `{ get() { ... }, deps: [...] }`.
+
+### deps is not an array
+
+**Message:** `Stitch.computed() deps must be an array of property names. Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`
+
+**Cause:** `deps` was given as a string or object.
+
+**Fix:** Pass an array of property names, or leave `deps` out (dependencies are tracked automatically).
+
+### Computed deps form a cycle
+
+**Message:** `Stitch.computed() deps form a cycle: … → …. Remove the computed from its own dependency chain.`
+
+**Cause:** The `deps` lists lead back to the computed itself.
+
+**Fix:** Remove the computed from its own dependency chain.
+
+## Model helpers and events
+
+Events (`$on`, `$off`, `$emit`, `$once`, `$use`) live on the root model only. Change handlers (`$onChange`, `$offChange`) work on any model object.
+
+### Events on a nested object, row or list
+
+**Message:** `…(): events live on the root model: use model.$emit('…') / model.$on('…', callback). From a list row, call a root handler with $root.handler (data-click / data-event).`
+
+**Cause:** `$emit`, `$on`, `$off`, `$once` or `$use` was called on something other than the root model (a nested object, a list row, an array, a Map or Set).
+
+**Fix:** Call it on the root model. From a list row, call a root method with `data-click="$root.handler"` and emit from there.
+
+```js throws
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+model.user.$on('saved', function () {});
+```
+Throws: `$on(): events live on the root model: use model.$emit('saved')`
+
+### v2 helper name
+
+**Message:** `.…() is now .…() in Stitch v3: the helpers are $-prefixed, so that data fields can be named on, off, get or set. Events: $on(event, callback) / $off(event, callback).`
+
+**Cause:** Code calls (or assigns) `on`, `off`, `get` or `set`, the v2 names. In v3 the helpers are `$`-prefixed, so data can have fields with those names.
+
+**Fix:** Use `$onChange` (was `on`), `$offChange` (was `off`), `$get` (was `get`), `$set` (was `set`). Events use `$on(event, callback)` / `$off(event, callback)`.
+
+```js throws
+const model = Stitch.Observable.create({ count: 0 });
+model.on(function (change) {});
+```
+Throws: `.on() is now .$onChange() in Stitch v3`
+
+### $onChange() with an event name
+
+**Message:** `$onChange(fn) registers a change handler; for events use $on(event, callback).`
+
+**Cause:** `$onChange` got a string first. Change handlers take only a function.
+
+**Fix:** For events, use `$on(event, callback)`.
+
+### $onChange() with several arguments
+
+**Message:** `$onChange(fn) takes one argument (the change handler), got ….`
+
+**Cause:** `$onChange` takes exactly one function.
+
+**Fix:** Pass only the handler.
+
+### $onChange() without a function
+
+**Message:** `$onChange(handler): handler must be a function, got ….`
+
+**Cause:** The argument is not a function.
+
+**Fix:** Pass a function.
+
+### $offChange() with an event name
+
+**Message:** `$offChange(fn) removes a change handler; for events use $off(event, callback).`
+
+**Cause:** `$offChange` got a string first.
+
+**Fix:** For events, use `$off(event, callback)`.
+
+### $offChange() without the handler
+
+**Message:** `$offChange(handler) needs the handler to remove (exactly one argument, got …). Removing is explicit: call it once per handler given to $onChange().`
+
+**Cause:** `$offChange` was called with no argument or several. There is no "remove all".
+
+**Fix:** Pass the function given to `$onChange`, once per handler.
+
+### $offChange() with a value that is not a function
+
+**Message:** `$offChange(handler): handler is …, not a function. Pass the handler given to $onChange().`
+
+**Cause:** Often a variable that is `undefined`.
+
+**Fix:** Pass the function given to `$onChange`.
+
+### $offChange() of a handler that is not installed
+
+**Message:** `$offChange(handler): that function is not a change handler of this object. Pass the function given to $onChange().`
+
+**Cause:** The function was never added to this object, or was already removed.
+
+**Fix:** Pass the same function given to `$onChange` on the same object.
+
+### $on() with swapped arguments
+
+**Message:** `$on(fn, event): the arguments are swapped. Use $on(event, callback).`
+
+**Cause:** The callback came first.
+
+**Fix:** Write `$on(event, callback)`.
+
+### $on() with only a function
+
+**Message:** `$on(fn): $on needs an event name; for change handlers use $onChange(fn).`
+
+**Cause:** In v2, `on(fn)` registered a change handler. `$on` takes an event name.
+
+**Fix:** For change handlers use `$onChange(fn)`; for events `$on(event, callback)`.
+
+### $on() with the wrong number of arguments
+
+**Message:** `$on(event, callback) takes two arguments, got …; for change handlers use $onChange(fn).`
+
+**Cause:** `$on` takes an event name and a callback.
+
+**Fix:** Pass both.
+
+### $off() without both arguments
+
+**Message:** `$off needs an event name and the callback: $off(event, callback) for events, $offChange(fn) for change handlers.`
+
+**Cause:** `$off` takes an event name and the callback to remove.
+
+**Fix:** Pass both, or use the function `$on` returned. For change handlers use `$offChange(fn)`.
+
+### $once() without an event name
+
+**Message:** `$once(fn): $once needs an event name: $once(event, callback).`
+
+**Cause:** The callback came first or the name is missing.
+
+**Fix:** Write `$once(event, callback)`.
+
+### $once() without a callback
+
+**Message:** `$once(event, callback): callback must be a function, got ….`
+
+**Cause:** The callback is not a function.
+
+**Fix:** Pass a function.
+
+### $set() without a name
+
+**Message:** `$set(key, value): key must be a non-empty string, got ….`
+
+**Cause:** The first argument of `$set` is not a non-empty string.
+
+**Fix:** Pass the property name or path as a string.
+
+### $watch() without a callback
+
+**Message:** `$watch("…", callback): callback must be a function, got ….`
+
+**Cause:** The second argument of `$watch` is not a function.
+
+**Fix:** Pass a function `(newValue, oldValue, info) => { ... }`.
+
+## Message bus
+
+These come from `Stitch.MessageBus` and from the model's event helpers, which use it (so an error from `model.$on(...)` may name `MessageBus.subscribe`).
+
+### Event name missing
+
+**Message:** `MessageBus.…(event, ...): the event name must be a non-empty string, got ….`
+
+**Cause:** The event name is empty or not a string.
+
+**Fix:** Pass a non-empty string.
+
+### Subscriber is not a function
+
+**Message:** `MessageBus.…(event, callback): callback must be a function, got ….`
+
+**Cause:** The callback given to `subscribe` / `unsubscribe` (or `$on` / `$off`) is not a function.
+
+**Fix:** Pass a function.
+
+### Unsubscribing a callback that is not subscribed
+
+**Message:** `MessageBus.unsubscribe("…", callback): that callback is not subscribed to "…". Pass the same function that was subscribed (or call the function subscribe() returned).`
+
+**Cause:** The function passed to `unsubscribe` (or `$off`) is not subscribed to that event: a different function (a new arrow function with the same body is a different function), the wrong event, already removed, or a `$once` callback that already ran.
+
+**Fix:** Pass the same function that was subscribed, or call the function `subscribe` / `$on` returned.
+
+### Middleware is not a function
+
+**Message:** `MessageBus.use(middleware): middleware must be a function, got ….`
+
+**Cause:** `use` / `$use` got something other than a function.
+
+**Fix:** Pass `function (eventData) { ... }`.
+
+### Events publishing each other forever
+
+**Message:** `MessageBus stopped an infinite loop: events kept publishing each other for … rounds; the queued events were dropped (…). A subscriber probably publishes an event that leads back to itself.`
+
+**Cause:** Subscribers kept publishing events for 100 rounds; the queued events were dropped. Reported to `Stitch.onError`.
+
+**Fix:** Find the subscriber that publishes an event leading back to itself, and break the loop.
+
+## Updates and handlers
+
+### Updates triggering each other forever
+
+**Message:** `Stopped an infinite loop of updates: effects kept re-queuing each other for … rounds (… still queued were dropped). An effect, computed or binding probably writes a value that it, or something it triggers, reads. Move the write out of the effect, or guard it so the value stops changing.`
+
+**Cause:** Effects kept re-running each other for 100 rounds: usually a binding, computed or watch that writes a value it (or something it triggers) reads. Reported to `Stitch.onError`.
+
+**Fix:** Move the write out of the effect, or guard it so the value stops changing.
+
+### onError() or onBindReport() without a function
+
+**Message:** `…(fn): fn must be a function (or null to remove the handler), got ….`
+
+**Cause:** The argument is neither a function nor `null`.
+
+**Fix:** Pass a function, or `null` to remove the installed one.
+
+### Second onError() or onBindReport() handler
+
+**Message:** `…(fn): a handler is already installed. Remove it first with …(null) or the function the first …() call returned, then install the new one.`
+
+**Cause:** A different handler is already installed. There is one per page.
+
+**Fix:** Remove the first one (call the function the first call returned, or pass `null`), then install the new one.
+
+## Internal errors
+
+You should not see these from normal use. If you do, it is probably a bug in Stitch or code that uses its internals.
+
+### Effect on a disposed reactive system
+
+**Message:** `effect(): this ReactiveSystem was disposed; create a new model to bind again.`
+
+**Cause:** A custom binding created an effect after `reactiveSystem.dispose()`.
+
+**Fix:** Create a new model (and binder) to bind again.
+
+### Scheduler got something that is not an effect
+
+**Message:** `queue() expects a function, got …`
+
+**Cause:** Internal: an effect queue received a non-function.
+
+**Fix:** Report it as a bug.
+
+### foreach binding missing
+
+**Message:** `foreach binding is not available: createBindingRuntime() was given no bindForeach.`
+
+**Cause:** Internal: the binding runtime was built without the list renderer.
+
+**Fix:** Use the published `stitch.js` / `stitch.min.js`; report it as a bug.

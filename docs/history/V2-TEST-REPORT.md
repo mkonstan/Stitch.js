@@ -1,3 +1,8 @@
+> **Historical document: it describes Stitch.js v2, not v3.** Archived on 2026-10-19 and no longer
+> maintained; several statements in it are wrong for v3. For v3 read the [README](../../README.md),
+> the [Guide](../GUIDE.md), the [API reference](../API.md), the [error reference](../ERRORS.md) and the
+> [Migration guide](../../MIGRATION.md).
+
 # Stitch.js V2.0.1 Test Report
 
 **Version**: v2.0.1

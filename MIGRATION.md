@@ -1,4 +1,402 @@
-# Migration Guide: Stitch.js v1.0 → v2.0
+# Migration guide
+
+- [Stitch.js v2 to v3](#stitchjs-v2-to-v3) (current)
+- [History: Stitch.js v1.0 to v2.0](#history-stitchjs-v10-to-v20)
+
+## Stitch.js v2 to v3
+
+v3 makes every mistake loud. In v2, a misspelled property, a list without keys, an expression in an
+attribute or a handler that could not be found did nothing, or rendered the wrong rows, without an
+error. In v3 each one throws (or reaches `Stitch.onError`), naming the element, the binding and the
+fix. Most of the changes below turn a silent failure into an error; a few rename APIs.
+
+How to migrate a page:
+
+1. Load the v3 `stitch.js`, open the page, and fix each error it throws, top to bottom. The message
+   names the fix; the [error reference](docs/ERRORS.md) explains each one.
+2. Search your scripts for the renamed APIs below (`.on(`, `.off(`, `.get(`, `.set(`,
+   `Stitch.debug.`, `{ debug: true }`) and for event handlers that take `event` first.
+3. Install `Stitch.onError` on pages users depend on, so errors in later updates reach you.
+4. Exercise the page (click, type, filter): some mistakes in list rows and handlers surface only when
+   a row renders or a handler runs.
+
+In each section below, **Before** is v2 code and **After** is the v3 equivalent. Where the v2 code
+throws in v3, the block shows the message you will see. Every block is executed by the test suite
+against v3.
+
+### Model helpers are $-prefixed
+
+`on`, `off`, `get` and `set` were model methods in v2, which made data fields with those names
+impossible. In v3 the helpers are `$onChange`, `$offChange`, `$get` and `$set`, and `on`, `off`,
+`get`, `set` are free for data. Calling an old name where no data field has it throws a message
+that names the new one.
+
+Before:
+
+```js throws
+const model = Stitch.Observable.create({ count: 0 });
+model.on(function (change) { console.log(change.field); });
+```
+Throws: `.on() is now .$onChange() in Stitch v3`
+
+After:
+
+```js run
+const model = Stitch.Observable.create({ count: 0 });
+function log(change) { /* change.field, change.oldValue, change.newValue */ }
+model.$onChange(log);
+model.$offChange(log);
+```
+
+| v2 | v3 |
+|---|---|
+| `model.on(fn)` | `model.$onChange(fn)` |
+| `model.off(fn)` | `model.$offChange(fn)` (always with the function; there is no "remove all") |
+| `model.off()` | call `$offChange(fn)` once per handler |
+| `model.get('a.b')` | `model.$get('a.b')` |
+| `model.set('a.b', v)` | `model.$set('a.b', v)` |
+
+`$on` takes an event name and a callback only; `$on(fn)` (a change handler) throws and points to
+`$onChange`.
+
+Change handlers now fire for every write. In v2 they did not fire for a property that nothing on
+the page was reading.
+
+### Events live on the root model
+
+In v2 every nested object and list row had its own event channel, so `row.$emit('saved')` never
+reached `model.$on('saved')`. In v3, `$on`, `$off`, `$emit`, `$once` and `$use` exist only on the
+model `Observable.create()` returned; on anything inside it they throw.
+
+Before:
+
+```js throws
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+model.user.$emit('renamed', 'Ada');
+```
+Throws: `events live on the root model`
+
+After:
+
+```js run
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+model.$on('renamed', function (name) {});
+model.$emit('renamed', 'Ada');
+```
+
+From inside a list row, call a root method with `data-click="$root.save"` and emit from there.
+
+### No debug mode
+
+`Stitch.debug.enable()`, `Stitch.debug.disable()`, debug categories and the `{ debug: true }` option
+are gone. Stitch behaves the same in development and production: mistakes throw, errors in updates go
+to `Stitch.onError`, and `Stitch.onBindReport` lists what `bind()` used and ignored.
+`Stitch.debug.stats()` remains, read-only. Unknown options throw.
+
+Before:
+
+```js throws
+const model = Stitch.Observable.create({ count: 0 }, { debug: true });
+```
+Throws: `unknown option "debug". Known options: isolated. There is no debug mode in v3`
+
+After:
+
+```js run
+const model = Stitch.Observable.create({ count: 0 });
+Stitch.onBindReport(function (report) { /* report.bound, report.ignored */ });
+const counts = Stitch.debug.stats(); // { effects, subscriptions, parentLinks }
+```
+
+### Every list row needs a key
+
+v2 fell back to the row position (or a `key` field) when a row had no `id`, so filtering or
+reordering could show the wrong data in a row. v3 keys every object row by its `id`, or by the field
+named with the new `data-key` attribute; a plain value is its own key. A missing or duplicate key
+throws.
+
+Before:
+
+```html page
+<ul id="app" data-foreach="stocks"><li data-text="name"></li></ul>
+```
+
+```js throws
+const model = Stitch.Observable.create({ stocks: [{ ticker: 'ACME', name: 'Acme' }] });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `row 0 has no "id"`
+
+After:
+
+```html page
+<ul id="app" data-foreach="stocks" data-key="ticker"><li data-text="name"></li></ul>
+```
+
+```js run
+const model = Stitch.Observable.create({ stocks: [{ ticker: 'ACME', name: 'Acme' }] });
+new Stitch.DataBinder().bind('#app', model);
+```
+<!-- check: text('#app li') === 'Acme' -->
+
+Related list changes:
+
+- A row template must be exactly one element. v2 silently rendered only the first of several root
+  elements (and dropped the rest, including nested lists). v3 throws; wrap them in one element.
+- Replacing a row with a new object under the same key now shows the new object (v2 kept the old
+  row bound to the old object).
+- `data-foreach` on a value that is not an array (and not `null`/`undefined`) throws; v2 cleared the
+  list silently.
+- A `<select data-foreach>` without `data-value` keeps the user's choice when the list changes; v2
+  reset it to the placeholder on every change.
+- Rows that leave a list release their bindings (v2 leaked them on hide/show and filter cycles).
+
+### Handlers receive (item, event)
+
+In v2 a handler outside a list received the event first. In v3 every handler is called as
+`handler(item, event)` with `this` set to the object the method is on, where `item` is the current
+row's item, or the model outside a list. Handler names are a bare name (the current row; the model
+outside a list), `$parent.name` or `$root.name`; a name that is not found throws at `bind()` and
+says where it does exist.
+
+Before (v2 handler signature, which no longer receives the event first):
+
+```js fragment
+addTodo(event) { event.preventDefault(); this.todos.push({ id: Date.now(), text: this.newTodo }); }
+```
+
+After:
+
+```html page
+<form id="app"><input data-value="newTodo"><button id="add" type="submit" data-click="addTodo">Add</button><span id="n" data-text="todos.length"></span></form>
+```
+
+```js run
+let nextId = 1;
+const model = Stitch.Observable.create({
+    newTodo: 'milk',
+    todos: [],
+    addTodo(model, event) {
+        event.preventDefault();
+        this.todos.push({ id: nextId++, text: this.newTodo });
+    }
+});
+new Stitch.DataBinder().bind('#app', model);
+```
+<!-- check: click('#add') -->
+<!-- check: text('#n') === '1' -->
+
+In a nested list, `data-click="$root.remove"` now reaches the root model (in v2 it did nothing).
+
+### Bindings name one property; no expressions
+
+v2 accepted some expressions and comma-separated options in attributes and rendered nothing for the
+rest. In v3 a binding value is one property path. Expressions, calls, object literals and options
+throw at `bind()`. Move the logic into computed properties.
+
+Before:
+
+```html page
+<p id="app" data-visible="!isLoading">Loaded</p>
+```
+
+```js throws
+const model = Stitch.Observable.create({ isLoading: false });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `an expression is not supported`
+
+After:
+
+```html page
+<p id="app" data-visible="isLoaded">Loaded</p>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    isLoading: false,
+    isLoaded: Stitch.computed(function () { return !this.isLoading; })
+});
+new Stitch.DataBinder().bind('#app', model);
+```
+<!-- check: visible('#app') -->
+
+Write `data-value="city" data-visible="hasCity"` instead of `data-value="city, visible: hasCity"`.
+
+### Every bound property must exist
+
+v2 rendered an empty value for a binding to a property the model did not have. v3 throws, listing
+the properties the model has. Declare every bound property in `Observable.create()` with a starting
+value (`null` is fine), and add later properties with `$set` (plain assignment adds a property no
+binding can follow). Bindings to properties starting with `_` throw too: they were never reactive.
+
+Before:
+
+```html page
+<span id="app" data-text="user.nickname"></span>
+```
+
+```js throws
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `"nickname" is not a property of "user"`
+
+After:
+
+```html page
+<span id="app" data-text="user.nickname"></span>
+```
+
+```js run
+const model = Stitch.Observable.create({ user: { name: 'Ada', nickname: null } });
+new Stitch.DataBinder().bind('#app', model);
+```
+
+### Only Stitch's own attributes are read
+
+v2 looked at every `data-*` attribute, so `data-testid` or `data-bs-toggle` could trip it, while a
+misspelled binding was only reported in debug mode. v3 reads only its own attributes. A misspelled
+binding (`data-txt`) is not Stitch's and is ignored; install `Stitch.onBindReport(fn)` to list
+ignored attributes while you develop.
+
+### Errors in updates are reported
+
+v2 logged errors raised during an update (a list re-render, a computed, a change handler) with
+`console.error` and carried on, leaving the page stale. v3 passes them to `Stitch.onError(fn)`, or,
+with no handler installed, re-throws them as uncaught errors. The page keeps its last good state.
+Stitch itself never logs to the console.
+
+```js run
+const remove = Stitch.onError(function (error, context) {
+    // send to your error tracker: error.message, context.source, context.binding
+});
+```
+
+### Custom bindings
+
+- A custom binding's attribute value is a model path by default, and the path must exist. For a
+  binding that takes text (`data-tooltip="Save changes"`), register it with `value: 'literal'`.
+- `registerBinding` must be called before the first `bind()` on the page; later it throws.
+- A name must be lowercase letters, digits and dashes; re-registering a built-in name throws (v2
+  warned and replaced it).
+
+Before:
+
+```html page
+<button id="app" data-tooltip="Save changes">Save</button>
+```
+
+```js throws
+Stitch.DataBinder.registerBinding('tooltip', {
+    bind(element, model, value) { element.title = value; }
+});
+new Stitch.DataBinder().bind('#app', Stitch.Observable.create({}));
+```
+Throws: `an expression is not supported`
+
+The text is read as a property path; with a space in it, it is rejected as an expression (a
+single word would be reported as a missing property).
+
+After (the binding is declared literal):
+
+```html page
+<button id="app" data-tooltip="Save changes">Save</button>
+```
+
+```js run
+Stitch.DataBinder.registerBinding('tooltip', {
+    value: 'literal',
+    bind(element, model, text) { element.title = text; }
+});
+new Stitch.DataBinder().bind('#app', Stitch.Observable.create({}));
+```
+<!-- check: attr('#app', 'title') === 'Save changes' -->
+
+### A model cannot hold another model
+
+In v2, assigning one model into another left it a separate root, so events, change handlers and
+error paths ignored the outer model. v3 throws. Assign plain data, or a copy made with
+`Observable.toRaw()`. Two models cannot share one array, `Map` or `Set` either: give each its own
+copy (`[...list]`, `new Map(map)`, `new Set(set)`).
+
+Before:
+
+```js throws
+const app = Stitch.Observable.create({ cart: null });
+const cart = Stitch.Observable.create({ items: [] });
+app.cart = cart;
+```
+Throws: `A model cannot be nested in another model`
+
+After:
+
+```js run
+const app = Stitch.Observable.create({ cart: null });
+const cart = Stitch.Observable.create({ items: [] });
+app.cart = Stitch.Observable.toRaw(cart);
+```
+
+`Observable.toRaw()` now returns a deep plain copy for every model value; in v2 it returned the
+reactive list itself for an array.
+
+### Properties cannot be deleted
+
+In v2, `delete model.x` removed the reactive accessor, and the page stopped following `x` without an
+error. In v3 model properties cannot be deleted (strict-mode code gets a `TypeError`, sloppy-mode
+code gets `false`), and `delete` on a list, `Map` or `Set` throws. Set the property to `null`; use
+`splice` on lists and `delete(key)` on Maps and Sets.
+
+Before:
+
+```js throws
+const model = Stitch.Observable.create({ rows: [{ id: 1 }] });
+delete model.rows[0];
+```
+Throws: `use rows.splice(0, 1)`
+
+After:
+
+```js run
+const model = Stitch.Observable.create({ rows: [{ id: 1 }], selected: { id: 1 } });
+model.rows.splice(0, 1);
+model.selected = null;
+```
+
+### Binding and unbinding are checked
+
+- Binding an element that is already bound (by any binder) throws; `unbind()` it first.
+- `unbind()` of an element with nothing bound by that binder throws, so a second `unbind()` throws.
+- `bind()` and `unbind()` on a disposed binder throw.
+- A `bind()` that throws leaves nothing bound.
+- `new DataBinder(hooks)` rejects unknown hook names and hooks that are not functions.
+- `data-key`, `data-template`, `data-default-text` and `data-default-value` outside the element
+  they configure throw; so do `data-text` on an element containing bound elements and `data-text`
+  together with `data-foreach`.
+- `data-value` on a computed, a read-only getter or a row-context value (`$index`, `$data`, ...)
+  throws.
+
+### Other names that now throw
+
+- Data fields named `toJSON` or like a helper (`$on`, `$set`, `$watch`, ...) throw at creation.
+- `$watch` on a property that does not exist (or is not reactive) throws; it never fired in v2.
+- `MessageBus.unsubscribe` and `$off` of a callback that is not subscribed throw.
+- `Observable.create()` / `Observable.reactive()` of an object inside a model throws.
+- `$get('{...}')` (an object literal instead of a path) throws.
+
+### New in v3
+
+`data-key`, `$root.` handler and path prefixes, `Stitch.onError`, `Stitch.onBindReport`,
+`Stitch.debug.stats()`, `$onChange` / `$offChange`, `value: 'literal'` custom bindings. See the
+[API reference](docs/API.md).
+
+<!-- history: the guide below describes the v1 to v2 upgrade and is not maintained -->
+
+---
+
+# History: Stitch.js v1.0 to v2.0
+
+> This section is kept for reference. It describes v2 and is not maintained; its code is v2 code.
 
 This guide helps you migrate from Stitch.js v1.0 to v2.0.
 
@@ -424,9 +822,9 @@ See [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for implementation details of the v2.0.1 
 
 ## Need Help?
 
-- 📖 See [stitch_documentation.md](stitch_documentation.md) for complete API reference
+- 📖 See [stitch_documentation.md](docs/history/stitch_documentation.md) for complete API reference
 - 🏗️ See [ARCHITECTURE.md](ARCHITECTURE.md) for technical implementation details
-- 🐛 Report issues at: [GitHub Issues](https://github.com/your-repo/stitch.js/issues)
+- 🐛 Report issues at: [GitHub Issues](https://github.com/mkonstan/Stitch.js/issues)
 - 💡 Check [KNOWN-ISSUES.md](KNOWN-ISSUES.md) for documented limitations
 
 ---
