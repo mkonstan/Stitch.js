@@ -358,7 +358,7 @@
                             <span data-text="text"></span>
                             <div class="item-actions">
                                 <span style="color: #666;">#<span data-text="$index"></span></span>
-                                <button data-click="$parent.removeTodo">Remove</button>
+                                <button data-click="$root.removeTodo">Remove</button>
                             </div>
                         </li>
                     </ul>
@@ -574,7 +574,7 @@
                     }
                 },
 
-                // data-click="$parent.removeTodo" passes the clicked row's todo.
+                // data-click="$root.removeTodo" passes the clicked row's todo.
                 removeTodo(todo) {
                     const index = this.todos.indexOf(todo);
                     if (index > -1) {

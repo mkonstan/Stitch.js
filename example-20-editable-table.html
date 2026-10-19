@@ -177,10 +177,10 @@
                         <input data-visible="isEditing" data-value="editEmail" type="email">
                     </td>
                     <td>
-                        <button data-visible="isNotEditing" data-click="$parent.editTableRow">Edit</button>
-                        <button data-visible="isEditing" data-click="$parent.saveTableRow" class="success">Save</button>
-                        <button data-visible="isEditing" data-click="$parent.cancelEditTableRow">Cancel</button>
-                        <button data-click="$parent.deleteUser" class="danger">Delete</button>
+                        <button data-visible="isNotEditing" data-click="$root.editTableRow">Edit</button>
+                        <button data-visible="isEditing" data-click="$root.saveTableRow" class="success">Save</button>
+                        <button data-visible="isEditing" data-click="$root.cancelEditTableRow">Cancel</button>
+                        <button data-click="$root.deleteUser" class="danger">Delete</button>
                     </td>
                 </tr>
             </template>
@@ -191,7 +191,7 @@
                     <strong>foreach:</strong> External template for table rows<br>
                     <strong>Nested Stitch.computed():</strong> isNotEditing computed at row level<br>
                     <strong>visible:</strong> Toggle between view/edit mode<br>
-                    <strong>$parent:</strong> Access parent methods from nested items
+                    <strong>$root:</strong> Row buttons call model methods with data-click="$root.name"; the method gets the row item
                 </p>
             </div>
         </div>

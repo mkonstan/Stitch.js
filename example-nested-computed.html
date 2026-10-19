@@ -132,7 +132,7 @@
                 <h4 data-text="fullName"></h4>
                 <div class="user-info">
                     <span class="status-badge" data-text="statusLabel" data-class="statusClass"></span>
-                    <button data-click="$parent.toggleStatus">Toggle Status</button>
+                    <button data-click="$root.toggleStatus">Toggle Status</button>
                 </div>
             </div>
         </div>
@@ -150,22 +150,13 @@
         console.log('🚀 Starting Nested Computed Properties Test');
         console.log('='.repeat(50));
 
-        // Track console errors
+        // Count errors. A mistake in a binding throws from bind() (caught below); an error in
+        // a later update (a computed, a re-render, a click handler) goes to Stitch.onError.
         let errorCount = 0;
-        const originalError = console.error;
-        const originalWarn = console.warn;
-
-        console.error = function(...args) {
+        Stitch.onError(function (error, context) {
             errorCount++;
-            originalError.apply(console, args);
-        };
-
-        console.warn = function(...args) {
-            if (args[0] && args[0].includes('does not exist')) {
-                errorCount++;
-            }
-            originalWarn.apply(console, args);
-        };
+            console.log('Stitch.onError (' + context.source + '):', error.message);
+        });
 
         try {
             // Create model with nested computed properties in array
@@ -233,8 +224,8 @@
                     }
                 ],
 
-                // Toggle function accessible via $parent in foreach
-                // data-click="$parent.toggleStatus" passes the clicked row's user.
+                // Toggle function on the root model, reached from each row with $root.
+                // data-click="$root.toggleStatus" passes the clicked row's user.
                 toggleStatus: function(user) {
                     console.log('🔄 Toggling status for:', user);
                     user.isActive = !user.isActive;
@@ -254,7 +245,8 @@
             if (descriptor && descriptor.get) {
                 console.log('✅ fullName is a getter function');
             } else {
-                console.error('❌ fullName is NOT a getter - this is the bug!');
+                errorCount++;
+                console.log('❌ fullName is NOT a getter');
             }
 
             // Try accessing computed property directly
@@ -262,7 +254,8 @@
                 const fullName = model.users[0].fullName;
                 console.log('✅ Directly accessed fullName:', fullName);
             } catch (err) {
-                console.error('❌ Failed to access fullName:', err);
+                errorCount++;
+                console.log('❌ Failed to access fullName:', err.message);
             }
 
             // Create and bind
@@ -275,24 +268,24 @@
             console.log('✅ Binding complete!');
             console.log('='.repeat(50));
 
-            // Update status
+            // Update status (text only: never build HTML from values such as error messages)
             setTimeout(() => {
-                const statusEl = document.getElementById('status');
-                const errorCountEl = document.getElementById('error-count');
-
-                if (errorCount === 0) {
-                    statusEl.innerHTML = '<span class="success">✅ SUCCESS - No errors detected!</span>';
-                    errorCountEl.innerHTML = `<span class="success">Errors: ${errorCount}</span>`;
-                } else {
-                    statusEl.innerHTML = '<span class="error">❌ FAILED - Errors detected</span>';
-                    errorCountEl.innerHTML = `<span class="error">Errors: ${errorCount}</span>`;
-                }
+                const ok = errorCount === 0;
+                showStatus(ok ? '✅ SUCCESS - No errors detected!' : '❌ FAILED - Errors detected',
+                    'Errors: ' + errorCount, ok);
             }, 100);
 
         } catch (error) {
-            console.error('💥 Fatal error during initialization:', error);
-            document.getElementById('status').innerHTML = '<span class="error">❌ FATAL ERROR - See console</span>';
-            document.getElementById('error-count').innerHTML = `<span class="error">Exception: ${error.message}</span>`;
+            console.log('💥 bind() threw:', error.message);
+            showStatus('❌ FATAL ERROR - See console', 'Exception: ' + error.message, false);
+        }
+
+        function showStatus(status, detail, ok) {
+            const statusEl = document.getElementById('status');
+            const errorCountEl = document.getElementById('error-count');
+            statusEl.textContent = status;
+            errorCountEl.textContent = detail;
+            statusEl.className = errorCountEl.className = ok ? 'success' : 'error';
         }
     </script>
 </body>

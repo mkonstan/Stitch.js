@@ -188,7 +188,7 @@
                 <div class="product-card">
                     <div class="product-name" data-text="name"></div>
                     <div class="product-price">$<span data-text="price"></span></div>
-                    <button data-click="$parent.addToCart">Add to Cart</button>
+                    <button data-click="$root.addToCart">Add to Cart</button>
                 </div>
             </template>
 
@@ -201,12 +201,12 @@
                         <div class="cart-item">
                             <div class="cart-item-name" data-text="name"></div>
                             <div class="cart-item-quantity">
-                                <button data-click="$parent.decrementCartItem">-</button>
+                                <button data-click="$root.decrementCartItem">-</button>
                                 <span data-text="quantity"></span>
-                                <button data-click="$parent.incrementCartItem">+</button>
+                                <button data-click="$root.incrementCartItem">+</button>
                             </div>
                             <div>$<span data-text="price"></span></div>
-                            <button class="danger" data-click="$parent.removeFromCart">Remove</button>
+                            <button class="danger" data-click="$root.removeFromCart">Remove</button>
                         </div>
                     </template>
 
@@ -239,7 +239,7 @@
                 <p>
                     <strong>foreach:</strong> External templates for products and cart items<br>
                     <strong>Stitch.computed():</strong> Cart totals auto-calculate<br>
-                    <strong>$parent:</strong> Click handlers access parent model
+                    <strong>$root:</strong> Row buttons call model methods with data-click="$root.name"; the method gets the row item
                 </p>
             </div>
         </div>
