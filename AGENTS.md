@@ -126,7 +126,7 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 20. Every object row needs a unique `id`. If the identifying field has another name, put
     `data-key="thatField"` on the list element. Plain values (strings, numbers) are their own key and
     must be unique. Missing or duplicate keys throw: from `bind()` for the first render, and to
-    `Stitch.onError` (rule 34) when a later change breaks the rule.
+    `Stitch.onError` (rule 36) when a later change breaks the rule.
 21. A row template is exactly ONE root element. Wrap several elements in one `<div>`, `<li>` or
     `<tr>`.
 22. Inside a row, a bare name is a field of the row's item. Use `$root.name` for the model,
@@ -137,7 +137,12 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 24. Filter and sort with a computed that returns a new array. Copy before sorting:
     `this.items.slice().sort(...)`; `sort()` on the model's own array reorders the model.
 25. `data-foreach` takes an array, `null` or `undefined`. Anything else throws.
-26. A `<select>` with options from a list: put `data-foreach` on the select and `data-value` on the
+26. To show an element only for some rows: `data-visible="flag"` (it stays rendered and hidden; its
+    bindings must still resolve), or, to leave it out of the page, wrap it in
+    `<span data-foreach="ifX">` with `ifX: Stitch.computed(function () { return this.x ? [this] : []; })`.
+    There is no "if" binding. Other bindings may sit on a list element (`<ul data-visible="open"
+    data-foreach="children">`), except `data-text`.
+27. A `<select>` with options from a list: put `data-foreach` on the select and `data-value` on the
     select for the selection (optionally `data-default-text` for a placeholder). For a list of
     objects, the option is `<option data-value="code" data-text="name">` (and `data-key` if the key is
     not `id`). For a list of plain values (strings), the option is `<option data-text="$data">`, with
@@ -156,16 +161,21 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 
 ### Handlers
 
-27. `data-click="name"` looks the name up on the current row's item (outside a list: the model).
+28. `data-click="name"` looks the name up on the current row's item (outside a list: the model).
     Methods live on the model, so from inside a row write `data-click="$root.name"`.
-28. A handler is called as `handler(item, event)`, with `this` = the object it is on. `item` is the
+29. A handler is called as `handler(item, event)`, with `this` = the object it is on. `item` is the
     row's item; outside a list it is the model itself. The event is the SECOND argument.
-29. `data-event="prop"` names a model property holding `{ eventName: 'handlerName' }`, e.g.
+30. `data-event="prop"` names a model property holding `{ eventName: 'handlerName' }`, e.g.
     `{ input: 'touch', blur: 'validate' }`. Handler names resolve like `data-click`. Prefer names; a
     function in that object must not be an arrow function.
-30. A `<button>` inside a `<form>` submits the form and RELOADS the page after your handler runs.
+31. A `<button>` inside a `<form>` submits the form and RELOADS the page after your handler runs.
     Give every such button `type="button"`, or put `data-event` on the form with
-    `{ submit: 'save' }` and call `event.preventDefault()` in `save(model, event)`.
+    `{ submit: 'save' }` and call `event.preventDefault()` in `save(model, event)`. When Stitch does the
+    validation, put `novalidate` on the form: otherwise the browser's own validation (`required`,
+    `type="email"`) blocks the submit event and your handler never runs.
+32. For touched/dirty flags map `input` in `data-event` (it fires on every user edit, for text,
+    number, checkbox, radio and select); `change` fires only when a text field is left; `blur` means
+    visited. Values written from the model fire no events.
 
 ```html run
 <form id="signup">
@@ -187,26 +197,26 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 
 ### Events, changes, errors
 
-31. `$on(event, callback)`, `$off(event, callback)`, `$emit(event, payload)` and `$once` exist only on
+33. `$on(event, callback)`, `$off(event, callback)`, `$emit(event, payload)` and `$once` exist only on
     the root model. Never call them on a nested object or a row.
-32. `obj.$onChange(fn)` reports writes to `obj` and returns a remover. `model.$watch(path, fn)` calls
+34. `obj.$onChange(fn)` reports writes to `obj` and returns a remover. `model.$watch(path, fn)` calls
     `fn(newValue, oldValue)` when one path changes and returns a remover too. These belong to the
     model: `binder.dispose()` does NOT stop them, only their removers do. Prefer computeds and bindings.
-33. Every Stitch error starts with a stable code, `[Stitch E###]`. Look it up in
+35. Every Stitch error starts with a stable code, `[Stitch E###]`. Look it up in
     [docs/ERRORS.md](docs/ERRORS.md); match errors by code, not by wording.
-34. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,
+36. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,
     handlers) go there; without it they are uncaught. Errors in `bind()` are thrown to your code.
-35. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
+37. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
     `Stitch.debug.stats()` gives live counts.
-36. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first
+38. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first
     `bind()`. Use `value: 'literal'` when the attribute holds text, not a property path.
 
 ### Timing
 
-37. `bind()` renders synchronously. After that, a model change reaches the page in a microtask.
+39. `bind()` renders synchronously. After that, a model change reaches the page in a microtask.
     To read the page after a change in code or a test, `await Promise.resolve()` (or a
     `setTimeout(..., 0)`) first. A button enabled by a change is still disabled until then.
-38. Bind each element once. To rebind, `binder.unbind(root)` first; when the section goes away,
+40. Bind each element once. To rebind, `binder.unbind(root)` first; when the section goes away,
     `binder.dispose()`.
 
 ## When something throws

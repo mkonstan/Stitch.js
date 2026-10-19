@@ -505,6 +505,78 @@ Every node binds `children`, so every node needs a `children` array, even an emp
 [Declare every property you bind](#declare-every-property-you-bind)). Keys need only be unique
 within each list.
 
+### A keyed list from a template
+
+`data-key` and `data-template` combine: the template gives the row, the key field identifies it. This
+is the usual shape for a table body:
+
+```html page
+<table>
+    <tbody id="stocks" data-foreach="stocks" data-key="ticker" data-template="stock-row"></tbody>
+</table>
+<template id="stock-row">
+    <tr><td data-text="ticker"></td><td data-text="name"></td></tr>
+</template>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    stocks: [{ ticker: 'AAPL', name: 'Apple' }, { ticker: 'MSFT', name: 'Microsoft' }]
+});
+new Stitch.DataBinder().bind('#stocks', model);
+model.stocks.unshift({ ticker: 'ACME', name: 'Acme' });
+```
+<!-- check: texts('#stocks td:first-child').join(',') === 'ACME,AAPL,MSFT' -->
+
+### Other bindings on the list element
+
+The list element itself may carry other bindings: `data-visible`, `data-class`, `data-attr`,
+`data-enabled`, and `data-value` on a `<select>`. The list renders its rows first, then those bindings
+apply to the element. Only `data-text` is refused there, because it would replace the rows. In a row
+template, `<ul data-visible="expanded" data-foreach="children">` shows a row's children only while
+the row is expanded (the tree pattern).
+
+### Showing an element only for some rows
+
+There is no "if" binding. Two honest options, depending on whether the element may stay in the page:
+
+- **`data-visible`**: the element is always rendered and only hidden. Its bindings stay live, so
+  every property they name must exist on every row (declare it, `null` is fine).
+- **A list of zero or one item**: the element exists only when the list has an item. Bind
+  `data-foreach` to a computed that returns `[this]` (the row itself, keyed by its `id`) or `[]`, with
+  the element as the template. Inside it, names resolve against that item as usual. Use this when the
+  element must not be in the page (for example a button that tests count, or markup that would bind
+  to fields only some rows have).
+
+```html page
+<ul id="files" data-foreach="files">
+    <li>
+        <span data-foreach="ifFolder"><button data-click="$root.open">open</button></span>
+        <span class="name" data-text="name"></span>
+        <em data-visible="isLarge">large</em>
+    </li>
+</ul>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    files: [
+        { id: 1, name: 'src', folder: true, size: 0 },
+        { id: 2, name: 'app.js', folder: false, size: 90000 }
+    ].map(f => Object.assign(f, {
+        ifFolder: Stitch.computed(function () { return this.folder ? [this] : []; }),
+        isLarge: Stitch.computed(function () { return this.size > 50000; })
+    })),
+    opened: '',
+    open(file) { this.opened = file.name; }
+});
+new Stitch.DataBinder().bind('#files', model);
+```
+<!-- check: count('#files button') === 1 && count('#files em') === 2 -->
+<!-- check: texts('#files em').length === 2 && visible('#files li:nth-child(2) em') && !visible('#files li:first-child em') -->
+<!-- check: click('#files button') -->
+<!-- check: model.opened === 'src' -->
+
 ### Filtering and sorting
 
 Bind the list to a computed that returns the rows to show. Copy before sorting: `sort()` on the
@@ -739,6 +811,22 @@ Notes:
 - A two-way binding through a `null` object (`data-value="address.city"` while `address` is `null`)
   throws when the user types. Give the object a value first, or hide the input while it is empty.
 
+### Which events mark a field as touched
+
+`data-value` keeps the model in step on both `input` and `change`. For "touched" or "dirty"
+flags, map the event that matches what you want to know, with `data-event` (verified in Chromium):
+
+| Control | `input` fires | `change` fires |
+|---|---|---|
+| text, email, password, `textarea` | on every keystroke | when the user leaves the field after changing it |
+| `type="number"` | on every keystroke and arrow step | when the user leaves after typing, or at once for an arrow step |
+| `type="checkbox"`, `type="radio"` | on each click | on each click (together with `input`) |
+| `select` | when an option is picked | when an option is picked (together with `input`) |
+
+`input` therefore means "the user changed it", for every control, so `{ input: 'touchEmail' }` is the
+simplest touched flag. Use `blur` (fires on leaving, changed or not) for "the user visited it".
+Values written from the model fire no events, so a model change never marks a field as touched.
+
 ### Buttons inside a form
 
 A `<button>` inside a `<form>` is a submit button by default: clicking it runs your `data-click`
@@ -768,6 +856,34 @@ new Stitch.DataBinder().bind('#search', model);
 ```
 <!-- check: click('#go') -->
 <!-- check: text('#result') === 'Searched for stitch' && location.href === 'about:srcdoc' -->
+
+A `type="submit"` button (or Enter in a field) fires the form's `submit` event, which `data-event` on
+the `<form>` receives as above. When Stitch does the validation, add `novalidate` to the form: without
+it, the browser's own validation (`required`, `type="email"`, `min`/`max`) blocks the `submit`
+event while a field is invalid, so your handler never runs and the browser shows its own messages.
+
+```html page
+<form id="join" novalidate data-event="formEvents">
+    <input id="mail" type="email" required data-value="email">
+    <button id="send" type="submit">Join</button>
+    <p id="msg" data-text="message"></p>
+</form>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    email: 'ada@',          // invalid for the browser, but novalidate lets the submit through
+    message: '',
+    formEvents: { submit: 'join' },
+    join(model, event) {
+        event.preventDefault();
+        this.message = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(this.email) ? 'Joined' : 'Enter a valid email address';
+    }
+});
+new Stitch.DataBinder().bind('#join', model);
+```
+<!-- check: click('#send') -->
+<!-- check: text('#msg') === 'Enter a valid email address' -->
 
 ## Computed properties
 
@@ -1096,6 +1212,8 @@ window.result = Stitch.debug.stats().effects === before;
 | Write computeds as `function () { return this.x; }`, or as `m => m.x` using the argument | Use `this` inside an arrow computed |
 | Give buttons inside a `<form>` `type="button"`, or handle `submit` and call `event.preventDefault()` | Leave a plain `<button>` in a form (it submits and reloads the page) |
 | Build options from plain values with `<option data-text="$data">` | Put `data-value="$data"` on an option |
+| Add `novalidate` to a form Stitch validates | Let the browser's validation block the submit event |
+| Show an element for some rows with `data-visible`, or a computed list of `[this]` / `[]` | Look for an "if" binding |
 | Match errors by their code, `[Stitch E###]` | Match errors by their wording |
 | Emit and listen on the root model | `$emit` / `$on` on nested objects or rows |
 | Copy shared lookup lists per model: `[...list]`, `new Map(map)` | Give two models the same array, Map or Set |

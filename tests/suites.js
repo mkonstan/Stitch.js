@@ -70,11 +70,12 @@
     // PENDING and does not run it; `npm run test:acceptance` runs every entry on both builds.
     // Guards: only specs under tests/acceptance/ may be pending, and a pending spec whose page
     // exists fails `npm test` (set pending to false once the page is committed).
-    var pageByFreshAgent = { reason: "the page is written by an agent that has only the docs (fresh-agent gate)", sprint: "T3" };
+    // The three pages below were written by an agent that had only the docs and TASKS.md (the
+    // fresh-agent gate); they passed these specs on the first try and are kept unedited.
     var acceptance = [
-        { spec: "tests/acceptance/tree.spec.js", pending: pageByFreshAgent },
-        { spec: "tests/acceptance/list.spec.js", pending: pageByFreshAgent },
-        { spec: "tests/acceptance/form.spec.js", pending: pageByFreshAgent }
+        { spec: "tests/acceptance/tree.spec.js", pending: false },
+        { spec: "tests/acceptance/list.spec.js", pending: false },
+        { spec: "tests/acceptance/form.spec.js", pending: false }
     ];
     return { suites: suites, examples: examples, acceptance: acceptance };
 });

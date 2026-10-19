@@ -18,7 +18,8 @@
             'nested-foreach-renders-and-updates',
             'computed-filtered-list',
             'replace-list-with-new-ids',
-            'hide-and-show-list'
+            'hide-and-show-list',
+            'other-bindings-on-the-list-element'
         ]);
 
         const tick = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -110,6 +111,37 @@
                 model.items[0].name = 'a2';
                 await tick();
                 t.deepEqual(texts(host, 'li'), ['a2', 'b', 'c'], 'a change after the cycles reaches the live row');
+            });
+
+            // By design: on a data-foreach element the list binds first, then the element's other
+            // bindings (data-visible, data-class, data-attr, ...); only data-text is refused there.
+            await StitchTest.test('other-bindings-on-the-list-element', async (t) => {
+                const host = mount('<ul data-foreach="items" data-visible="open" data-class="listClass" data-attr="listAttrs"><li data-text="name"></li></ul>');
+                const model = Stitch.Observable.create({
+                    open: false,
+                    items: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }],
+                    listClass: { busy: true },
+                    listAttrs: { title: 'the list' }
+                });
+                new Stitch.DataBinder().bind(host, model);
+                const ul = host.querySelector('ul');
+                t.deepEqual(texts(host, 'li'), ['a', 'b'], 'the rows render on a hidden list');
+                t.equal(ul.style.display, 'none', 'data-visible hides the list element');
+                t.ok(ul.classList.contains('busy') && ul.getAttribute('title') === 'the list', 'data-class and data-attr apply to the list element');
+                model.open = true;
+                model.items.push({ id: 3, name: 'c' });
+                await tick();
+                t.equal(ul.style.display, '', 'data-visible shows it');
+                t.deepEqual(texts(host, 'li'), ['a', 'b', 'c'], 'and the list keeps following its array');
+                const nested = mount('<ul data-foreach="groups"><li><span data-text="name"></span><ol data-visible="open" data-foreach="children"><li data-text="name"></li></ol></li></ul>');
+                const tree = Stitch.Observable.create({ groups: [{ id: 1, name: 'g', open: false, children: [{ id: 2, name: 'x' }] }] });
+                new Stitch.DataBinder().bind(nested, tree);
+                const ol = nested.querySelector('ol');
+                t.equal(ol.style.display, 'none', 'in a row template, data-visible on a nested list reads the row');
+                tree.groups[0].open = true;
+                await tick();
+                t.equal(ol.style.display, '', 'and follows it');
+                t.deepEqual(Array.from(ol.querySelectorAll('li')).map(li => li.textContent), ['x'], 'the nested list renders its rows');
             });
 
         })();
