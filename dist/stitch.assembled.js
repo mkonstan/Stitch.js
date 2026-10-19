@@ -347,6 +347,7 @@ module.exports = {
 const { ReactiveSystem } = __stitchRequire(13);
 const { ComputedRef } = __stitchRequire(11);
 const { MessageBus } = __stitchRequire(12);
+const { REACTIVE_TOTALS } = __stitchRequire(21);
 const runtimeHelpers = __stitchRequire(22);
 const objectHelpers = __stitchRequire(20);
 const { VERSION } = __stitchRequire(25);
@@ -467,7 +468,7 @@ function createReactiveFactory(options = {}) {
             seen.add(current);
             if (Object.prototype.hasOwnProperty.call(current, "_factory")) return current;
             const parentLink = current._parent;
-            if (!parentLink || !parentLink.obj) return null;
+            if (!parentLink || !parentLink.obj) return (current._parentLinks && current._parentLinks.homeRoot) || null;
             current = parentLink.obj;
         }
         return null;
@@ -701,16 +702,42 @@ function createReactiveFactory(options = {}) {
     }
 
     /**
-     * B8: an object can be held in several places of one model (aliases, e.g. a "selected"
-     * row). It keeps one link per place, and its parent (_parent) is the FIRST link whose
-     * slot still holds it; an alias never takes over. When the first place lets go (the
-     * row is removed or replaced), the next place that holds it becomes the parent. If no
-     * slot holds it (it is being written right now, or it was detached), the newest link
-     * answers.
+     * B8 + B9: an object can be held in several places of one model (aliases, e.g. a
+     * "selected" row). It keeps one link per place that holds it, and its parent (_parent)
+     * is the FIRST link whose slot still holds it; an alias never takes over.
+     * Links never outlive their holders (B9):
+     * - resolving the parent prunes links whose slot no longer holds the object (if none
+     *   holds, only the newest stays: the slot being written right now);
+     * - every removal point (a property or index overwritten, pop / shift / splice / fill /
+     *   a shorter length, Map.set over a value, Map/Set delete and clear) releases the
+     *   object's link to that container at once;
+     * - an object held nowhere is detached: it drops all its links (remembering its model
+     *   in its links' homeRoot, so D30 still refuses it elsewhere) and releases its children's links
+     *   to it, recursively. Assigning it back links its children again.
+     * Stitch.debug.stats().parentLinks counts links added minus links removed. Objects that
+     * are garbage-collected while still inside a discarded model are not subtracted (a
+     * FinalizationRegistry would, but it measurably slowed list re-renders), so compare the
+     * count on a model that is still alive.
      */
+
+    function countLinks(delta) {
+        REACTIVE_TOTALS.parentLinks = (REACTIVE_TOTALS.parentLinks || 0) + delta;
+    }
+
+    // proxy -> raw target, so a slot can be read without the proxy converting or tracking.
+    const rawOfProxy = new WeakMap();
+    function rawOf(value) {
+        return rawOfProxy.get(value) || value;
+    }
+
+    function isReactiveObject(value) {
+        return !!value && typeof value === "object" && value.__isReactive === true;
+    }
+
     function linksOf(target) {
         if (!Object.prototype.hasOwnProperty.call(target, "_parentLinks")) {
-            defineHidden(target, "_parentLinks", []);
+            const links = [];
+            defineHidden(target, "_parentLinks", links);
             Object.defineProperty(target, "_parent", {
                 enumerable: false,
                 configurable: false,
@@ -718,22 +745,38 @@ function createReactiveFactory(options = {}) {
                     return primaryLink(target);
                 }
             });
+            // Detached state lives on the links array itself (no extra properties per object).
+            links.detached = false;
+            links.homeRoot = null;
         }
         return target._parentLinks;
     }
 
     function addLink(target, parent, key) {
+        target = rawOf(target);
         const links = linksOf(target);
         if (!links.some(link => link.obj === parent && link.key === key)) {
             links.push({ obj: parent, key: key });
+            countLinks(1);
+        }
+        if (links.detached) {
+            // Back in a model: its children link to it again (they were released when it left).
+            links.detached = false;
+            links.homeRoot = null;
+            const holder = proxyMap.get(target) && Array.isArray(target) ? proxyMap.get(target) : target;
+            for (const [child, childKey] of childrenOf(target)) {
+                addLink(child, holder, childKey);
+            }
         }
     }
 
-    // proxy -> raw target, so a slot can be read without the proxy converting or tracking.
-    const rawOfProxy = new WeakMap();
+    function removeLinkAt(links, index) {
+        links.splice(index, 1);
+        countLinks(-1);
+    }
 
     function slotHolds(link, target) {
-        const obj = rawOfProxy.get(link.obj) || link.obj;
+        const obj = rawOf(link.obj);
         const proxy = proxyMap.get(target);
         if (obj instanceof Set) {
             return obj.has(target) || (!!proxy && obj.has(proxy));
@@ -747,10 +790,79 @@ function createReactiveFactory(options = {}) {
     function primaryLink(target) {
         const links = target._parentLinks;
         if (!links || links.length === 0) return undefined;
-        for (const link of links) {
-            if (slotHolds(link, target)) return link;
+        let first = null;
+        for (let i = links.length - 1; i >= 0; i--) {
+            if (slotHolds(links[i], target)) {
+                first = links[i];
+            }
         }
-        return links[links.length - 1];
+        if (first) {
+            // Prune: a link whose slot no longer holds the object is gone for good.
+            for (let i = links.length - 1; i >= 0; i--) {
+                if (links[i] !== first && !slotHolds(links[i], target)) removeLinkAt(links, i);
+            }
+            return first;
+        }
+        while (links.length > 1) removeLinkAt(links, 0);
+        return links[0];
+    }
+
+    /** The reactive objects a holder holds, with the key each sits under. */
+    function childrenOf(holder) {
+        const raw = rawOf(holder);
+        const out = [];
+        const add = (value, key) => { if (isReactiveObject(value)) out.push([value, key]); };
+        if (Array.isArray(raw)) {
+            raw.forEach((value, index) => add(value, index));
+        } else if (raw instanceof Map) {
+            raw.forEach((value, key) => add(value, typeof key === "string" || typeof key === "number" ? key : "value"));
+        } else if (raw instanceof Set) {
+            raw.forEach(value => add(value, "value"));
+        } else {
+            for (const key of Object.keys(raw)) {
+                const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+                if (!descriptor || !descriptor.get || (descriptor.set && descriptor.set.stitchReadOnlyComputed)) continue;
+                add(reactiveSystem.untracked(() => raw[key]), key);
+            }
+        }
+        return out;
+    }
+
+    /** value no longer sits where holder had it: drop that link; detach value if it is held nowhere. */
+    function releaseFrom(value, holder) {
+        if (!isReactiveObject(value)) return;
+        const target = rawOf(value);
+        const links = target._parentLinks;
+        if (!links) return;
+        // Its model, found while the link to the place it just left still exists.
+        const homeRoot = rootOfObject(target);
+        const holderRaw = rawOf(holder);
+        for (let i = links.length - 1; i >= 0; i--) {
+            if (rawOf(links[i].obj) === holderRaw && !slotHolds(links[i], target)) removeLinkAt(links, i);
+        }
+        if (!Object.prototype.hasOwnProperty.call(target, "_factory") && !links.some(link => slotHolds(link, target))) {
+            detach(target, homeRoot);
+        }
+    }
+
+    /** target is held nowhere: it drops its links and releases its children's links to it. */
+    function detach(target, homeRoot) {
+        const links = linksOf(target);
+        if (links.detached) return;
+        while (links.length) removeLinkAt(links, links.length - 1);
+        links.detached = true;
+        links.homeRoot = homeRoot;
+        for (const [child] of childrenOf(target)) {
+            const childTarget = rawOf(child);
+            const childLinks = childTarget._parentLinks;
+            if (!childLinks) continue;
+            for (let i = childLinks.length - 1; i >= 0; i--) {
+                if (rawOf(childLinks[i].obj) === target) removeLinkAt(childLinks, i);
+            }
+            if (!childLinks.some(link => slotHolds(link, childTarget))) {
+                detach(childTarget, homeRoot);
+            }
+        }
     }
 
     /**
@@ -841,6 +953,7 @@ function createReactiveFactory(options = {}) {
                 }
                 newValue = makeDeepReactive(newValue, target, key);
                 internal[key] = newValue;
+                releaseFrom(oldValue, target);
                 reactiveSystem.trigger(target, key, oldValue, newValue);
                 bubbleChangeUp(target, key, oldValue, newValue);
             }
@@ -1205,7 +1318,9 @@ function createReactiveFactory(options = {}) {
                         return function() {
                             const oldSize = target.size;
                             if (oldSize > 0) {
+                                const removed = Array.from(target.values());
                                 target.clear();
+                                removed.forEach(value => releaseFrom(value, target));
                                 reactiveSystem.trigger(target, "size", oldSize, 0);
                                 reactiveSystem.trigger(target, "iteration", null, null);
                                 bubbleChangeUp(target, "clear", oldSize, 0);
@@ -1261,6 +1376,7 @@ function createReactiveFactory(options = {}) {
                         val = reactive(val, new WeakSet, target, keyName);
                     }
                     const result = target.set(key, val);
+                    if (oldValue !== val) releaseFrom(oldValue, target);
                     if (!oldHas || oldValue !== val) {
                         reactiveSystem.trigger(target, key, oldValue, val);
                         reactiveSystem.trigger(target, "size", target.size, target.size);
@@ -1273,6 +1389,7 @@ function createReactiveFactory(options = {}) {
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
                     const result = target.delete(key);
+                    releaseFrom(oldValue, target);
                     if (oldHas) {
                         reactiveSystem.trigger(target, key, oldValue, undefined);
                         reactiveSystem.trigger(target, "size", target.size + 1, target.size);
@@ -1328,6 +1445,7 @@ function createReactiveFactory(options = {}) {
                     const normalizedVal = normalizeSetLookup(val);
                     const oldHas = target.has(normalizedVal);
                     const result = target.delete(normalizedVal);
+                    releaseFrom(normalizedVal, target);
                     if (oldHas) {
                         reactiveSystem.trigger(target, normalizedVal, normalizedVal, undefined);
                         reactiveSystem.trigger(target, "size", target.size + 1, target.size);
@@ -1397,6 +1515,7 @@ function createReactiveFactory(options = {}) {
                         }
                         const oldSnapshot = trackedIndexKeys.length > 0 ? target.slice() : null;
                         const oldLength = target.length;
+                        const overwritten = key === "fill" ? target.slice() : null;
                         const result = Array.prototype[key].apply(target, args);
 
                         // Rows of this list (and reactive rows just put in) point at their index.
@@ -1414,6 +1533,12 @@ function createReactiveFactory(options = {}) {
                                 }
                             }
                         }
+
+                        // Items that left the list release their link to it (B9).
+                        const removed = key === "pop" || key === "shift" ? [result]
+                            : key === "splice" ? result
+                            : overwritten || [];
+                        removed.forEach(item => releaseFrom(item, target));
 
                         // FIX: Trigger synchronously for immediate computed invalidation
                         reactiveSystem.trigger(target, "length", oldLength, target.length);
@@ -1460,7 +1585,10 @@ function createReactiveFactory(options = {}) {
                 } else if (value && typeof value === "object") {
                     value = reactive(value, new WeakSet, receiver, key);
                 }
+                const cut = key === "length" && typeof value === "number" && value < target.length ? target.slice(value) : null;
                 const result = Reflect.set(target, key, value, receiver);
+                if (cut) cut.forEach(item => releaseFrom(item, target));
+                else if (oldValue !== value) releaseFrom(oldValue, target);
                 if (oldValue !== value) {
                     reactiveSystem.trigger(target, key, oldValue, value);
                     bubbleChangeUp(target, key, oldValue, value);
@@ -4959,16 +5087,21 @@ module.exports = {
  *   plus any $watch or custom-binding effect).
  * - subscriptions: subscriber edges that a change can reach: an effect or computed
  *   subscribed to a reactive property, or an effect / computed subscribed to a computed.
+ * - parentLinks: links from model objects to the places that hold them (B9: they must
+ *   not outlive those places; on a live model, a count that only grows is a leak). Objects
+ *   collected while still inside a discarded model are not subtracted.
  */
 const REACTIVE_TOTALS = {
     effects: 0,
-    subscriptions: 0
+    subscriptions: 0,
+    parentLinks: 0
 };
 
 function readReactiveStats() {
     return {
         effects: REACTIVE_TOTALS.effects,
-        subscriptions: REACTIVE_TOTALS.subscriptions
+        subscriptions: REACTIVE_TOTALS.subscriptions,
+        parentLinks: REACTIVE_TOTALS.parentLinks
     };
 }
 

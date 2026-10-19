@@ -95,6 +95,10 @@
             t.equal(probeRuns - before, liveRows, `${label}: one list-wide change ran one update per live row`);
         }
 
+        // The reactive graph only: parentLinks (B9) has its own tests, and rows converted while
+        // rendering legitimately add links the model still holds.
+        const graph = s => ({ effects: s.effects, subscriptions: s.subscriptions });
+
         (async () => {
             await StitchTest.test('filter-100-cycles', async (t) => {
                 const host = mount('<input data-value="mode"><ul data-foreach="shown"><li><span data-probe="name"></span>' +
@@ -219,7 +223,7 @@
                 await tick();
                 t.equal(stats().effects - base.effects, countBindings(host), 'precondition: live effects = live bindings');
                 binder.unbind(host);
-                t.deepEqual(stats(), base, 'unbind(root) released every binding under it, rows included');
+                t.deepEqual(graph(stats()), graph(base), 'unbind(root) released every binding under it, rows included');
                 const before = probeRuns;
                 model.title = 'changed';
                 model.items[0].name = 'changed';
@@ -325,12 +329,13 @@
                 }
                 await tick();
                 t.deepEqual(texts(host, 'span'), [1, 2, 3].map(i => String(i * generation * 2)), 'precondition: the last rows are shown');
-                t.deepEqual(stats(), afterFirstRender, 'after 100 replacements effects and subscriptions equal the first render');
+                t.deepEqual(graph(stats()), graph(afterFirstRender), 'after 100 replacements effects and subscriptions equal the first render');
+                t.equal(stats().parentLinks, afterFirstRender.parentLinks, 'and the replaced rows left no parent links behind (B9)');
                 model.rate = 3;
                 await tick();
                 t.deepEqual(texts(host, 'span'), [1, 2, 3].map(i => String(i * generation * 3)), 'the live rows still follow the long-lived property');
                 binder.unbind(host);
-                t.deepEqual(stats(), base, 'after unbind nothing is left, computeds included');
+                t.deepEqual(graph(stats()), graph(base), 'after unbind nothing is left, computeds included');
             });
 
             // A change inside one row updates that row's binding only; the list itself does

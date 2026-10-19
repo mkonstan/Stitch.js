@@ -45,11 +45,15 @@
             return host;
         }
 
+        // The reactive graph only: parentLinks (B9) has its own tests, and rows converted while
+        // rendering legitimately add links the model still holds.
+        const graph = s => ({ effects: s.effects, subscriptions: s.subscriptions });
+
         (async () => {
             await StitchTest.test('stats-is-read-only-snapshot', async (t) => {
                 t.equal(typeof Stitch.debug.stats, 'function', 'Stitch.debug.stats is a function');
                 const before = stats();
-                t.deepEqual(Object.keys(before).sort(), ['effects', 'subscriptions'], 'stats() reports effects and subscriptions');
+                t.deepEqual(Object.keys(before).sort(), ['effects', 'parentLinks', 'subscriptions'], 'stats() reports effects, subscriptions and parentLinks');
                 before.effects += 1000;
                 t.equal(stats().effects === before.effects, false, 'changing the returned object does not change the counts');
             });
@@ -127,7 +131,7 @@
                 t.equal(model.twice, 2, 'precondition: the computed computes');
                 t.equal(stats().subscriptions - base.subscriptions, 1, 'while cached it listens to its one source');
                 model.a = 5;
-                t.deepEqual(stats(), base, 'after the source changed, with no reader, it listens to nothing');
+                t.deepEqual(graph(stats()), graph(base), 'after the source changed, with no reader, it listens to nothing');
                 t.equal(model.twice, 10, 'the next read recomputes');
                 model.a = 6;
                 t.equal(model.twice, 12, 'and stays correct');
@@ -147,7 +151,7 @@
                     error = e;
                 }
                 t.ok(error instanceof Error && error.message === 'boom on first run', 'effect() rethrows the first-run error');
-                t.deepEqual(stats(), base, 'no live effect and no subscription left behind');
+                t.deepEqual(graph(stats()), graph(base), 'no live effect and no subscription left behind');
                 model.n = 2;
                 await tick();
                 t.equal(runs, 1, 'the failed effect never ran again');
@@ -172,7 +176,7 @@
                 t.ok(typeof rs.dispose === 'function', 'ReactiveSystem has dispose()');
                 rs.dispose();
                 t.deepEqual(rs.stats(), { effects: 0, subscriptions: 0 }, 'the disposed system has zero effects and zero subscriptions');
-                t.deepEqual(stats(), base, 'the page-wide counts are back to what they were before');
+                t.deepEqual(graph(stats()), graph(base), 'the page-wide counts are back to what they were before');
                 const html = host.innerHTML;
                 model.title = 'changed';
                 model.items[0].name = 'changed';
@@ -200,7 +204,7 @@
                 await tick();
                 t.ok(stats().effects - base.effects > 0, 'precondition: bindings created effects');
                 binder.dispose();
-                t.deepEqual(stats(), base, 'after binder.dispose() no effect or subscription it made is left');
+                t.deepEqual(graph(stats()), graph(base), 'after binder.dispose() no effect or subscription it made is left');
             });
         })();
     </script>

@@ -106,6 +106,10 @@
         }
         registerErrors = collectRegisterErrors();
 
+        // The reactive graph only: parentLinks (B9) has its own tests, and rows converted while
+        // rendering legitimately add links the model still holds.
+        const graph = s => ({ effects: s.effects, subscriptions: s.subscriptions });
+
         (async () => {
             await StitchTest.test('register-binding-rules', async (t) => {
                 t.equal(registerErrors.ok, null, 'a lowercase new name registers before any bind()');
@@ -303,7 +307,7 @@
                 const model = Stitch.Observable.create({ name: 'Ann', rows: [{ id: 1, name: 'r' }] });
                 const error = tryBind(host, model);
                 t.match(messageOf(error), /"missing" is not a property/, 'precondition: the last binding throws');
-                t.deepEqual(Stitch.debug.stats(), before, 'the bindings made before the error were released');
+                t.deepEqual(graph(Stitch.debug.stats()), graph(before), 'the bindings made before the error were released');
             });
 
             await StitchTest.test('model-api-mistakes-throw', async (t) => {
@@ -369,7 +373,7 @@
                 let same = null;
                 try { first.bind(document.getElementById('dbl-panel'), m2); } catch (e) { same = e; }
                 t.match(messageOf(same), /already bound by this DataBinder/, 'the same binder on a bound sub-root throws');
-                t.deepEqual(Stitch.debug.stats(), before, 'the failed binds released nothing of the first bind');
+                t.deepEqual(graph(Stitch.debug.stats()), graph(before), 'the failed binds released nothing of the first bind');
                 m1.title = 'T1-changed';
                 await tick();
                 t.equal(document.getElementById('dbl-b').textContent, 'T1-changed', 'the element inside the sub-root still follows the first model');
@@ -383,7 +387,7 @@
                 const before = Stitch.debug.stats();
                 const bad = mount('<span data-text="name"></span><b data-text="nmae"></b>');
                 t.match(messageOf(tryBindWith(binder, bad, model)), /"nmae" is not a property/, 'precondition: the second bind throws');
-                t.deepEqual(Stitch.debug.stats(), before, 'the counts are back to just after the first bind');
+                t.deepEqual(graph(Stitch.debug.stats()), graph(before), 'the counts are back to just after the first bind');
                 model.name = 'Bob';
                 await tick();
                 t.equal(good.textContent, 'Bob', 'the first bind still works');

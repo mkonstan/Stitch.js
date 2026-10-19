@@ -37,7 +37,8 @@
             'shared-raw-collections-throw',
             'set-members-and-map-values-cannot-move-across-models',
             'map-and-set-initial-content-is-reactive',
-            'aliases-keep-the-first-parent'
+            'aliases-keep-the-first-parent',
+            'parent-links-stay-bounded'
         ]);
 
         function mount(html) {
@@ -356,6 +357,56 @@
                 both.b.push({ id: 2 });
                 await tick();
                 t.deepEqual(bothFields, ['a.items'], 'create({ a: ARR, b: ARR }): the first place (a) is reported');
+            });
+
+            // B9: an object must not keep its past holders alive. The link count
+            // (Stitch.debug.stats().parentLinks) returns to its baseline after holders come and go.
+            await StitchTest.test('parent-links-stay-bounded', async (t) => {
+                const links = () => Stitch.debug.stats().parentLinks;
+                t.equal(typeof links(), 'number', 'Stitch.debug.stats() reports parentLinks');
+                const m = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }], wrap: null, selected: null, list2: [], group: null });
+                const row = m.rows[0];
+                const base = links();
+                for (let i = 0; i < 100; i++) { m.wrap = { row }; m.wrap = null; }
+                t.equal(links(), base, '100 wrap / unwrap cycles: back to the baseline');
+                t.ok(row._parentLinks.length <= 1, 'the row keeps one link (got ' + row._parentLinks.length + ')');
+                for (let i = 0; i < 100; i++) { m.list2.push(row); m.list2.splice(0, 1); }
+                t.equal(links(), base, '100 push / splice cycles: back to the baseline');
+                for (let i = 0; i < 100; i++) { m.selected = row; m.selected = null; }
+                t.equal(links(), base, '100 select / unselect cycles: back to the baseline');
+                for (let i = 0; i < 100; i++) { m.group = { rows: [row], meta: { n: i } }; m.selected = row; m.group = null; m.selected = null; }
+                t.equal(links(), base, '100 detached-ancestor cycles: back to the baseline');
+
+                // The detached ancestor no longer names the path, and a re-attached object bubbles again.
+                const fields = [];
+                m.$onChange(change => fields.push(change.field));
+                m.group = { rows: [row] };
+                m.selected = row;
+                m.group = null;
+                await tick();
+                fields.length = 0;
+                row.name = 'b';
+                await tick();
+                t.deepEqual(fields, ['rows.0.name'], 'with its ancestor detached, the row reports its first live place');
+                m.rows.splice(0, 1);
+                await tick();
+                fields.length = 0;
+                row.name = 'c';
+                await tick();
+                t.deepEqual(fields, ['selected.name'], 'and then its next live place');
+                m.wrap = { inner: { v: 1 } };
+                const saved = m.wrap;
+                m.wrap = null;
+                m.wrap = saved;
+                await tick();
+                fields.length = 0;
+                saved.inner.v = 2;
+                await tick();
+                t.deepEqual(fields, ['wrap.inner.v'], 'a detached object assigned back bubbles from its children again');
+                const other = Stitch.Observable.create({ list: [] });
+                t.match(thrown(() => other.list.push(saved.inner)), /belongs to a different model/, 'D30 still holds');
+                m.wrap = null;
+                t.match(thrown(() => other.list.push(saved)), /belongs to a different model/, 'a detached object of m still cannot move into another model');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {
