@@ -36,7 +36,8 @@
             'reactive-on-a-nested-object-throws',
             'shared-raw-collections-throw',
             'set-members-and-map-values-cannot-move-across-models',
-            'map-and-set-initial-content-is-reactive'
+            'map-and-set-initial-content-is-reactive',
+            'aliases-keep-the-first-parent'
         ]);
 
         function mount(html) {
@@ -250,7 +251,8 @@
                 t.match(thrown(() => m.listB[0].$set('meta', { toJSON: 1 })), /"listB\[0\]\.meta\.toJSON" is reserved/,
                     'and a toJSON error names the new path');
                 const inner = m.a.inner;
-                t.equal(thrown(() => { m.b = inner; }), '', 'a nested object re-assigned elsewhere in the same model works');
+                t.equal(thrown(() => { m.b = inner; m.a.inner = null; }), '', 'a nested object moved elsewhere in the same model (old slot cleared) works');
+                await tick();
                 fields.length = 0;
                 inner.v = 2;
                 await tick();
@@ -325,6 +327,35 @@
                 host.remove();
                 t.match(thrown(() => Stitch.Observable.create({ prices: new Map([['a', { inner: Stitch.Observable.create({ x: 1 }) }]]) })),
                     /"prices\.a\.inner"/, 'a model inside an initial Map value throws at create');
+            });
+
+            // B8: within one model an object may be held in two places (the "selected row"); the
+            // FIRST place that still holds it is its parent. Writes report that place.
+            await StitchTest.test('aliases-keep-the-first-parent', async (t) => {
+                const m = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }], selected: null });
+                const fields = [];
+                m.$onChange(change => fields.push(change.field));
+                const write = async (obj, value) => { await tick(); fields.length = 0; obj.name = value; await tick(); return fields.slice(); };
+                const first = m.rows[0];
+                m.selected = first;
+                t.deepEqual(await write(first, 'a2'), ['rows.0.name'], 'selected = rows[0]: a write reports rows.0.name');
+                m.selected = null;
+                t.deepEqual(await write(first, 'a3'), ['rows.0.name'], 'after selected = null it is still rows.0.name');
+                m.selected = first;
+                m.rows.unshift({ id: 0, name: 'z' });
+                t.deepEqual(await write(first, 'a4'), ['rows.1.name'], 'unshift re-indexes the aliased row too');
+                m.selected = m.rows[2];
+                t.match(thrown(() => m.rows[2].$set('meta', { toJSON: 1 })), /"rows\[2\]\.meta\.toJSON" is reserved/, 'a toJSON error names the first place (rows[2])');
+                m.selected = first;
+                m.rows.splice(1, 1);
+                t.deepEqual(await write(first, 'a5'), ['selected.name'], 'removed from rows while held by selected: its parent moves to selected');
+                const ARR = [{ id: 1 }];
+                const both = Stitch.Observable.create({ a: ARR, b: ARR });
+                const bothFields = [];
+                both.$onChange(change => bothFields.push(change.field));
+                both.b.push({ id: 2 });
+                await tick();
+                t.deepEqual(bothFields, ['a.items'], 'create({ a: ARR, b: ARR }): the first place (a) is reported');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

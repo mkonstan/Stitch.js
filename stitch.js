@@ -429,10 +429,11 @@ function createReactiveFactory(options = {}) {
         );
     }
 
+    // parts: the path to obj, or a function returning it (built only for the error).
     function checkReservedKeys(obj, parts) {
         for (const name of Object.keys(obj)) {
             if (RESERVED_NAMES.indexOf(name) !== -1) {
-                throw reservedError(parts.concat(name));
+                throw reservedError((typeof parts === "function" ? parts() : parts).concat(name));
             }
         }
     }
@@ -523,24 +524,13 @@ function createReactiveFactory(options = {}) {
     /** Points a raw (array / Map / Set) target's parent link at its new place. */
     function repointRaw(target, parent, key) {
         if (!parent) return;
-        if (target._parent && target._parent.obj) {
-            target._parent.obj = parent;
-            target._parent.key = key;
-        } else {
-            attachParent(target, parent, key);
-        }
+        addLink(target, parent, key);
     }
 
     /** A moved object's parent link follows it, so writes bubble from (and errors name) its new place. */
     function repoint(value, parentObj, key) {
         if (!value || typeof value !== "object" || !value.__isReactive || !parentObj) return;
-        const parentLink = value._parent;
-        if (parentLink && parentLink.obj) {
-            parentLink.obj = parentObj;
-            parentLink.key = key;
-        } else {
-            attachParent(value, parentObj, key);
-        }
+        addLink(value, parentObj, key);
     }
 
     // v2 name -> v3 name (on() registered a change handler in v2).
@@ -705,9 +695,62 @@ function createReactiveFactory(options = {}) {
      * @param {string|number|null} key - Property key in parent
      */
     function attachParent(target, parent, key) {
-        if (parent && key !== null && key !== undefined && !target._parent) {
-            defineHidden(target, "_parent", { obj: parent, key: key });
+        if (parent && key !== null && key !== undefined) {
+            addLink(target, parent, key);
         }
+    }
+
+    /**
+     * B8: an object can be held in several places of one model (aliases, e.g. a "selected"
+     * row). It keeps one link per place, and its parent (_parent) is the FIRST link whose
+     * slot still holds it; an alias never takes over. When the first place lets go (the
+     * row is removed or replaced), the next place that holds it becomes the parent. If no
+     * slot holds it (it is being written right now, or it was detached), the newest link
+     * answers.
+     */
+    function linksOf(target) {
+        if (!Object.prototype.hasOwnProperty.call(target, "_parentLinks")) {
+            defineHidden(target, "_parentLinks", []);
+            Object.defineProperty(target, "_parent", {
+                enumerable: false,
+                configurable: false,
+                get() {
+                    return primaryLink(target);
+                }
+            });
+        }
+        return target._parentLinks;
+    }
+
+    function addLink(target, parent, key) {
+        const links = linksOf(target);
+        if (!links.some(link => link.obj === parent && link.key === key)) {
+            links.push({ obj: parent, key: key });
+        }
+    }
+
+    // proxy -> raw target, so a slot can be read without the proxy converting or tracking.
+    const rawOfProxy = new WeakMap();
+
+    function slotHolds(link, target) {
+        const obj = rawOfProxy.get(link.obj) || link.obj;
+        const proxy = proxyMap.get(target);
+        if (obj instanceof Set) {
+            return obj.has(target) || (!!proxy && obj.has(proxy));
+        }
+        const held = obj instanceof Map ? obj.get(link.key)
+            : Array.isArray(obj) ? obj[link.key]
+            : reactiveSystem.untracked(() => obj[link.key]);
+        return held === target || (held !== undefined && held !== null && proxy === held);
+    }
+
+    function primaryLink(target) {
+        const links = target._parentLinks;
+        if (!links || links.length === 0) return undefined;
+        for (const link of links) {
+            if (slotHolds(link, target)) return link;
+        }
+        return links[links.length - 1];
     }
 
     /**
@@ -976,10 +1019,10 @@ function createReactiveFactory(options = {}) {
     function createReactiveObject(target, parent = null, key = null, computedProps = new Map()) {
         // Names Stitch defines on every model object: a field with one of them would be
         // overwritten by the helper, silently.
-        const ownParts = parent ? pathParts(parent).concat([key]) : [];
+        const ownParts = () => (parent ? pathParts(parent).concat([key]) : []);
         checkReservedKeys(target, ownParts);
         computedProps.forEach((_marker, name) => {
-            if (RESERVED_NAMES.indexOf(name) !== -1) throw reservedError(ownParts.concat(name));
+            if (RESERVED_NAMES.indexOf(name) !== -1) throw reservedError(ownParts().concat(name));
         });
         // Add metadata
         if (!target._changeHandlers) {
@@ -1140,6 +1183,7 @@ function createReactiveFactory(options = {}) {
                 if (prop === "__isReactive") return true;
                 if (prop === "_changeHandlers") return target._changeHandlers;
                 if (prop === "_parent") return target._parent;
+                if (prop === "_parentLinks") return target._parentLinks;
                 if (Object.prototype.hasOwnProperty.call(helpers, prop)) return helpers[prop];
                 if (prop === "on" || prop === "off") return oldHelperStub(prop);
 
@@ -1179,6 +1223,7 @@ function createReactiveFactory(options = {}) {
             }
         });
         proxyMap.set(target, proxy);
+        rawOfProxy.set(proxy, target);
         return proxy;
     }
 
@@ -1326,6 +1371,7 @@ function createReactiveFactory(options = {}) {
                 if (key === "__isReactive") return true;
                 if (key === "_changeHandlers") return target._changeHandlers;
                 if (key === "_parent") return target._parent;
+                if (key === "_parentLinks") return target._parentLinks;
                 if (typeof key === "string" && Object.prototype.hasOwnProperty.call(helpers, key)) return helpers[key];
                 if (key === "on" || key === "off" || key === "get" || key === "set") return oldHelperStub(key);
                 reactiveSystem.track(target, key);
@@ -1354,14 +1400,16 @@ function createReactiveFactory(options = {}) {
                         const result = Array.prototype[key].apply(target, args);
 
                         // Rows of this list (and reactive rows just put in) point at their index.
-                        if (key === "push") {
-                            for (let i = oldLength; i < target.length; i++) repoint(target[i], receiver, i);
-                        } else if (key !== "pop") {
-                            const inserted = new Set(args);
-                            for (let i = 0; i < target.length; i++) {
+                        const indexFrom = key === "push" ? oldLength : 0;
+                        if (key !== "pop") {
+                            for (let i = indexFrom; i < target.length; i++) {
                                 const item = target[i];
-                                if (item && typeof item === "object" && item.__isReactive &&
-                                    (inserted.has(item) || (item._parent && (item._parent.obj === receiver || item._parent.obj === target)))) {
+                                if (!item || typeof item !== "object" || !item.__isReactive) continue;
+                                const links = item._parentLinks || [];
+                                const own = links.find(link => link.obj === receiver || link.obj === target);
+                                if (own) {
+                                    own.key = i;
+                                } else {
                                     repoint(item, receiver, i);
                                 }
                             }
@@ -1421,6 +1469,7 @@ function createReactiveFactory(options = {}) {
             }
         });
         proxyMap.set(target, proxy);
+        rawOfProxy.set(proxy, target);
         for (let i = 0; i < target.length; i++) repoint(target[i], proxy, i);
         return proxy;
     }
