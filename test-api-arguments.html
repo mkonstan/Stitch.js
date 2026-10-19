@@ -33,7 +33,10 @@
             'a-model-cannot-be-nested',
             'moving-within-a-model-re-points-the-parent',
             'to-raw-returns-plain-data',
-            'reactive-on-a-nested-object-throws'
+            'reactive-on-a-nested-object-throws',
+            'shared-raw-collections-throw',
+            'set-members-and-map-values-cannot-move-across-models',
+            'map-and-set-initial-content-is-reactive'
         ]);
 
         function mount(html) {
@@ -274,6 +277,54 @@
                 t.match(thrown(() => Stitch.Observable.reactive(m.user)), /"user" already belongs to a model; use the root model/, 'Observable.reactive(model.user) throws');
                 t.match(thrown(() => Stitch.Observable.create(m.user)), /"user" already belongs to a model; use the root model/, 'Observable.create(model.user) throws');
                 t.ok(Stitch.Observable.reactive(m) === m, 'control: reactive(root) returns the root');
+            });
+
+            // B7: a raw array / Map / Set that already belongs to one model cannot be reused by
+            // another (the proxy cache used to hand the first model's proxy to the second).
+            await StitchTest.test('shared-raw-collections-throw', async (t) => {
+                const COUNTRIES = [{ id: 1, name: 'US' }];
+                const RATES = new Map([['usd', 1]]);
+                const CODES = new Set(['US']);
+                Stitch.Observable.create({ countries: COUNTRIES, rates: RATES, codes: CODES });
+                const SHARED = /"(countries|rates|codes)" already belongs to a model; give each model its own copy \((\[\.\.\.countries\]|new Map\(rates\)|new Set\(codes\))\)/;
+                t.match(thrown(() => Stitch.Observable.create({ countries: COUNTRIES })), SHARED, 'a shared array throws, telling the fix ([...countries])');
+                t.match(thrown(() => Stitch.Observable.create({ rates: RATES })), SHARED, 'a shared Map throws (new Map(rates))');
+                t.match(thrown(() => Stitch.Observable.create({ codes: CODES })), SHARED, 'a shared Set throws (new Set(codes))');
+                t.match(thrown(() => Stitch.Observable.create({ countries: COUNTRIES }, { isolated: true })), SHARED, 'also into an isolated model');
+                const later = Stitch.Observable.create({ countries: [] });
+                t.match(thrown(() => { later.countries = COUNTRIES; }), SHARED, 'also by a later assignment');
+                t.equal(thrown(() => Stitch.Observable.create({ countries: [...COUNTRIES] })), '', 'control: a copy is accepted');
+            });
+
+            await StitchTest.test('set-members-and-map-values-cannot-move-across-models', async (t) => {
+                const a = Stitch.Observable.create({ tags: new Set(), prices: new Map() });
+                const member = { name: 'x' };
+                a.tags.add(member);
+                const value = { price: 1 };
+                a.prices.set('p', value);
+                const b = Stitch.Observable.create({ current: null });
+                t.match(thrown(() => { b.current = member; }), /belongs to a different model/, 'a Set member of model a cannot be assigned into model b');
+                t.match(thrown(() => { b.current = a.prices.get('p'); }), /belongs to a different model/, 'nor a Map value');
+                t.match(thrown(() => a.tags.add({ inner: Stitch.Observable.create({ x: 1 }) })), /"tags\.value\.inner"/, 'the Set.add error path names the collection');
+            });
+
+            await StitchTest.test('map-and-set-initial-content-is-reactive', async (t) => {
+                const m = Stitch.Observable.create({
+                    prices: new Map([['a', { price: 1 }]]),
+                    shown: Stitch.computed(function () { return this.prices.get('a').price; })
+                });
+                const host = document.createElement('div');
+                host.innerHTML = '<span data-text="shown"></span>';
+                document.body.appendChild(host);
+                new Stitch.DataBinder().bind(host, m);
+                t.equal(host.textContent, '1', 'precondition: the initial Map value renders');
+                m.prices.get('a').price = 5;
+                await tick();
+                t.equal(host.textContent, '5', 'a write to an initial Map value updates the binding');
+                t.equal(Stitch.Observable.isReactive(m.prices.get('a')), true, 'the initial Map value is reactive, like one added later');
+                host.remove();
+                t.match(thrown(() => Stitch.Observable.create({ prices: new Map([['a', { inner: Stitch.Observable.create({ x: 1 }) }]]) })),
+                    /"prices\.a\.inner"/, 'a model inside an initial Map value throws at create');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

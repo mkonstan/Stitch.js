@@ -155,6 +155,38 @@ function createReactiveFactory(options = {}) {
         }
     }
 
+    /**
+     * B7: a raw array / Map / Set that was already converted for a model (it carries
+     * _changeHandlers) may only be reused within that same model (or if it belongs to none,
+     * in the same factory). Otherwise two models would share one live object.
+     */
+    function claimRaw(target, parent, key) {
+        if (!Object.prototype.hasOwnProperty.call(target, "_changeHandlers")) return;
+        const ownRoot = rootOfObject(target);
+        const sameFactory = proxyMap.has(target);
+        if (!sameFactory || (ownRoot && ownRoot !== rootOfObject(parent))) {
+            const parts = parent ? pathParts(parent).concat([key]) : [key];
+            const last = parts[parts.length - 1];
+            const name = typeof last === "string" && !/^\d+$/.test(last) ? last : "list";
+            const copy = target instanceof Map ? `new Map(${name})` : target instanceof Set ? `new Set(${name})` : `[...${name}]`;
+            throw new Error(
+                `[Stitch.js ${Version}] "${formatPath(parts) || name}" already belongs to a model; give each model its own copy (${copy}). ` +
+                "The same array, Map or Set in two models would be one live object with two owners: it belongs to a different model."
+            );
+        }
+    }
+
+    /** Points a raw (array / Map / Set) target's parent link at its new place. */
+    function repointRaw(target, parent, key) {
+        if (!parent) return;
+        if (target._parent && target._parent.obj) {
+            target._parent.obj = parent;
+            target._parent.key = key;
+        } else {
+            attachParent(target, parent, key);
+        }
+    }
+
     /** A moved object's parent link follows it, so writes bubble from (and errors name) its new place. */
     function repoint(value, parentObj, key) {
         if (!value || typeof value !== "object" || !value.__isReactive || !parentObj) return;
@@ -517,9 +549,10 @@ function createReactiveFactory(options = {}) {
 
         // Return cached proxy for collections to preserve identity:
         // reactive(raw) === reactive(raw)
+        claimRaw(obj, parent, key);
         const cachedProxy = proxyMap.get(obj);
         if (cachedProxy) {
-            attachParent(obj, parent, key);
+            repointRaw(obj, parent, key);
             return cachedProxy;
         }
 
@@ -704,20 +737,50 @@ function createReactiveFactory(options = {}) {
      * @returns {Proxy} Reactive collection proxy
      */
     function createReactiveCollection(target, parent, key, methodOverrides) {
+        claimRaw(target, parent, key);
         const cachedProxy = proxyMap.get(target);
         if (cachedProxy) {
-            attachParent(target, parent, key);
+            repointRaw(target, parent, key);
             return cachedProxy;
         }
 
-        const ownParts = parent ? pathParts(parent).concat([key]) : [];
-        target.forEach((value, entryKey) => {
-            checkIncoming(value, parent, ownParts.concat([target instanceof Map && (typeof entryKey === "string" || typeof entryKey === "number") ? entryKey : "value"]));
-        });
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
         attachParent(target, parent, key);
+
+        // The initial content is made reactive exactly like values added later (Map.set /
+        // Set.add): plain objects convert (in place), and D30 refuses a model or a foreign
+        // object. Before, initial Map values stayed plain and writes to them never reached a
+        // binding.
+        const ownParts = parent ? pathParts(parent).concat([key]) : [];
+        if (target instanceof Map) {
+            for (const [entryKey, value] of Array.from(target.entries())) {
+                if (!value || typeof value !== "object") continue;
+                const name = typeof entryKey === "string" || typeof entryKey === "number" ? entryKey : "value";
+                if (value.__isReactive) {
+                    checkIncoming(value, parent, ownParts.concat([name]));
+                    repoint(value, target, name);
+                } else {
+                    const converted = reactive(value, new WeakSet, target, name);
+                    if (converted !== value) target.set(entryKey, converted);
+                }
+            }
+        } else {
+            for (const value of Array.from(target)) {
+                if (!value || typeof value !== "object") continue;
+                if (value.__isReactive) {
+                    checkIncoming(value, parent, ownParts.concat(["value"]));
+                    repoint(value, target, "value");
+                } else {
+                    const converted = reactive(value, new WeakSet, target, "value");
+                    if (converted !== value) {
+                        target.delete(value);
+                        target.add(converted);
+                    }
+                }
+            }
+        }
 
         const overrides = methodOverrides(target);
         const helpers = createHelpers(target);
@@ -806,7 +869,7 @@ function createReactiveFactory(options = {}) {
                         checkIncoming(val, target, pathParts(target).concat([keyName]));
                         repoint(val, target, keyName);
                     } else if (val && typeof val === "object") {
-                        val = reactive(val, new WeakSet);
+                        val = reactive(val, new WeakSet, target, keyName);
                     }
                     const result = target.set(key, val);
                     if (!oldHas || oldValue !== val) {
@@ -856,8 +919,10 @@ function createReactiveFactory(options = {}) {
                     const oldValue = val;
                     if (val && typeof val === "object" && val.__isReactive) {
                         checkIncoming(val, target, pathParts(target).concat(["value"]));
+                        repoint(val, target, "value");
                     } else if (val && typeof val === "object") {
-                        val = reactive(val, new WeakSet);
+                        // A parent link: the member belongs to this model (it cannot move to another).
+                        val = reactive(val, new WeakSet, target, "value");
                     }
                     const normalizedVal = normalizeSetLookup(val);
                     const oldHas = target.has(normalizedVal);
@@ -897,9 +962,10 @@ function createReactiveFactory(options = {}) {
      * @returns {Proxy} Reactive array proxy
      */
     function createReactiveArray(target, parent = null, key = null) {
+        claimRaw(target, parent, key);
         const cachedProxy = proxyMap.get(target);
         if (cachedProxy) {
-            attachParent(target, parent, key);
+            repointRaw(target, parent, key);
             return cachedProxy;
         }
 
