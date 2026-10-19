@@ -29,7 +29,11 @@
             'off-removes-a-once-subscription',
             'events-and-change-handlers-do-not-overload',
             'old-name-assignment-throws',
-            'events-live-on-the-root-model'
+            'events-live-on-the-root-model',
+            'a-model-cannot-be-nested',
+            'moving-within-a-model-re-points-the-parent',
+            'to-raw-returns-plain-data',
+            'reactive-on-a-nested-object-throws'
         ]);
 
         function mount(html) {
@@ -39,6 +43,7 @@
             document.getElementById('stage').appendChild(host);
             return host;
         }
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
         const thrown = fn => { try { fn(); return ''; } catch (error) { return String(error && error.message); } };
 
         (async () => {
@@ -191,6 +196,84 @@
                 model.user.$offChange(watcher);
                 model.user.name = 'c';
                 t.deepEqual(changes, ['name'], 'and $offChange removes it');
+            });
+
+            // D30: one model = one root. A model, or an object of another model, cannot be put
+            // into a model by any write path; the error names the target path.
+            await StitchTest.test('a-model-cannot-be-nested', async (t) => {
+                const NESTED = /A model cannot be nested in another model: assign plain data, or Observable\.toRaw\(/;
+                const app = Stitch.Observable.create({ cart: null, rows: [{ id: 1 }], tags: new Set(), prices: new Map(), info: {} });
+                const cart = () => Stitch.Observable.create({ total: 1 });
+                const cases = [
+                    ['app.cart = model', () => { app.cart = cart(); }, /"cart"/],
+                    ['an isolated model', () => { app.cart = Stitch.Observable.create({ total: 1 }, { isolated: true }); }, /"cart"/],
+                    ['rows.push(model)', () => app.rows.push(cart()), /"rows\[1\]"/],
+                    ['rows.unshift(model)', () => app.rows.unshift(cart()), /"rows\[0\]"/],
+                    ['rows.splice(0, 0, model)', () => app.rows.splice(0, 0, cart()), /"rows\[0\]"/],
+                    ['rows[0] = model', () => { app.rows[0] = cart(); }, /"rows\[0\]"/],
+                    ['Map.set', () => app.prices.set('a', cart()), /"prices/],
+                    ['Set.add', () => app.tags.add(cart()), /"tags/],
+                    ['$set', () => app.$set('cart', cart()), /"cart"/],
+                    ['a model inside plain data', () => { app.info = { inner: cart() }; }, /"info\.inner"/],
+                    ['at create', () => Stitch.Observable.create({ cart: cart() }), /"cart"/],
+                    ['createArray', () => Stitch.Observable.createArray([cart()]), /"\[0\]"/]
+                ];
+                for (const [what, fn, where] of cases) {
+                    const message = thrown(fn);
+                    t.ok(NESTED.test(message) && where.test(message), `${what} throws, naming the target path (got: ${message.slice(0, 120)})`);
+                }
+                t.equal(app.cart, null, 'the failed assignment left the model unchanged');
+                t.equal(app.rows.length, 1, 'the failed push left the list unchanged');
+
+                const other = Stitch.Observable.create({ rows: [{ id: 7, name: 'x' }], user: { name: 'u' } });
+                const b = Stitch.Observable.create({ current: null, list: [] });
+                t.match(thrown(() => { b.current = other.rows[0]; }), /belongs to a different model/, 'an object of another model cannot be assigned');
+                t.match(thrown(() => b.list.push(other.user)), /belongs to a different model/, 'or pushed');
+                t.equal(thrown(() => { b.current = Stitch.Observable.toRaw(other.rows[0]); }), '', 'control: its plain copy can');
+            });
+
+            await StitchTest.test('moving-within-a-model-re-points-the-parent', async (t) => {
+                const m = Stitch.Observable.create({ listA: [{ id: 1, name: 'x' }], listB: [], a: { inner: { v: 1 } }, b: null });
+                const fields = [];
+                m.$onChange(change => fields.push(change.field));
+                const row = m.listA[0];
+                m.listA.splice(0, 1);
+                t.equal(thrown(() => m.listB.push(row)), '', 'a row moves from list A to list B of the same model');
+                await tick();
+                fields.length = 0;
+                row.name = 'y';
+                await tick();
+                t.deepEqual(fields, ['listB.0.name'], 'a write to the moved row bubbles from its new place');
+                t.match(thrown(() => m.listB[0].$set('meta', { toJSON: 1 })), /"listB\[0\]\.meta\.toJSON" is reserved/,
+                    'and a toJSON error names the new path');
+                const inner = m.a.inner;
+                t.equal(thrown(() => { m.b = inner; }), '', 'a nested object re-assigned elsewhere in the same model works');
+                fields.length = 0;
+                inner.v = 2;
+                await tick();
+                t.deepEqual(fields, ['b.v'], 'and its writes bubble from the new place');
+                m.listB.unshift({ id: 2, name: 'first' });
+                await tick();
+                fields.length = 0;
+                row.name = 'z';
+                await tick();
+                t.deepEqual(fields, ['listB.1.name'], 'an unshift re-points the indexes of the rows after it');
+            });
+
+            await StitchTest.test('to-raw-returns-plain-data', async (t) => {
+                const m = Stitch.Observable.create({ n: 1, user: { name: 'a' }, rows: [{ id: 1 }], tags: new Set(['x']), total: Stitch.computed(function () { return this.n * 2; }) });
+                const raw = Stitch.Observable.toRaw(m);
+                t.deepEqual(JSON.parse(JSON.stringify(raw)), { n: 1, user: { name: 'a' }, rows: [{ id: 1 }], tags: {}, total: 2 }, 'toRaw copies the values (computeds included)');
+                t.equal(Stitch.Observable.isReactive(raw) || Stitch.Observable.isReactive(raw.user) || Stitch.Observable.isReactive(raw.rows), false, 'nothing in it is reactive');
+                t.ok(Array.isArray(raw.rows) && raw.tags instanceof Set && raw.tags.has('x'), 'arrays stay arrays, Sets stay Sets');
+                t.equal(Stitch.Observable.isReactive(Stitch.Observable.toRaw(m.rows)), false, 'toRaw of a list gives a plain array');
+            });
+
+            await StitchTest.test('reactive-on-a-nested-object-throws', async (t) => {
+                const m = Stitch.Observable.create({ user: { name: 'a' } });
+                t.match(thrown(() => Stitch.Observable.reactive(m.user)), /"user" already belongs to a model; use the root model/, 'Observable.reactive(model.user) throws');
+                t.match(thrown(() => Stitch.Observable.create(m.user)), /"user" already belongs to a model; use the root model/, 'Observable.create(model.user) throws');
+                t.ok(Stitch.Observable.reactive(m) === m, 'control: reactive(root) returns the root');
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {

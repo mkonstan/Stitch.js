@@ -9,6 +9,65 @@ const { VERSION } = require("../../utils/src/version");
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
 
+/** "user", "rows[2].meta": where obj sits in its model (from its parent links). */
+function modelPathOf(obj) {
+    const parts = [];
+    const seen = new Set();
+    let current = obj;
+    while (current && current._parent && current._parent.obj && !seen.has(current)) {
+        seen.add(current);
+        parts.unshift(current._parent.key);
+        current = current._parent.obj;
+    }
+    return parts.reduce((text, part) => /^\d+$/.test(String(part)) ? `${text}[${part}]` : (text ? `${text}.${part}` : String(part)), "");
+}
+
+/** Throws when obj is a reactive object inside a model (not a root of its own). */
+function refuseNested(method, obj) {
+    if (obj && obj.__isReactive && !Object.prototype.hasOwnProperty.call(obj, "_factory")) {
+        throw new Error(
+            `[Stitch.js ${Version}] ${method}(): "${modelPathOf(obj) || "this object"}" already belongs to a model; use the root model ` +
+            "(events, change handlers and bindings live there), or Observable.toRaw() it to make a separate model from a copy."
+        );
+    }
+}
+
+/** A deep plain copy: reactive objects, arrays, Maps and Sets become plain ones; computeds become values. */
+function toPlain(value, seen) {
+    if (value === null || typeof value !== "object") return value;
+    if (seen.has(value)) return seen.get(value);
+    if (value instanceof Date) return new Date(value.getTime());
+    if (Array.isArray(value)) {
+        const out = [];
+        seen.set(value, out);
+        for (let i = 0; i < value.length; i++) out.push(toPlain(value[i], seen));
+        return out;
+    }
+    if (value instanceof Map) {
+        const out = new Map();
+        seen.set(value, out);
+        value.forEach((v, k) => out.set(k, toPlain(v, seen)));
+        return out;
+    }
+    if (value instanceof Set) {
+        const out = new Set();
+        seen.set(value, out);
+        value.forEach(v => out.add(toPlain(v, seen)));
+        return out;
+    }
+    const proto = Object.getPrototypeOf(value);
+    if (!value.__isReactive && proto !== Object.prototype && proto !== null) {
+        return value; // a class instance that is not model data: kept as is
+    }
+    const out = {};
+    seen.set(value, out);
+    for (const key of Object.keys(value)) {
+        if (key[0] === "_") continue;
+        out[key] = toPlain(value[key], seen);
+    }
+    return out;
+}
+
 // The options Observable.create / createArray / reactive accept. Anything else throws,
 // rather than being ignored (v2's { debug: true } is gone: there is no debug mode).
 const KNOWN_OPTIONS = ["isolated"];
@@ -76,9 +135,10 @@ class Observable {
             throw new Error("Observable.create() requires an object as input");
         }
         checkOptions("Observable.create", options);
-        if (data.__isReactive && data._factory) {
+        if (data.__isReactive && Object.prototype.hasOwnProperty.call(data, "_factory")) {
             throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
         }
+        refuseNested("Observable.create", data);
 
         const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
 
@@ -157,6 +217,7 @@ class Observable {
      */
     static reactive(obj, options = {}) {
         checkOptions("Observable.reactive", options);
+        refuseNested("Observable.reactive", obj);
         if (obj && obj.__isReactive) {
             return obj;
         }
@@ -234,7 +295,7 @@ class Observable {
         if (!Observable.isReactive(reactiveObj)) {
             return reactiveObj;
         }
-        return reactiveObj.toJSON ? reactiveObj.toJSON() : reactiveObj;
+        return toPlain(reactiveObj, new Map());
     }
 
     /**

@@ -33,6 +33,65 @@ const { VERSION } = __stitchRequire(25);
 const Version = `v${VERSION}`;
 const getProperty = runtimeHelpers.getProperty;
 
+/** "user", "rows[2].meta": where obj sits in its model (from its parent links). */
+function modelPathOf(obj) {
+    const parts = [];
+    const seen = new Set();
+    let current = obj;
+    while (current && current._parent && current._parent.obj && !seen.has(current)) {
+        seen.add(current);
+        parts.unshift(current._parent.key);
+        current = current._parent.obj;
+    }
+    return parts.reduce((text, part) => /^\d+$/.test(String(part)) ? `${text}[${part}]` : (text ? `${text}.${part}` : String(part)), "");
+}
+
+/** Throws when obj is a reactive object inside a model (not a root of its own). */
+function refuseNested(method, obj) {
+    if (obj && obj.__isReactive && !Object.prototype.hasOwnProperty.call(obj, "_factory")) {
+        throw new Error(
+            `[Stitch.js ${Version}] ${method}(): "${modelPathOf(obj) || "this object"}" already belongs to a model; use the root model ` +
+            "(events, change handlers and bindings live there), or Observable.toRaw() it to make a separate model from a copy."
+        );
+    }
+}
+
+/** A deep plain copy: reactive objects, arrays, Maps and Sets become plain ones; computeds become values. */
+function toPlain(value, seen) {
+    if (value === null || typeof value !== "object") return value;
+    if (seen.has(value)) return seen.get(value);
+    if (value instanceof Date) return new Date(value.getTime());
+    if (Array.isArray(value)) {
+        const out = [];
+        seen.set(value, out);
+        for (let i = 0; i < value.length; i++) out.push(toPlain(value[i], seen));
+        return out;
+    }
+    if (value instanceof Map) {
+        const out = new Map();
+        seen.set(value, out);
+        value.forEach((v, k) => out.set(k, toPlain(v, seen)));
+        return out;
+    }
+    if (value instanceof Set) {
+        const out = new Set();
+        seen.set(value, out);
+        value.forEach(v => out.add(toPlain(v, seen)));
+        return out;
+    }
+    const proto = Object.getPrototypeOf(value);
+    if (!value.__isReactive && proto !== Object.prototype && proto !== null) {
+        return value; // a class instance that is not model data: kept as is
+    }
+    const out = {};
+    seen.set(value, out);
+    for (const key of Object.keys(value)) {
+        if (key[0] === "_") continue;
+        out[key] = toPlain(value[key], seen);
+    }
+    return out;
+}
+
 // The options Observable.create / createArray / reactive accept. Anything else throws,
 // rather than being ignored (v2's { debug: true } is gone: there is no debug mode).
 const KNOWN_OPTIONS = ["isolated"];
@@ -100,9 +159,10 @@ class Observable {
             throw new Error("Observable.create() requires an object as input");
         }
         checkOptions("Observable.create", options);
-        if (data.__isReactive && data._factory) {
+        if (data.__isReactive && Object.prototype.hasOwnProperty.call(data, "_factory")) {
             throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
         }
+        refuseNested("Observable.create", data);
 
         const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
 
@@ -181,6 +241,7 @@ class Observable {
      */
     static reactive(obj, options = {}) {
         checkOptions("Observable.reactive", options);
+        refuseNested("Observable.reactive", obj);
         if (obj && obj.__isReactive) {
             return obj;
         }
@@ -258,7 +319,7 @@ class Observable {
         if (!Observable.isReactive(reactiveObj)) {
             return reactiveObj;
         }
-        return reactiveObj.toJSON ? reactiveObj.toJSON() : reactiveObj;
+        return toPlain(reactiveObj, new Map());
     }
 
     /**
@@ -377,13 +438,77 @@ function createReactiveFactory(options = {}) {
     }
 
     /** Array items are made reactive when first read; their keys are checked when they arrive. */
-    function checkArrayItems(items, arrayParts, firstIndex) {
+    function checkArrayItems(items, arrayParts, firstIndex, container) {
         items.forEach((item, i) => {
-            if (item && typeof item === "object" && !item.__isReactive && !Array.isArray(item)
-                && !(item instanceof Map) && !(item instanceof Set)) {
-                checkReservedKeys(item, arrayParts.concat(firstIndex + i));
+            const parts = arrayParts.concat(firstIndex + i);
+            if (!item || typeof item !== "object") return;
+            if (item.__isReactive) {
+                checkIncoming(item, container, parts);
+                return;
+            }
+            if (!Array.isArray(item) && !(item instanceof Map) && !(item instanceof Set)) {
+                checkReservedKeys(item, parts);
+                // A model one level down in a plain row is caught now, not when the row is read.
+                for (const name of Object.keys(item)) {
+                    checkIncoming(item[name], container, parts.concat(name));
+                }
             }
         });
+    }
+
+    // ---- D30: one model = one root -------------------------------------------------
+
+    /** The root model obj belongs to (the object carrying _factory up its _parent chain), or null. */
+    function rootOfObject(obj) {
+        const seen = new Set();
+        let current = obj;
+        while (current && typeof current === "object" && !seen.has(current)) {
+            seen.add(current);
+            if (Object.prototype.hasOwnProperty.call(current, "_factory")) return current;
+            const parentLink = current._parent;
+            if (!parentLink || !parentLink.obj) return null;
+            current = parentLink.obj;
+        }
+        return null;
+    }
+
+    function nestingError(parts, what) {
+        const last = parts[parts.length - 1];
+        const name = typeof last === "string" && !/^\d+$/.test(last) ? last : "value";
+        return new Error(
+            `[Stitch.js ${Version}] cannot put ${what} at "${formatPath(parts) || "(the model)"}": A model cannot be nested in ` +
+            `another model: assign plain data, or Observable.toRaw(${name}). One page model is one root; events, change ` +
+            "handlers and bindings follow that root only."
+        );
+    }
+
+    /**
+     * D30: throws when value (already reactive) may not go into container: it is a model of
+     * its own (a root), or it belongs to a different model. An object of the same model (or
+     * one that belongs to none) may move.
+     */
+    function checkIncoming(value, container, parts) {
+        if (!value || typeof value !== "object" || !value.__isReactive) return;
+        if (Object.prototype.hasOwnProperty.call(value, "_factory")) {
+            throw nestingError(parts, "a model");
+        }
+        const ownRoot = rootOfObject(value);
+        if (ownRoot && ownRoot !== rootOfObject(container)) {
+            const from = formatPath(pathParts(value));
+            throw nestingError(parts, `an object that belongs to a different model${from ? ` (its "${from}")` : ""}`);
+        }
+    }
+
+    /** A moved object's parent link follows it, so writes bubble from (and errors name) its new place. */
+    function repoint(value, parentObj, key) {
+        if (!value || typeof value !== "object" || !value.__isReactive || !parentObj) return;
+        const parentLink = value._parent;
+        if (parentLink && parentLink.obj) {
+            parentLink.obj = parentObj;
+            parentLink.key = key;
+        } else {
+            attachParent(value, parentObj, key);
+        }
     }
 
     // v2 name -> v3 name (on() registered a change handler in v2).
@@ -701,6 +826,10 @@ function createReactiveFactory(options = {}) {
             return value;
         }
         if (value.__isReactive) {
+            // D30: a model, or an object of another model, cannot come in; one of this
+            // model's own objects moves here.
+            checkIncoming(value, parent, parent ? pathParts(parent).concat([key]) : [key]);
+            repoint(value, parent, key);
             return value;
         }
         if (Array.isArray(value)) {
@@ -772,9 +901,10 @@ function createReactiveFactory(options = {}) {
             }
         }
         
-        // Make nested objects reactive (only regular properties)
+        // Make nested objects reactive (only regular properties). An already-reactive value
+        // goes through makeDeepReactive too, so D30 refuses a model or a foreign object here.
         for (const [childKey, value] of Object.entries(regularProps)) {
-            if (value && typeof value === "object" && !value.__isReactive) {
+            if (value && typeof value === "object") {
                 regularProps[childKey] = makeDeepReactive(value, obj, childKey);
             }
         }
@@ -924,6 +1054,10 @@ function createReactiveFactory(options = {}) {
             return cachedProxy;
         }
 
+        const ownParts = parent ? pathParts(parent).concat([key]) : [];
+        target.forEach((value, entryKey) => {
+            checkIncoming(value, parent, ownParts.concat([target instanceof Map && (typeof entryKey === "string" || typeof entryKey === "number") ? entryKey : "value"]));
+        });
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
@@ -1010,8 +1144,12 @@ function createReactiveFactory(options = {}) {
                 set: function(key, val) {
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
-                    // Make value reactive if object
-                    if (val && typeof val === "object" && !val.__isReactive) {
+                    const keyName = typeof key === "string" || typeof key === "number" ? key : "value";
+                    // Make value reactive if object (D30: never another model)
+                    if (val && typeof val === "object" && val.__isReactive) {
+                        checkIncoming(val, target, pathParts(target).concat([keyName]));
+                        repoint(val, target, keyName);
+                    } else if (val && typeof val === "object") {
                         val = reactive(val, new WeakSet);
                     }
                     const result = target.set(key, val);
@@ -1060,7 +1198,9 @@ function createReactiveFactory(options = {}) {
                 },
                 add: function(val) {
                     const oldValue = val;
-                    if (val && typeof val === "object" && !val.__isReactive) {
+                    if (val && typeof val === "object" && val.__isReactive) {
+                        checkIncoming(val, target, pathParts(target).concat(["value"]));
+                    } else if (val && typeof val === "object") {
                         val = reactive(val, new WeakSet);
                     }
                     const normalizedVal = normalizeSetLookup(val);
@@ -1108,7 +1248,7 @@ function createReactiveFactory(options = {}) {
         }
 
         const arrayMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill"];
-        checkArrayItems(target, parent ? pathParts(parent).concat([key]) : [], 0);
+        checkArrayItems(target, parent ? pathParts(parent).concat([key]) : [], 0, parent);
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
         }
@@ -1127,12 +1267,12 @@ function createReactiveFactory(options = {}) {
                     return function (...args) {
                         // New items: their keys are checked now, with the index they will take.
                         const arrayParts = pathParts(target);
-                        if (key === "push") checkArrayItems(args, arrayParts, target.length);
-                        else if (key === "unshift") checkArrayItems(args, arrayParts, 0);
+                        if (key === "push") checkArrayItems(args, arrayParts, target.length, receiver);
+                        else if (key === "unshift") checkArrayItems(args, arrayParts, 0, receiver);
                         else if (key === "splice") {
                             const start = args[0] < 0 ? Math.max(target.length + args[0], 0) : Math.min(args[0] || 0, target.length);
-                            checkArrayItems(args.slice(2), arrayParts, start);
-                        } else if (key === "fill") checkArrayItems([args[0]], arrayParts, 0);
+                            checkArrayItems(args.slice(2), arrayParts, start, receiver);
+                        } else if (key === "fill") checkArrayItems([args[0]], arrayParts, 0, receiver);
                         // Only snapshot when indexed deps are actually being tracked.
                         const deps = reactiveSystem.depsMap.get(target);
                         const trackedIndexKeys = [];
@@ -1146,6 +1286,20 @@ function createReactiveFactory(options = {}) {
                         const oldSnapshot = trackedIndexKeys.length > 0 ? target.slice() : null;
                         const oldLength = target.length;
                         const result = Array.prototype[key].apply(target, args);
+
+                        // Rows of this list (and reactive rows just put in) point at their index.
+                        if (key === "push") {
+                            for (let i = oldLength; i < target.length; i++) repoint(target[i], receiver, i);
+                        } else if (key !== "pop") {
+                            const inserted = new Set(args);
+                            for (let i = 0; i < target.length; i++) {
+                                const item = target[i];
+                                if (item && typeof item === "object" && item.__isReactive &&
+                                    (inserted.has(item) || (item._parent && (item._parent.obj === receiver || item._parent.obj === target)))) {
+                                    repoint(item, receiver, i);
+                                }
+                            }
+                        }
 
                         // FIX: Trigger synchronously for immediate computed invalidation
                         reactiveSystem.trigger(target, "length", oldLength, target.length);
@@ -1186,7 +1340,10 @@ function createReactiveFactory(options = {}) {
                     throw migrationError(key);
                 }
                 const oldValue = target[key];
-                if (value && typeof value === "object" && !value.__isReactive) {
+                if (value && typeof value === "object" && value.__isReactive) {
+                    checkIncoming(value, receiver, pathParts(target).concat([key]));
+                    repoint(value, receiver, key);
+                } else if (value && typeof value === "object") {
                     value = reactive(value, new WeakSet, receiver, key);
                 }
                 const result = Reflect.set(target, key, value, receiver);
@@ -1198,6 +1355,7 @@ function createReactiveFactory(options = {}) {
             }
         });
         proxyMap.set(target, proxy);
+        for (let i = 0; i < target.length; i++) repoint(target[i], proxy, i);
         return proxy;
     }
 
