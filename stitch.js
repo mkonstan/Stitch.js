@@ -561,6 +561,20 @@ function createReactiveFactory(options = {}) {
         });
     }
 
+    /** D31: deleting from a list, Map or Set proxy throws, naming the method that removes. */
+    function deleteError(target, key) {
+        const where = formatPath(pathParts(target)) || "list";
+        const name = where.split(/[.[]/).pop().replace(/]$/, "") || "list";
+        const fix = target instanceof Map ? `${where}.delete(key) removes an entry`
+            : target instanceof Set ? `${where}.delete(value) removes a member`
+            : /^\d+$/.test(String(key)) ? `use ${where}.splice(${key}, 1)`
+            : "model lists cannot lose properties; set a value instead";
+        return new TypeError(
+            `[Stitch.js ${Version}] delete ${where}${/^\d+$/.test(String(key)) ? `[${String(key)}]` : `.${String(key)}`}: ${fix}. ` +
+            `Model data cannot be deleted (it would leave a hole the screen does not see; set it to null instead).`
+        );
+    }
+
     function eventBusOf(target) {
         if (!target._eventBus) {
             defineHidden(target, "_eventBus", new MessageBus({ version: Version }));
@@ -938,7 +952,9 @@ function createReactiveFactory(options = {}) {
     function createReactiveDescriptor(target, key, internal) {
         return {
             enumerable: true,
-            configurable: true,
+            // D31: a model property cannot be deleted (set it to null instead). Non-configurable,
+            // so delete is refused and the accessor (and every binding on it) survives.
+            configurable: false,
             get() {
                 reactiveSystem.track(target, key);
                 return internal[key];
@@ -1292,6 +1308,9 @@ function createReactiveFactory(options = {}) {
                 }
                 return Reflect.set(target, prop, value);
             },
+            deleteProperty(target, prop) {
+                throw deleteError(target, prop);
+            },
             get(target, prop, receiver) {
                 if (prop === "__isReactive") return true;
                 if (prop === "_changeHandlers") return target._changeHandlers;
@@ -1573,6 +1592,9 @@ function createReactiveFactory(options = {}) {
                     return reactiveValue;
                 }
                 return value;
+            },
+            deleteProperty(target, key) {
+                throw deleteError(target, key);
             },
             set(target, key, value, receiver) {
                 if (key === "on" || key === "off" || key === "get" || key === "set") {

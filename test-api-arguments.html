@@ -38,7 +38,8 @@
             'set-members-and-map-values-cannot-move-across-models',
             'map-and-set-initial-content-is-reactive',
             'aliases-keep-the-first-parent',
-            'parent-links-stay-bounded'
+            'parent-links-stay-bounded',
+            'model-properties-cannot-be-deleted'
         ]);
 
         function mount(html) {
@@ -407,6 +408,41 @@
                 t.match(thrown(() => other.list.push(saved.inner)), /belongs to a different model/, 'D30 still holds');
                 m.wrap = null;
                 t.match(thrown(() => other.list.push(saved)), /belongs to a different model/, 'a detached object of m still cannot move into another model');
+            });
+
+            // D31: model properties cannot be deleted (set them to null instead). The accessor
+            // survives, so the model and the screen never disagree.
+            await StitchTest.test('model-properties-cannot-be-deleted', async (t) => {
+                const host = document.createElement('div');
+                host.innerHTML = '<b data-visible="flag">F</b><i data-text="obj.inner.v"></i><ul data-foreach="rows"><li data-text="name"></li></ul>';
+                document.body.appendChild(host);
+                const m = Stitch.Observable.create({ flag: true, obj: { inner: { v: 1 } }, rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }], prices: new Map([['x', 1]]), tags: new Set(['t']) });
+                new Stitch.DataBinder().bind(host, m);
+                const sloppyDelete = new Function('o', 'k', 'return delete o[k];');
+                const strictDelete = (o, k) => { 'use strict'; return delete o[k]; };
+
+                t.equal(sloppyDelete(m, 'flag'), false, 'sloppy: delete m.flag is refused (returns false)');
+                t.match(thrown(() => strictDelete(m, 'flag')), /Cannot delete|non-configurable/i, 'strict: delete m.flag throws a TypeError');
+                m.flag = false;
+                await tick();
+                t.equal(host.querySelector('b').style.display, 'none', 'm.flag = false afterwards still hides the element');
+
+                t.equal(sloppyDelete(m.obj, 'inner'), false, 'sloppy: delete m.obj.inner is refused');
+                t.match(thrown(() => strictDelete(m.obj, 'inner')), /Cannot delete|non-configurable/i, 'strict: delete m.obj.inner throws');
+                m.obj.inner = { v: 2 };
+                await tick();
+                t.equal(host.querySelector('i').textContent, '2', 'a later m.obj.inner = {...} updates the screen');
+
+                for (const [what, fn] of [['sloppy', () => sloppyDelete(m.rows, 0)], ['strict', () => strictDelete(m.rows, 0)]]) {
+                    t.match(thrown(fn), /delete rows\[0\]: use rows\.splice\(0, 1\)/, `${what}: delete rows[0] throws, naming splice`);
+                }
+                await tick();
+                t.equal(m.rows.length, 2, 'the list still has both rows');
+                t.deepEqual(Array.from(host.querySelectorAll('li')).map(li => li.textContent), ['a', 'b'], 'and the screen agrees');
+                t.match(thrown(() => sloppyDelete(m.prices, 'x')), /prices\.delete\(key\)/, 'delete on a Map proxy throws, naming map.delete(key)');
+                t.match(thrown(() => sloppyDelete(m.tags, 'size')), /tags\.delete\(value\)/, 'delete on a Set proxy throws, naming set.delete(value)');
+                t.equal(thrown(() => { m.$set('added', 1); m.added = 2; }), '', 'control: $set still adds a reactive property');
+                host.remove();
             });
 
             await StitchTest.test('message-bus-arguments', async (t) => {
