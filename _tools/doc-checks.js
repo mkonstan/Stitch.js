@@ -11,14 +11,19 @@
  *                  names) has a heading in docs/API.md, and every heading names something
  *                  that exists. Code spans in the guides that name a Stitch API must name a
  *                  real one.
- *   error-coverage Both ways: every distinct error message constructed in packages/ has a
- *                  "Message:" line in docs/ERRORS.md (in a section with a Cause and a Fix),
- *                  and every "Message:" line matches a real message.
+ *   error-coverage Both ways, by code: every error built in packages/ starts with a code
+ *                  ("[Stitch E###] ..."); every code has one "### E###: title" entry in
+ *                  docs/ERRORS.md (with a Cause and a Fix) whose Message line is that
+ *                  error's message; every entry's code is thrown; a code is never used for
+ *                  two different messages.
  *   doc-hygiene    Public documents state rules, not the project's private history: no
  *                  decision numbers (D12), no analysis/ paths, no triage numbers.
  *
- * Messages are matched by their text: the static parts of the message, with "…" for every
- * part filled in at run time (a name, a value, a path). See canonicalMessages().
+ * A message is read as its static parts, with "…" for every part filled in at run time (a
+ * name, a value, a path). See canonicalMessages().
+ *
+ * What these checks do NOT verify: the signatures and prose under an API heading, and the Cause
+ * and Fix prose of an error entry. Those are covered only where an executed snippet exercises them.
  */
 
 const fs = require("fs");
@@ -441,8 +446,6 @@ function normalizeMessage(text) {
     return text
         .replace(/\s+/g, " ")
         .replace(/…(?:\s*…)+/g, HOLE)
-        .replace(/^\[Stitch\.js v?…(?: BatchScheduler)?\] /, "")
-        .replace(/^Stitch\.js …: /, "")
         .trim();
 }
 
@@ -450,17 +453,17 @@ function hasText(pattern) {
     return /[A-Za-z]{4,}/.test(pattern.replace(/…/g, ""));
 }
 
-// Functions whose argument IS the message (they add the "[Stitch.js vX] <where>: " prefix):
-// file -> { functionName: index of the message argument }.
+// Every Stitch error message starts with its stable code: "[Stitch E201] ...".
+const CODE_PREFIX = /^\[Stitch (E\d{3})\] /;
+
+// Functions that build an error from a code argument and a message argument (they add the
+// "[Stitch E###] <where>: " prefix themselves): file -> { name: { code, message } (indexes) }.
+// problem(code, text) makes a reason that a bindingError call relays: a call whose code
+// argument is `<x>.code` relays a code made by one of these calls and is not read again.
 const MESSAGE_WRAPPERS = {
-    "packages/browser/src/binding-paths.js": { bindingError: 1 },
-    "packages/browser/src/binding-runtime.js": { bindingError: 3 },
-    "packages/api/src/reactive-factory.js": { helperError: 0 }
-};
-// Functions that return message text (a reason) that a wrapper call then throws:
-// file -> [functionName]. Each string they return is a message.
-const MESSAGE_SOURCES = {
-    "packages/browser/src/binding-paths.js": ["pathSyntaxProblem"]
+    "packages/browser/src/binding-paths.js": { bindingError: { code: 0, message: 2 }, problem: { code: 0, message: 1 } },
+    "packages/browser/src/binding-runtime.js": { bindingError: { code: 0, message: 4 } },
+    "packages/api/src/reactive-factory.js": { helperError: { code: 0, message: 1 } }
 };
 
 function functionBody(tokens, name) {
@@ -478,10 +481,15 @@ function functionBody(tokens, name) {
     return null;
 }
 
+function isRelay(arg) {
+    return arg.length === 3 && arg[0].type === "ident" && arg[1].value === "." && arg[2].value === "code";
+}
+
 /**
- * Every error message constructed in packages/: [{ message, where }]. A message whose
- * static text cannot be read (it is all computed) is reported as a problem, so a new way
- * of building messages cannot slip past the check.
+ * Every error constructed in packages/: [{ code, message, where }], message without its
+ * "[Stitch E###] " prefix. Problems: an error without a code, a code argument that is not a
+ * literal code, and a message whose static text cannot be read (so a new way of building
+ * errors cannot slip past the check).
  */
 function canonicalMessages(root) {
     const found = [];
@@ -496,51 +504,59 @@ function canonicalMessages(root) {
         const inWrapper = (k) => wrapperBodies.some((b) => k > b.start && k < b.end);
         for (let k = 0; k < tokens.length - 2; k++) {
             const t = tokens[k];
-            let messageArg = null;
+            let wrapper = null;
             let open = -1;
             if (t.type === "ident" && t.value === "new" && /^(?:Type|Range|Syntax)?Error$/.test(tokens[k + 1].value) &&
                 tokens[k + 2].value === "(") {
                 if (inWrapper(k)) continue; // the wrapper's own `new Error(prefix + message)`
                 open = k + 2;
-                messageArg = 0;
             } else if (t.type === "ident" && Object.prototype.hasOwnProperty.call(wrappers, t.value) && tokens[k + 1].value === "(" &&
                 !(tokens[k - 1] && tokens[k - 1].value === "function")) {
                 open = k + 1;
-                messageArg = wrappers[t.value];
+                wrapper = wrappers[t.value];
             } else {
                 continue;
             }
             const { args } = readArguments(tokens, open);
-            const arg = args[messageArg] || [];
-            const message = normalizeMessage(patternOf(arg, consts));
             const where = `${rel}:${lineAt(t.start)}`;
-            if (arg.length === 1 && arg[0].type === "ident" && (MESSAGE_SOURCES[rel] || []).length) {
-                continue; // a reason returned by a message source (read below)
+            let code = null;
+            let message;
+            if (wrapper) {
+                const codeArg = args[wrapper.code] || [];
+                if (isRelay(codeArg)) continue;
+                if (codeArg.length === 1 && codeArg[0].type === "str" && /^E\d{3}$/.test(codeArg[0].value)) {
+                    code = codeArg[0].value;
+                } else {
+                    problems.push(`${where}: the code argument of ${t.value}() must be a literal code such as "E201"`);
+                    continue;
+                }
+                message = normalizeMessage(patternOf(args[wrapper.message] || [], consts));
+            } else {
+                const full = normalizeMessage(patternOf(args[0] || [], consts));
+                const m = CODE_PREFIX.exec(full);
+                if (m) {
+                    code = m[1];
+                    message = full.slice(m[0].length);
+                } else {
+                    message = full;
+                }
             }
             if (!hasText(message)) {
                 problems.push(`${where}: cannot read the message of this error (it has no static text: ${JSON.stringify(message)}). ` +
-                    "Write the message where the error is made, or teach _tools/doc-checks.js (MESSAGE_WRAPPERS / MESSAGE_SOURCES) where it comes from.");
+                    "Write the message where the error is made, or teach _tools/doc-checks.js (MESSAGE_WRAPPERS) where it comes from.");
                 continue;
             }
-            found.push({ message, where });
-        }
-        for (const name of MESSAGE_SOURCES[rel] || []) {
-            const body = functionBody(tokens, name);
-            if (!body) { problems.push(`${rel}: MESSAGE_SOURCES names ${name}, which is not a function there`); continue; }
-            for (let k = body.start; k < body.end; k++) {
-                if (tokens[k].type !== "ident" || tokens[k].value !== "return") continue;
-                const expr = [];
-                for (let e = k + 1; e < body.end && !(tokens[e].type === "punct" && tokens[e].value === ";"); e++) expr.push(tokens[e]);
-                if (expr.length === 1 && expr[0].type === "ident") continue; // return null
-                const message = normalizeMessage(patternOf(expr, consts));
-                if (hasText(message)) found.push({ message, where: `${rel}:${lineAt(tokens[k].start)}` });
+            if (!code) {
+                problems.push(`${where}: this error has no code: start its message with "[Stitch E###] " (a new code, documented in ${ERRORS_DOC}): ${message}`);
+                continue;
             }
+            found.push({ code, message, where });
         }
     }
     return { found, problems };
 }
 
-/** docs/ERRORS.md: the "Message:" code spans, by section, and the sections' Cause/Fix lines. */
+/** docs/ERRORS.md: one section per code ("### E201: title"), its Message, Cause and Fix lines. */
 function documentedErrors(text) {
     const sections = [];
     let current = null;
@@ -550,7 +566,8 @@ function documentedErrors(text) {
         if (/^(`{3,}|~{3,})/.test(line)) inFence = !inFence;
         if (inFence) return;
         if (/^#{2,3}\s/.test(line)) {
-            current = { title: line.replace(/^#+\s*/, ""), line: i + 1, messages: [], cause: false, fix: false };
+            const code = /^###\s+(E\d{3})\b/.exec(line);
+            current = { title: line.replace(/^#+\s*/, ""), line: i + 1, code: code ? code[1] : null, messages: [], cause: false, fix: false };
             sections.push(current);
             return;
         }
@@ -563,32 +580,55 @@ function documentedErrors(text) {
     return sections;
 }
 
+/**
+ * Both ways, by code: every code thrown in packages/ has one entry in docs/ERRORS.md, every
+ * entry's code is thrown, a code means one thing (its sites build the same message), and the
+ * entry's Message line is that message.
+ */
 function checkErrorCoverage(root, files) {
     if (files.indexOf(ERRORS_DOC) === -1) return [`${ERRORS_DOC} does not exist`];
     const { found, problems } = canonicalMessages(root);
-    const inCode = new Map();
+    const byCode = new Map();
     for (const f of found) {
-        if (!inCode.has(f.message)) inCode.set(f.message, f.where);
+        if (!byCode.has(f.code)) byCode.set(f.code, []);
+        byCode.get(f.code).push(f);
+    }
+    for (const [code, sites] of byCode) {
+        const messages = Array.from(new Set(sites.map((s) => s.message)));
+        if (messages.length > 1) {
+            problems.push(`${code} is used for different messages (a code means one thing; give each its own code): ` +
+                sites.map((s) => `${s.where} "${s.message.slice(0, 60)}"`).join("; "));
+        }
     }
     const sections = documentedErrors(read(root, ERRORS_DOC));
-    const inDocs = new Map();
+    const documented = new Map();
     for (const section of sections) {
-        if (section.messages.length && (!section.cause || !section.fix)) {
-            problems.push(`${ERRORS_DOC}:${section.line}: "${section.title}" lists a message but needs a **Cause:** line and a **Fix:** line`);
+        if (!section.code) {
+            if (section.messages.length) problems.push(`${ERRORS_DOC}:${section.line}: "${section.title}" lists a message but its heading has no code (### E###: title)`);
+            continue;
         }
-        for (const m of section.messages) {
-            if (inDocs.has(m.message)) problems.push(`${ERRORS_DOC}:${m.line}: message listed twice: ${m.message}`);
-            inDocs.set(m.message, m.line);
+        if (documented.has(section.code)) problems.push(`${ERRORS_DOC}:${section.line}: ${section.code} has two entries`);
+        documented.set(section.code, section);
+        if (!section.cause || !section.fix) {
+            problems.push(`${ERRORS_DOC}:${section.line}: "${section.title}" needs a **Cause:** line and a **Fix:** line`);
         }
     }
-    for (const [message, where] of inCode) {
-        if (!inDocs.has(message)) problems.push(`${where}: error message not in ${ERRORS_DOC} (add **Message:** \`${message}\`)`);
+    for (const [code, sites] of byCode) {
+        const section = documented.get(code);
+        if (!section) {
+            problems.push(`${code} is thrown at ${sites[0].where} but has no entry in ${ERRORS_DOC} (add "### ${code}: <title>" with **Message:** \`${sites[0].message}\`, **Cause:** and **Fix:**)`);
+            continue;
+        }
+        if (section.messages.length !== 1 || section.messages[0].message !== sites[0].message) {
+            problems.push(`${ERRORS_DOC}:${section.line}: the entry for ${code} must have one **Message:** line, \`${sites[0].message}\``);
+        }
     }
-    for (const [message, line] of inDocs) {
-        if (!inCode.has(message)) problems.push(`${ERRORS_DOC}:${line}: no error in packages/ has this message: ${message}`);
+    for (const [code, section] of documented) {
+        if (!byCode.has(code)) problems.push(`${ERRORS_DOC}:${section.line}: ${code} has an entry but no error in packages/ throws it`);
     }
     return problems;
 }
+
 
 // ---------------------------------------------------------------------------
 // doc-hygiene

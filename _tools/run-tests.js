@@ -46,6 +46,8 @@ const BUILDS = ["stitch.js", "stitch.min.js"];
 const PAGE_TIMEOUT_MS = 20000;
 const ACCEPTANCE_TEST_TIMEOUT_MS = 15000;
 const ACCEPTANCE_HELPERS = "tests/acceptance/helpers.js";
+// Only acceptance specs (whose pages are written later, by the fresh-agent gate) may be pending.
+const PENDING_DIR = "tests/acceptance/";
 const SETTLE_MS = 300;
 const SELF_TEST_CONCURRENCY = 4;
 const LIBRARY_PATH = /^\/(?:.*\/)?stitch(?:\.min)?\.js$/;
@@ -63,7 +65,7 @@ function mainConfig() {
         name: "main",
         suites: loadSuites(lists.suites),
         examples: loadExamples(lists.examples),
-        acceptance: loadAcceptance(lists.acceptance || []),
+        acceptance: loadAcceptance(lists.acceptance || [], PENDING_DIR, SUITES_FILE),
         runPendingAcceptance: false,
         knownFailing: loadKnownFailing(path.join(ROOT, KNOWN_FAILING_FILE)),
         knownFailingLabel: KNOWN_FAILING_FILE,
@@ -84,7 +86,7 @@ function fixtureConfig(name) {
         name: `fixture:${name}`,
         suites: loadSuites(fixture.suites.map((page) => ({ page }))),
         examples: loadExamples(fixture.examples || []),
-        acceptance: loadAcceptance(fixture.acceptance || []),
+        acceptance: loadAcceptance(fixture.acceptance || [], fixture.pendingDir || PENDING_DIR, `${FIXTURES_FILE}#${name}`),
         runPendingAcceptance: false,
         knownFailing: validateKnownFailing(fixture.knownFailing || {}, `${FIXTURES_FILE}#${name}`),
         knownFailingLabel: `${FIXTURES_FILE}#${name}`,
@@ -100,7 +102,7 @@ function fixtureConfig(name) {
 /** `npm run test:acceptance`: every acceptance spec, pending or not, on both builds. */
 function acceptanceConfig() {
     const lists = require(path.join(ROOT, SUITES_FILE));
-    const acceptance = loadAcceptance(lists.acceptance || []);
+    const acceptance = loadAcceptance(lists.acceptance || [], PENDING_DIR, SUITES_FILE);
     if (acceptance.length === 0) throw new Error(`${SUITES_FILE} lists no acceptance specs`);
     return {
         name: "acceptance",
@@ -119,16 +121,35 @@ function acceptanceConfig() {
     };
 }
 
-/** Acceptance entries: { spec, pending }. The spec module names its page. */
-function loadAcceptance(list) {
-    if (!Array.isArray(list)) throw new Error(`${SUITES_FILE}: "acceptance" must be an array`);
+/**
+ * Acceptance entries: { spec, pending }. The spec module names its page. pending is false (the
+ * spec runs in npm test) or { reason, sprint }: why it cannot run yet and the sprint that will
+ * make it run. Like a known-failing entry, a pending entry is guarded: only specs under
+ * pendingDir may be pending, and one whose page exists fails the suite list (it must run).
+ */
+function loadAcceptance(list, pendingDir, label) {
+    if (!Array.isArray(list)) throw new Error(`${label}: "acceptance" must be an array`);
     const seen = new Set();
     return list.map((entry) => {
-        if (!entry || typeof entry.spec !== "string") throw new Error(`acceptance entry without a spec: ${JSON.stringify(entry)}`);
-        if (typeof entry.pending !== "boolean") throw new Error(`acceptance entry ${entry.spec} needs "pending": true or false`);
-        if (seen.has(entry.spec)) throw new Error(`acceptance spec listed twice: ${entry.spec}`);
-        seen.add(entry.spec);
-        return { spec: entry.spec.replace(/\\/g, "/"), pending: entry.pending };
+        if (!entry || typeof entry.spec !== "string") throw new Error(`${label}: acceptance entry without a spec: ${JSON.stringify(entry)}`);
+        const spec = entry.spec.replace(/\\/g, "/");
+        if (seen.has(spec)) throw new Error(`${label}: acceptance spec listed twice: ${spec}`);
+        seen.add(spec);
+        const pending = entry.pending;
+        if (pending === false) return { spec, pending: false };
+        if (!pending || typeof pending !== "object" || Array.isArray(pending)) {
+            throw new Error(`${label}: acceptance entry ${spec} needs "pending": false, or { reason, sprint } saying why it cannot run yet`);
+        }
+        if (typeof pending.reason !== "string" || pending.reason.trim().split(/\s+/).length < 4) {
+            throw new Error(`${label}: acceptance entry ${spec} is pending without a reason (pending.reason: at least 4 words)`);
+        }
+        if (typeof pending.sprint !== "string" || !/^T\d+$/.test(pending.sprint)) {
+            throw new Error(`${label}: acceptance entry ${spec} needs pending.sprint like "T3": the sprint that makes it run`);
+        }
+        if (!spec.startsWith(pendingDir)) {
+            throw new Error(`${label}: ${spec} may not be pending: only acceptance specs under ${pendingDir} (whose pages are not written yet) may be`);
+        }
+        return { spec, pending: { reason: pending.reason, sprint: pending.sprint } };
     });
 }
 
@@ -248,8 +269,13 @@ function checkSuiteList(config) {
             continue;
         }
         // A pending spec's page is written later (the fresh-agent gate); a running one must exist.
-        if (!entry.pending && !fs.existsSync(path.join(ROOT, spec.page))) {
+        const pageExists = fs.existsSync(path.join(ROOT, spec.page));
+        if (!entry.pending && !pageExists) {
             problems.push(`acceptance page does not exist: ${spec.page} (${entry.spec} is not pending)`);
+        }
+        // The flip guard: once the page exists the spec must run (mirror of a FLIPPED known-failing).
+        if (entry.pending && pageExists && !config.runPendingAcceptance) {
+            problems.push(`acceptance page exists: ${spec.page}. Remove pending from ${entry.spec} in ${SUITES_FILE} so it runs`);
         }
     }
     if (config.discoverDir !== null) {
@@ -698,12 +724,14 @@ async function main() {
 
     for (const entry of config.acceptance) {
         if (entry.pending && !config.runPendingAcceptance) {
-            console.log(`PENDING ${entry.spec}: not run until its page is built and the entry is no longer pending (npm run test:acceptance runs it)`);
+            console.log(`PENDING ${entry.spec} (${entry.pending.sprint}): ${entry.pending.reason}. Not run by npm test; npm run test:acceptance runs it`);
         }
     }
     const { summary, fatal } = classify(config, runs);
     for (const line of fatal) console.log(line);
     printSummary(config, summary);
+    const pendingCount = config.acceptance.filter((entry) => entry.pending && !config.runPendingAcceptance).length;
+    if (pendingCount) console.log(`pending acceptance specs (not run): ${pendingCount}`);
     if (report.retries.length) {
         console.log(`RETRIED ${report.retries.length} page run(s) after a connection-level failure (listed above as RETRY; details in the report).`);
     }

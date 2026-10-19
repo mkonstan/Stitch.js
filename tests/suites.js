@@ -44,6 +44,7 @@
         { page: "property-hooks-test.html", title: "Property hooks", about: "onBind / onChange / onUnbind hooks" },
         { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
         { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" },
+        { page: "test-api-contracts.html", title: "API contracts", about: "Removers from $watch/$onChange, boolean isReactive, computed argument, frozen data refused, bind report covers data-type, custom-binding literal hint, error codes" },
         { page: "test-doc-snippets.html", title: "Executable docs", about: "Every html/js code block in the docs runs; mistakes throw their documented message" }
     ];
     // Every public example page (example*.html at the root). The runner fails if one is missing.
@@ -65,13 +66,15 @@
     // Acceptance tests (tests/acceptance/*.spec.js): Playwright specs that drive a page like a
     // user, against the page path each spec names. The pages are built from the docs alone by an
     // agent that has never seen Stitch (tests/acceptance/TASKS.md), so they do not exist until
-    // then. A pending entry is not run by `npm test` (it is listed as PENDING); it runs with
-    // `npm run test:acceptance`, which runs every entry on both builds. Set pending to false
-    // once its page is committed.
+    // then. pending is false (npm test runs the spec) or { reason, sprint }: npm test lists it as
+    // PENDING and does not run it; `npm run test:acceptance` runs every entry on both builds.
+    // Guards: only specs under tests/acceptance/ may be pending, and a pending spec whose page
+    // exists fails `npm test` (set pending to false once the page is committed).
+    var pageByFreshAgent = { reason: "the page is written by an agent that has only the docs (fresh-agent gate)", sprint: "T3" };
     var acceptance = [
-        { spec: "tests/acceptance/tree.spec.js", pending: true },
-        { spec: "tests/acceptance/list.spec.js", pending: true },
-        { spec: "tests/acceptance/form.spec.js", pending: true }
+        { spec: "tests/acceptance/tree.spec.js", pending: pageByFreshAgent },
+        { spec: "tests/acceptance/list.spec.js", pending: pageByFreshAgent },
+        { spec: "tests/acceptance/form.spec.js", pending: pageByFreshAgent }
     ];
     return { suites: suites, examples: examples, acceptance: acceptance };
 });

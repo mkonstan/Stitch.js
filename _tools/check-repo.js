@@ -15,8 +15,9 @@
  *                     checked).
  *   local-path        No absolute local path (Windows drive paths, /Users/<name>/,
  *                     /home/<name>/, file URLs) in any file.
- *   missing-reference Every file a doc or page points to exists, and every
- *                     `npm run <script>` mentioned exists in package.json.
+ *   missing-reference Every file a doc or page points to exists (and every #heading a
+ *                     markdown link points to), and every `npm run <script>` mentioned
+ *                     exists in package.json.
  *   build-match       stitch.js and dist/stitch.assembled.js equal a fresh assembly of
  *                     packages/*, and stitch.min.js equals a fresh minification of it.
  *   no-console        The library (packages/) never logs: an error is thrown, or goes to
@@ -275,6 +276,68 @@ function collectReferences(rel, text) {
     return refs;
 }
 
+/** The anchor GitHub gives a markdown heading (github-slugger rules, without the duplicate suffix). */
+function headingSlug(text) {
+    return text
+        .replace(/`([^`]*)`/g, "$1")
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .trim()
+        .toLowerCase()
+        .replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu, "")
+        .replace(/ /g, "-");
+}
+
+/** Every anchor of a markdown file: one per heading, duplicates numbered -1, -2, ... */
+function markdownAnchors(text) {
+    const anchors = new Set();
+    const counts = new Map();
+    let fence = null; // the opening fence (e.g. "```" or "~~~~") while inside a code block
+    for (const line of text.split(/\r?\n/)) {
+        const f = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+        if (fence) {
+            // Closes on the same character, at least as long, with nothing after it.
+            if (f && f[1][0] === fence[0] && f[1].length >= fence.length && f[2].trim() === "") fence = null;
+            continue;
+        }
+        if (f) { fence = f[1]; continue; }
+        const m = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+        if (!m) continue;
+        const base = headingSlug(m[1]);
+        const n = counts.get(base) || 0;
+        counts.set(base, n + 1);
+        anchors.add(n === 0 ? base : `${base}-${n}`);
+    }
+    return anchors;
+}
+
+/** Links with a #fragment into a markdown file: the heading must exist (GitHub anchor rules). */
+function checkAnchors(root, rel, text, refs, files) {
+    const problems = [];
+    const cache = new Map();
+    const anchorsOf = (file) => {
+        if (!cache.has(file)) cache.set(file, markdownAnchors(readText(root, file)));
+        return cache.get(file);
+    };
+    for (const ref of refs) {
+        if (ref.kind !== "link") continue;
+        const hash = ref.target.indexOf("#");
+        if (hash === -1 || /^[a-z][a-z0-9+.-]*:|^\/\//i.test(ref.target)) continue;
+        const pathPart = ref.target.slice(0, hash);
+        const fragment = decodeURIComponent(ref.target.slice(hash + 1));
+        let file = rel;
+        if (pathPart) {
+            const candidates = resolveCandidates(rel, pathPart.split("?")[0]).map((c) => path.posix.normalize(c));
+            file = candidates.find((c) => files.indexOf(c) !== -1);
+            if (!file) continue; // a missing file is reported by the file check
+        }
+        if (!file.endsWith(".md") || !fragment) continue;
+        if (!anchorsOf(file).has(fragment)) {
+            problems.push(`${rel}:${ref.line}: link points to a heading that does not exist: "${ref.target}" (no "#${fragment}" in ${file})`);
+        }
+    }
+    return problems;
+}
+
 function checkReferences(root, files) {
     const problems = [];
     const exists = makeExists(root, files);
@@ -284,7 +347,9 @@ function checkReferences(root, files) {
     for (const rel of files) {
         if (!/\.(?:md|html|yml|yaml)$/.test(rel)) continue;
         const text = readText(root, rel);
-        for (const ref of collectReferences(rel, text)) {
+        const refs = collectReferences(rel, text);
+        if (rel.endsWith(".md")) problems.push(...checkAnchors(root, rel, text, refs, files));
+        for (const ref of refs) {
             const target = ref.target.split("#")[0].split("?")[0];
             if (!target || isExternal(ref.target)) continue;
             const options = { allowBaseName: ref.kind === "code span" };

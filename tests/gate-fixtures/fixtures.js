@@ -21,6 +21,7 @@ const F = "tests/gate-fixtures/";
 const FAIL = (output) => ({ exitCode: 1, output });
 const PASS = { exitCode: 0 };
 const QUICK = 3000; // ms: fixtures that are meant to time out do so quickly
+const PENDING = { reason: "waiting for a page that is not written yet", sprint: "T9" };
 
 const browser = {
     // Controls: the gate must pass these, or every "must fail" below proves nothing.
@@ -153,8 +154,32 @@ const browser = {
     },
     "control-acceptance-pending-not-run": {
         suites: [`${F}pass.html`],
-        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: true }],
+        pendingDir: F,
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: PENDING }],
         expect: PASS
+    },
+    "acceptance-pending-page-exists": {
+        suites: [`${F}pass.html`],
+        pendingDir: F,
+        acceptance: [{ spec: `${F}acceptance-pass.spec.js`, pending: PENDING }],
+        expect: FAIL(`acceptance page exists: ${F}acceptance-page.html. Remove pending`)
+    },
+    "acceptance-pending-outside-acceptance-dir": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: PENDING }],
+        expect: FAIL("may not be pending: only acceptance specs under tests/acceptance/")
+    },
+    "acceptance-pending-without-reason": {
+        suites: [`${F}pass.html`],
+        pendingDir: F,
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: { sprint: "T9" } }],
+        expect: FAIL("is pending without a reason")
+    },
+    "acceptance-pending-without-sprint": {
+        suites: [`${F}pass.html`],
+        pendingDir: F,
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: { reason: "waiting for a page that is not written yet" } }],
+        expect: FAIL("needs pending.sprint")
     },
     "acceptance-assertion-fails": {
         suites: [`${F}pass.html`],
@@ -273,6 +298,24 @@ const staticFixtures = {
             "docs/app.js": "\n"
         }),
         expect: PASS
+    },
+    "missing-reference-anchor-control": {
+        check: "missing-reference",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "docs/guide.md": "# Guide\n\n## Real `heading` (v3)\n\n```md\n## Not a heading\n```\n\n## Twice\n\n## Twice\n",
+            "README.md": "# Readme\n\nSee [one](docs/guide.md#real-heading-v3), [two](docs/guide.md#twice-1) and [self](#readme).\n"
+        }),
+        expect: PASS
+    },
+    "missing-reference-anchor": {
+        check: "missing-reference",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "docs/guide.md": "# Guide\n\n## Real heading\n\n```md\n## Not a heading\n```\n",
+            "README.md": "# Readme\n\nSee [the guide](docs/guide.md#not-a-heading).\n"
+        }),
+        expect: FAIL('README.md:3: link points to a heading that does not exist: "docs/guide.md#not-a-heading"')
     },
     "missing-reference-link": {
         check: "missing-reference",
@@ -435,23 +478,41 @@ const staticFixtures = {
         create: (dir, { copyTree }) => API_TREE.forEach((rel) => copyTree(rel, dir)),
         expect: PASS
     },
-    "error-coverage-undocumented-error": {
+    "error-coverage-no-code": {
         check: "error-coverage",
         create: (dir, { copyTree }) => {
             API_TREE.forEach((rel) => copyTree(rel, dir));
             fs.appendFileSync(path.join(dir, "packages/core/src/batch-scheduler.js"),
-                "\nfunction fixture() { throw new Error(`[Stitch.js v${VERSION}] a brand new mistake nobody documented`); }\n");
+                "\nfunction fixture() { throw new Error(`a brand new mistake without any code`); }\n");
         },
-        expect: FAIL("error message not in docs/ERRORS.md (add **Message:** `a brand new mistake nobody documented`)")
+        expect: FAIL("this error has no code")
+    },
+    "error-coverage-undocumented-code": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "packages/core/src/batch-scheduler.js"),
+                "\nfunction fixture() { throw new Error(`[Stitch E998] a brand new mistake nobody documented`); }\n");
+        },
+        expect: FAIL("E998 is thrown at packages/core/src/batch-scheduler.js")
+    },
+    "error-coverage-shared-code": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "packages/core/src/batch-scheduler.js"),
+                "\nfunction fixture() { throw new Error(`[Stitch E101] some other meaning entirely here`); }\n");
+        },
+        expect: FAIL("E101 is used for different messages")
     },
     "error-coverage-documents-missing-error": {
         check: "error-coverage",
         create: (dir, { copyTree }) => {
             API_TREE.forEach((rel) => copyTree(rel, dir));
             fs.appendFileSync(path.join(dir, "docs/ERRORS.md"),
-                "\n### A mistake the code never reports\n\n**Message:** `a message no code throws`\n\n**Cause:** none.\n\n**Fix:** none.\n");
+                "\n### E997: A mistake the code never reports\n\n**Message:** `a message no code throws`\n\n**Cause:** none.\n\n**Fix:** none.\n");
         },
-        expect: FAIL("no error in packages/ has this message: a message no code throws")
+        expect: FAIL("E997 has an entry but no error in packages/ throws it")
     },
     "error-coverage-entry-without-fix": {
         check: "error-coverage",
