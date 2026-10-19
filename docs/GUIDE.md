@@ -1020,19 +1020,51 @@ strings that contain data: that is how script injection happens.
 - `binder.dispose()` releases everything that binder bound. After it, the binder cannot bind again;
   create a new one. Call it when a part of the page that Stitch manages goes away.
 - Rows that leave a list are released automatically.
-- `$watch` and `$onChange` return removers; `$on` returns an unsubscribe function. Call them for
-  listeners that should end before the model does.
 
-There is no separate "dispose the model" call, and none is needed: once nothing is bound to a model
-(`binder.dispose()` or `unbind()`), its watches are stopped and its change handlers and event
-subscriptions are removed, nothing outside the model refers to it, and it is garbage-collected like
-any object when your code drops it.
+`dispose()` and `unbind()` release **bindings only**. Watches (`$watch`), change handlers
+(`$onChange`) and event subscriptions (`$on`) belong to the model, not to a binder: they keep running
+after the binder is disposed, and only their removers stop them. `$watch` and `$onChange` return a
+remover; `$on` returns an unsubscribe function.
+
+```html page
+<p id="app" data-text="count"></p>
+```
+
+```js run
+const model = Stitch.Observable.create({ count: 0 });
+const binder = new Stitch.DataBinder();
+binder.bind('#app', model);
+const heard = [];
+const stopWatch = model.$watch('count', function () { heard.push('watch'); });
+const stopChange = model.$onChange(function () { heard.push('change'); });
+const stopEvent = model.$on('saved', function () { heard.push('event'); });
+
+binder.dispose();
+model.count = 1;          // the binding is gone, but the watch and the change handler still run
+model.$emit('saved');     // and so does the event subscriber
+setTimeout(function () {
+    window.afterDispose = heard.join(',');
+    stopWatch(); stopChange(); stopEvent();
+    model.count = 2;
+    model.$emit('saved');
+    setTimeout(function () { window.afterRemovers = heard.join(','); }, 0);
+}, 0);
+```
+<!-- check: tick().then(() => tick()).then(() => window.afterDispose === 'watch,change,event' && window.afterRemovers === 'watch,change,event' && text('#app') === '0') -->
+
+There is no separate "dispose the model" call, and none is needed: nothing in Stitch keeps a model
+alive. When your code drops a section (its elements, its binder and its model), all of it is
+garbage-collected, even if you did not call `dispose()` or the removers. Call them when the model
+stays alive but should stop updating that section, or stop listening.
 
 `Stitch.debug.stats()` returns live counts for the page: `effects` (running effects, about one per
-live binding), `subscriptions` (links from properties to the effects and computeds that read them)
-and `parentLinks` (links from model objects to the places that hold them). On a stable page they
-stay flat; numbers that grow with every list reload or show/hide cycle point to a leak.
-`subscriptions` also counts the links of model computeds, which last as long as the model.
+live binding, plus watches and custom-binding effects), `subscriptions` (links from properties to the
+effects and computeds that read them) and `parentLinks` (links from model objects to the places that
+hold them). The counts go down only when something is released: `dispose()`, `unbind()`, rows leaving
+a list, and the removers. A section that was dropped and garbage-collected without them keeps its
+counts, so a count that grows is a sign to check, not proof of a memory leak: it means something was
+not released, and if the page still holds it, that is a leak. `subscriptions` also counts the links of
+model computeds, which last as long as the model.
 
 ```html page
 <ul id="app" data-foreach="items"><li data-text="name"></li></ul>

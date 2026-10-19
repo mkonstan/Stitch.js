@@ -1861,7 +1861,7 @@ function describeBinding(element, attribute, value) {
     return `<${tagOf(element)}${id} ${attribute}="${value}">`;
 }
 
-/** An error about one binding, with its stable code: `[Stitch E201] <span data-text="x">: message`. */
+/** An error about one binding, with its stable code: `[Stitch E###] <span data-text="x">: message`. */
 function bindingError(code, where, message) {
     return new Error(`[Stitch ${code}] ${where}: ${message}`);
 }
@@ -2323,7 +2323,7 @@ function bindingErrorContext(element, type, path) {
     return { source: "binding", element, binding: `data-${type}="${path}"` };
 }
 
-/** An error about one binding, with its stable code: `[Stitch E301] <span data-text="x">: message`. */
+/** An error about one binding, with its stable code: `[Stitch E###] <span data-text="x">: message`. */
 function bindingError(code, element, type, path, message) {
     return new Error(`[Stitch ${code}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
 }

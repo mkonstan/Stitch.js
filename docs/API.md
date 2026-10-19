@@ -59,6 +59,8 @@ Makes a computed property for a model. Put the result in the data you pass to
   model.
 - Returns: a marker object that `Observable.create()` turns into a read-only property.
 - Throws: if `config` is neither form, or `deps` is not an array.
+- There is no setter: in the object form only `get` and `deps` are read (any other key, such as
+  `set`, is ignored), and assigning to the property throws (E713).
 
 The property is lazy (computed on first read, recomputed after a dependency changes and it is read
 again), read-only (assigning throws `Cannot set computed property`), and a computed nothing reads
@@ -572,8 +574,11 @@ Returns a snapshot `{ effects, subscriptions, parentLinks }` of live counts for 
   read them. Links made by model computeds last as long as the model.
 - `parentLinks`: links from model objects to the places that hold them.
 
-On a stable page the counts stay flat. Counts that grow with every reload or show/hide cycle point
-to a leak, for example a custom binding that does not register its cleanup.
+The counts go down only through a release: `binder.dispose()`, `unbind()`, rows leaving a list, and
+the removers of `$watch`, `$onChange` and custom-binding effects. Effects of a section that was
+dropped and garbage-collected without them stay counted (the memory is freed; the count is not). On a
+stable page the counts stay flat; counts that grow with every reload or show/hide cycle mean something
+is not released, for example a custom binding that does not register its cleanup.
 
 ## Stitch.MessageBus
 

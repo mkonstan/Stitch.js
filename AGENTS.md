@@ -190,8 +190,8 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 31. `$on(event, callback)`, `$off(event, callback)`, `$emit(event, payload)` and `$once` exist only on
     the root model. Never call them on a nested object or a row.
 32. `obj.$onChange(fn)` reports writes to `obj` and returns a remover. `model.$watch(path, fn)` calls
-    `fn(newValue, oldValue)` when one path changes and returns a remover too. Call the removers when
-    the listener should end; prefer computeds and bindings.
+    `fn(newValue, oldValue)` when one path changes and returns a remover too. These belong to the
+    model: `binder.dispose()` does NOT stop them, only their removers do. Prefer computeds and bindings.
 33. Every Stitch error starts with a stable code, `[Stitch E###]`. Look it up in
     [docs/ERRORS.md](docs/ERRORS.md); match errors by code, not by wording.
 34. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,

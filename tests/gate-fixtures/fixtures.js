@@ -496,6 +496,15 @@ const staticFixtures = {
         },
         expect: FAIL("E998 is thrown at packages/core/src/batch-scheduler.js")
     },
+    "error-coverage-non-literal-code": {
+        check: "error-coverage",
+        create: (dir, { copyTree }) => {
+            API_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "packages/browser/src/binding-runtime.js"),
+                "\nfunction fixture(code, el) { throw bindingError(code, el, \"text\", \"x\", \"a message whose code is not a literal\"); }\n");
+        },
+        expect: FAIL("the code argument of bindingError() must be a literal code")
+    },
     "error-coverage-shared-code": {
         check: "error-coverage",
         create: (dir, { copyTree }) => {

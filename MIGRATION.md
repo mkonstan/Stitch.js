@@ -557,7 +557,9 @@ model.count = 2;
 - Frozen or sealed data is refused with a Stitch error (E714) naming where it sits; v2 failed with
   the browser's own `TypeError`. Pass a copy.
 - A computed's function also receives the object that holds it as its first argument, so
-  `Stitch.computed(m => m.price * m.qty)` works. A v2 arrow computed that used `this` silently read
+  `Stitch.computed(m => m.price * m.qty)` works. A v2 getter with an optional first parameter
+  (`function (format = 'short') { ... }`) now receives that object instead, so its default no longer
+  applies: move the option into the model. A v2 arrow computed that used `this` silently read
   the wrong object; it still does, so rewrite it to use the argument.
 
 ### New in v3

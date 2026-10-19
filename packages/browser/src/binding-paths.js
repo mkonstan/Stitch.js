@@ -37,7 +37,7 @@ function describeBinding(element, attribute, value) {
     return `<${tagOf(element)}${id} ${attribute}="${value}">`;
 }
 
-/** An error about one binding, with its stable code: `[Stitch E201] <span data-text="x">: message`. */
+/** An error about one binding, with its stable code: `[Stitch E###] <span data-text="x">: message`. */
 function bindingError(code, where, message) {
     return new Error(`[Stitch ${code}] ${where}: ${message}`);
 }

@@ -39,7 +39,7 @@ to `null` instead.
 
 ## E1xx: Binding syntax
 
-A binding attribute names one property path (or, for `data-click`, one handler). Thrown by `bind()`, naming the element and the attribute.
+A binding attribute names one property path (or, for `data-click`, one handler). Thrown by `bind()`, naming the element and the attribute. For a custom binding (registered with `registerBinding`), every E1xx path error ends with how to register the binding as literal, since text in the attribute is the usual cause.
 
 [E101](#e101-empty-binding-value) · [E102](#e102-expression-in-a-binding) · [E103](#e103-object-literal-in-a-binding) · [E104](#e104-function-call-in-a-binding) · [E105](#e105-several-bindings-in-one-attribute) · [E106](#e106-not-a-property-path) · [E107](#e107-not-a-property-path-model-helpers) · [E108](#e108-handler-is-not-a-name) · [E109](#e109-handler-prefix-without-a-name) · [E110](#e110-two-scope-prefixes-in-a-handler)
 
@@ -113,7 +113,7 @@ Throws: `[Stitch E102]`
 
 **Message:** `…. A handler is a bare name (on the current row; the model outside a list), $parent.name or $root.name; it is called with the row item and the event.`
 
-**Cause:** The handler value is an expression, a call or an object (`data-click="save()"`, `data-click="remove(item)"`), so the first sentence of the message names the syntax problem.
+**Cause:** The handler value is not a name. One code covers every such case; the first sentence of the message says which one, using the same wording as the path-syntax errors: an empty value (E101), an expression such as `!ok` (E102), an object literal (E103), a call such as `save()` or `remove(item)` (E104), several values or options (E105), or characters a name cannot have (E106).
 
 **Fix:** Name the method only: `data-click="save"`. It is called with `(item, event)`, so it does not need arguments in the attribute.
 
@@ -135,7 +135,7 @@ Throws: `[Stitch E102]`
 
 ## E2xx: Missing and non-reactive properties
 
-Every property a binding reads must exist on the model (or row) when it is bound. A property added later by plain assignment is not reactive, so a binding could never follow it.
+Every property a binding reads must exist on the model (or row) when it is bound. A property added later by plain assignment is not reactive, so a binding could never follow it. For a custom binding, these errors also end with how to register the binding as literal.
 
 [E201](#e201-a-binding-names-a-property-the-model-does-not-have) · [E202](#e202-a-path-walks-through-a-plain-value) · [E203](#e203-a-binding-names-a-property-that-is-not-reactive) · [E204](#e204-watch-get-or-set-names-a-property-the-model-does-not-have) · [E205](#e205-watch-names-a-property-that-is-not-reactive)
 
