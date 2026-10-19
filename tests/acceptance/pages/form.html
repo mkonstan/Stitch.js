@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sign up</title>
+<script src="../../../stitch.js"></script>
+</head>
+<body>
+<div id="app">
+  <form data-testid="form" novalidate data-visible="notDone" data-event="formEvents">
+    <div><label>Name <input data-testid="name" type="text" data-value="name" data-event="nameEv"></label>
+      <p data-testid="name-error" data-visible="showName" data-text="nameError"></p></div>
+    <div><label>Email <input data-testid="email" type="text" data-value="email" data-event="emailEv"></label>
+      <p data-testid="email-error" data-visible="showEmail" data-text="emailError"></p></div>
+    <div><label>Age <input data-testid="age" type="number" data-value="age" data-event="ageEv"></label>
+      <p data-testid="age-error" data-visible="showAge" data-text="ageError"></p></div>
+    <div><label>Password <input data-testid="password" type="password" data-value="password" data-event="passwordEv"></label>
+      <p data-testid="password-error" data-visible="showPassword" data-text="passwordError"></p></div>
+    <div><label>Confirm password <input data-testid="confirm" type="password" data-value="confirm" data-event="confirmEv"></label>
+      <p data-testid="confirm-error" data-visible="showConfirm" data-text="confirmError"></p></div>
+    <div><label><input data-testid="terms" type="checkbox" data-value="terms" data-event="termsEv"> I accept the terms</label>
+      <p data-testid="terms-error" data-visible="showTerms" data-text="termsError"></p></div>
+    <button data-testid="submit" type="submit">Sign up</button>
+  </form>
+  <p data-testid="success" data-visible="done" data-text="welcome"></p>
+</div>
+<script>
+Stitch.onError(function (e) { console.error(e.message); });
+const model = Stitch.Observable.create({
+  name: '', email: '', age: null, password: '', confirm: '', terms: false,
+  tName: false, tEmail: false, tAge: false, tPassword: false, tConfirm: false, tTerms: false,
+  submitted: false, done: false,
+  nameEv: { input: 'touchName', change: 'touchName' },
+  emailEv: { input: 'touchEmail', change: 'touchEmail' },
+  ageEv: { input: 'touchAge', change: 'touchAge' },
+  passwordEv: { input: 'touchPassword', change: 'touchPassword' },
+  confirmEv: { input: 'touchConfirm', change: 'touchConfirm' },
+  termsEv: { input: 'touchTerms', change: 'touchTerms' },
+  formEvents: { submit: 'submit' },
+  touchName() { this.tName = true; },
+  touchEmail() { this.tEmail = true; },
+  touchAge() { this.tAge = true; },
+  touchPassword() { this.tPassword = true; },
+  touchConfirm() { this.tConfirm = true; },
+  touchTerms() { this.tTerms = true; },
+  nameError: Stitch.computed(function () { return this.name.trim() === '' ? 'Name is required' : ''; }),
+  emailError: Stitch.computed(function () {
+    if (this.email === '') return 'Email is required';
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(this.email) ? '' : 'Enter a valid email address';
+  }),
+  ageError: Stitch.computed(function () {
+    const a = this.age;
+    if (a === null) return 'Age is required';
+    return (Number.isInteger(a) && a >= 18 && a <= 120) ? '' : 'Age must be between 18 and 120';
+  }),
+  passwordError: Stitch.computed(function () { return this.password.length >= 8 ? '' : 'Password must be at least 8 characters'; }),
+  confirmError: Stitch.computed(function () { return this.confirm === this.password ? '' : 'Passwords do not match'; }),
+  termsError: Stitch.computed(function () { return this.terms ? '' : 'You must accept the terms'; }),
+  showName: Stitch.computed(function () { return (this.tName || this.submitted) && this.nameError !== ''; }),
+  showEmail: Stitch.computed(function () { return (this.tEmail || this.submitted) && this.emailError !== ''; }),
+  showAge: Stitch.computed(function () { return (this.tAge || this.submitted) && this.ageError !== ''; }),
+  showPassword: Stitch.computed(function () { return (this.tPassword || this.submitted) && this.passwordError !== ''; }),
+  showConfirm: Stitch.computed(function () { return (this.tConfirm || this.submitted) && this.confirmError !== ''; }),
+  showTerms: Stitch.computed(function () { return (this.tTerms || this.submitted) && this.termsError !== ''; }),
+  valid: Stitch.computed(function () {
+    return this.nameError === '' && this.emailError === '' && this.ageError === '' &&
+      this.passwordError === '' && this.confirmError === '' && this.termsError === '';
+  }),
+  notDone: Stitch.computed(function () { return !this.done; }),
+  welcome: Stitch.computed(function () { return 'Welcome, ' + this.name.trim() + '!'; }),
+  submit(model, event) {
+    event.preventDefault();
+    this.submitted = true;
+    if (this.valid) this.done = true;
+  }
+});
+new Stitch.DataBinder().bind('#app', model);
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>File tree</title>
+<script src="../../../stitch.js"></script>
+</head>
+<body>
+<div id="app">
+  <button data-testid="expand-all" type="button" data-click="expandAll">Expand all</button>
+  <button data-testid="collapse-all" type="button" data-click="collapseAll">Collapse all</button>
+  <p>Selected: <span data-testid="selected" data-text="selectedText"></span></p>
+  <ul data-foreach="nodes" data-template="node-tpl"></ul>
+</div>
+<template id="node-tpl">
+  <li data-testid="node">
+    <span data-foreach="toggleList"><button type="button" data-testid="node-toggle" data-click="$root.toggle" data-text="toggleText"></button></span>
+    <span data-testid="node-name" data-click="$root.select" data-text="name"></span>
+    <ul data-visible="expanded" data-foreach="children" data-template="node-tpl"></ul>
+  </li>
+</template>
+<script>
+Stitch.onError(function (e) { console.error(e.message); });
+const raw = [
+  { id: 1, name: "src", children: [
+    { id: 2, name: "app.js" },
+    { id: 3, name: "lib", children: [
+      { id: 4, name: "format.js" },
+      { id: 5, name: "parse.js" }
+    ] },
+    { id: 6, name: "styles", children: [
+      { id: 7, name: "main.css" }
+    ] }
+  ] },
+  { id: 8, name: "docs", children: [
+    { id: 9, name: "guide.md" }
+  ] },
+  { id: 10, name: "README.md" }
+];
+function norm(list, prefix) {
+  return list.map(function (n) {
+    const path = prefix ? prefix + '/' + n.name : n.name;
+    return {
+      id: n.id, name: n.name, path: path,
+      isFolder: !!n.children,
+      expanded: false,
+      children: n.children ? norm(n.children, path) : [],
+      toggleList: Stitch.computed(function () { return this.isFolder ? [this] : []; }),
+      toggleText: Stitch.computed(function () { return this.expanded ? '-' : '+'; })
+    };
+  });
+}
+function setAll(list, v) {
+  list.forEach(function (n) { if (n.isFolder) n.expanded = v; setAll(n.children, v); });
+}
+const model = Stitch.Observable.create({
+  nodes: norm(raw, ''),
+  selectedPath: null,
+  selectedText: Stitch.computed(function () { return this.selectedPath === null ? 'Nothing selected' : this.selectedPath; }),
+  toggle(node) { node.expanded = !node.expanded; },
+  select(node) { this.selectedPath = node.path; },
+  expandAll() { setAll(this.nodes, true); },
+  collapseAll() { setAll(this.nodes, false); }
+});
+new Stitch.DataBinder().bind('#app', model);
+</script>
+</body>
+</html>

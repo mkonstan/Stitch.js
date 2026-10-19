@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stocks</title>
+<script src="../../../stitch.js"></script>
+</head>
+<body>
+<div id="app">
+  <input data-testid="search" type="text" data-value="query" placeholder="Search">
+  <select data-testid="sector" data-foreach="sectors" data-value="sector" data-default-text="All sectors">
+    <option data-text="$data"></option>
+  </select>
+  <p data-testid="count" data-text="countText"></p>
+  <p data-testid="watched-count" data-text="watchedText"></p>
+  <p data-testid="empty" data-visible="isEmpty">No matching stocks</p>
+  <table>
+    <tbody data-foreach="visibleStocks" data-key="ticker" data-template="row-tpl"></tbody>
+  </table>
+</div>
+<template id="row-tpl">
+  <tr data-testid="row">
+    <td data-testid="row-ticker" data-text="ticker"></td>
+    <td data-testid="row-name" data-text="name"></td>
+    <td data-testid="row-price" data-text="priceText"></td>
+    <td><input type="checkbox" data-testid="row-watch" data-value="watched"></td>
+    <td><button type="button" data-testid="row-remove" data-click="$root.remove">Remove</button></td>
+  </tr>
+</template>
+<script>
+Stitch.onError(function (e) { console.error(e.message); });
+const data = [
+  { ticker: "AAPL", name: "Apple", sector: "Technology", price: 189.5 },
+  { ticker: "MSFT", name: "Microsoft", sector: "Technology", price: 411.2 },
+  { ticker: "JPM", name: "JPMorgan Chase", sector: "Financials", price: 196.8 },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy", price: 112.3 },
+  { ticker: "JNJ", name: "Johnson & Johnson", sector: "Health Care", price: 152.6 },
+  { ticker: "BAC", name: "Bank of America", sector: "Financials", price: 37.9 },
+  { ticker: "CVX", name: "Chevron", sector: "Energy", price: 158.1 },
+  { ticker: "PFE", name: "Pfizer", sector: "Health Care", price: 28.4 }
+];
+const sectorList = Array.from(new Set(data.map(function (s) { return s.sector; }))).sort();
+const stocks = data.map(function (s) {
+  return {
+    ticker: s.ticker, name: s.name, sector: s.sector, price: s.price, watched: false,
+    priceText: Stitch.computed(function () { return this.price.toFixed(2); })
+  };
+});
+const model = Stitch.Observable.create({
+  stocks: stocks,
+  sectors: sectorList,
+  query: '',
+  sector: '',
+  visibleStocks: Stitch.computed(function () {
+    const q = this.query.toLowerCase();
+    const sec = this.sector;
+    return this.stocks.filter(function (s) {
+      return (sec === '' || s.sector === sec) &&
+        (s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+    }).slice().sort(function (a, b) { return a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0; });
+  }),
+  countText: Stitch.computed(function () { return 'Showing ' + this.visibleStocks.length + ' of ' + this.stocks.length; }),
+  isEmpty: Stitch.computed(function () { return this.visibleStocks.length === 0; }),
+  watchedText: Stitch.computed(function () { return this.stocks.filter(function (s) { return s.watched; }).length + ' watched'; }),
+  remove(stock) { this.stocks.splice(this.stocks.indexOf(stock), 1); }
+});
+new Stitch.DataBinder().bind('#app', model);
+</script>
+</body>
+</html>
