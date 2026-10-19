@@ -142,6 +142,34 @@ const browser = {
     "doc-snippet-async-error": {
         suites: [`${F}doc-snippets-async-error.html`],
         expect: FAIL("the snippet threw: fixture: late failure")
+    },
+
+    // Acceptance specs (tests/acceptance/): a failing spec, a missing page, a console error
+    // and a missing page of a spec that is no longer pending must each fail the run.
+    "control-acceptance": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-pass.spec.js`, pending: false }],
+        expect: PASS
+    },
+    "control-acceptance-pending-not-run": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: true }],
+        expect: PASS
+    },
+    "acceptance-assertion-fails": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-fail.spec.js`, pending: false }],
+        expect: FAIL(`FAILED  ${F}acceptance-page.html#click-increments [stitch.js]: text of [data-testid="count"]`)
+    },
+    "acceptance-console-error": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-console.spec.js`, pending: false }],
+        expect: FAIL("console error: fixture: logged during an acceptance test")
+    },
+    "acceptance-page-missing": {
+        suites: [`${F}pass.html`],
+        acceptance: [{ spec: `${F}acceptance-missing.spec.js`, pending: false }],
+        expect: FAIL(`acceptance page does not exist: ${F}no-such-acceptance-page.html`)
     }
 };
 

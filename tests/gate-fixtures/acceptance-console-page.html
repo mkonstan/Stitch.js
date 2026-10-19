@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>gate fixture: acceptance page that logs an error</title></head>
+<body>
+<!-- Gate self-test fixture (see tests/gate-fixtures/fixtures.js): works, but logs a console error. -->
+<button data-testid="inc" data-click="inc">+</button> <span data-testid="count" data-text="count"></span>
+<script src="../../stitch.js"></script>
+<script>
+new Stitch.DataBinder().bind(document.body, Stitch.Observable.create({ count: 0, inc() { this.count++; console.error('fixture: logged during an acceptance test'); } }));
+</script>
+</body>
+</html>

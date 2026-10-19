@@ -9,7 +9,9 @@
  *   2. Every page in tests/suites.js, in Chromium, against stitch.js AND
  *      stitch.min.js. The page's own <script src="stitch.js"> is answered with
  *      the build under test. Pages report through tests/harness.js.
- *   3. Gate self-tests: each fixture in tests/gate-fixtures/fixtures.js is a way
+ *   3. Acceptance specs (tests/acceptance/*.spec.js) listed in tests/suites.js and
+ *      not pending, on both builds: Playwright drives the spec's page like a user.
+ *   4. Gate self-tests: each fixture in tests/gate-fixtures/fixtures.js is a way
  *      a broken suite could look green; the runner is re-run on it and must exit
  *      non-zero for the stated reason (controls must exit 0).
  *
@@ -23,6 +25,8 @@
  * Usage:
  *   node _tools/run-tests.js                  full run (what CI and `npm test` do)
  *   node _tools/run-tests.js --fixture <name> run one gate fixture (used by the self-tests)
+ *   node _tools/run-tests.js --acceptance     run every acceptance spec, pending or not, on
+ *                                             both builds (npm run test:acceptance)
  * The JSON report goes to _scratch/test-report.json (gitignored).
  */
 
@@ -40,6 +44,8 @@ const FIXTURE_DIR = "tests/gate-fixtures/";
 const REPORT_FILE = "_scratch/test-report.json";
 const BUILDS = ["stitch.js", "stitch.min.js"];
 const PAGE_TIMEOUT_MS = 20000;
+const ACCEPTANCE_TEST_TIMEOUT_MS = 15000;
+const ACCEPTANCE_HELPERS = "tests/acceptance/helpers.js";
 const SETTLE_MS = 300;
 const SELF_TEST_CONCURRENCY = 4;
 const LIBRARY_PATH = /^\/(?:.*\/)?stitch(?:\.min)?\.js$/;
@@ -57,6 +63,8 @@ function mainConfig() {
         name: "main",
         suites: loadSuites(lists.suites),
         examples: loadExamples(lists.examples),
+        acceptance: loadAcceptance(lists.acceptance || []),
+        runPendingAcceptance: false,
         knownFailing: loadKnownFailing(path.join(ROOT, KNOWN_FAILING_FILE)),
         knownFailingLabel: KNOWN_FAILING_FILE,
         discoverDir: "",
@@ -76,6 +84,8 @@ function fixtureConfig(name) {
         name: `fixture:${name}`,
         suites: loadSuites(fixture.suites.map((page) => ({ page }))),
         examples: loadExamples(fixture.examples || []),
+        acceptance: loadAcceptance(fixture.acceptance || []),
+        runPendingAcceptance: false,
         knownFailing: validateKnownFailing(fixture.knownFailing || {}, `${FIXTURES_FILE}#${name}`),
         knownFailingLabel: `${FIXTURES_FILE}#${name}`,
         discoverDir: fixture.discoverDir || null,
@@ -85,6 +95,52 @@ function fixtureConfig(name) {
         staticChecks: false,
         selfTests: false
     };
+}
+
+/** `npm run test:acceptance`: every acceptance spec, pending or not, on both builds. */
+function acceptanceConfig() {
+    const lists = require(path.join(ROOT, SUITES_FILE));
+    const acceptance = loadAcceptance(lists.acceptance || []);
+    if (acceptance.length === 0) throw new Error(`${SUITES_FILE} lists no acceptance specs`);
+    return {
+        name: "acceptance",
+        suites: [],
+        examples: [],
+        acceptance,
+        runPendingAcceptance: true,
+        knownFailing: loadKnownFailing(path.join(ROOT, KNOWN_FAILING_FILE)),
+        knownFailingLabel: KNOWN_FAILING_FILE,
+        discoverDir: null,
+        excludeDirs: [],
+        builds: BUILDS,
+        pageTimeoutMs: PAGE_TIMEOUT_MS,
+        staticChecks: false,
+        selfTests: false
+    };
+}
+
+/** Acceptance entries: { spec, pending }. The spec module names its page. */
+function loadAcceptance(list) {
+    if (!Array.isArray(list)) throw new Error(`${SUITES_FILE}: "acceptance" must be an array`);
+    const seen = new Set();
+    return list.map((entry) => {
+        if (!entry || typeof entry.spec !== "string") throw new Error(`acceptance entry without a spec: ${JSON.stringify(entry)}`);
+        if (typeof entry.pending !== "boolean") throw new Error(`acceptance entry ${entry.spec} needs "pending": true or false`);
+        if (seen.has(entry.spec)) throw new Error(`acceptance spec listed twice: ${entry.spec}`);
+        seen.add(entry.spec);
+        return { spec: entry.spec.replace(/\\/g, "/"), pending: entry.pending };
+    });
+}
+
+/** Loads an acceptance spec module: { page, tests: { id: async ({ page, ui }) => {} } }. */
+function loadSpec(rel) {
+    const file = path.join(ROOT, rel);
+    delete require.cache[require.resolve(file)];
+    const spec = require(file);
+    if (!spec || typeof spec.page !== "string" || !spec.tests || typeof spec.tests !== "object" || Object.keys(spec.tests).length === 0) {
+        throw new Error(`${rel} must export { page: "<path>", tests: { id: async ({ page, ui }) => {...} } } with at least one test`);
+    }
+    return spec;
 }
 
 function loadSuites(list) {
@@ -178,6 +234,23 @@ function checkSuiteList(config) {
     }
     for (const page of config.examples) {
         if (!fs.existsSync(path.join(ROOT, page))) problems.push(`listed example does not exist: ${page}`);
+    }
+    for (const entry of config.acceptance) {
+        if (!fs.existsSync(path.join(ROOT, entry.spec))) {
+            problems.push(`listed acceptance spec does not exist: ${entry.spec}`);
+            continue;
+        }
+        let spec;
+        try {
+            spec = loadSpec(entry.spec);
+        } catch (error) {
+            problems.push(`acceptance spec ${entry.spec}: ${error.message}`);
+            continue;
+        }
+        // A pending spec's page is written later (the fresh-agent gate); a running one must exist.
+        if (!entry.pending && !fs.existsSync(path.join(ROOT, spec.page))) {
+            problems.push(`acceptance page does not exist: ${spec.page} (${entry.spec} is not pending)`);
+        }
     }
     if (config.discoverDir !== null) {
         const listed = new Set(config.suites.map((s) => s.page));
@@ -344,6 +417,66 @@ function analysePage(raw, timeoutMs) {
     return { page: raw.page, tests, problems };
 }
 
+function logRun(build, label, analysed) {
+    const counts = analysed.tests.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
+    console.log(`  [${build}] ${label}: ${analysed.tests.length} test(s), pass ${counts.pass || 0}, fail ${counts.fail || 0}, skip ${counts.skip || 0}${analysed.problems.length ? `, ${analysed.problems.length} page problem(s)` : ""}`);
+}
+
+// ---------------------------------------------------------------------------
+// Acceptance specs: Playwright drives the spec's page like a user, one fresh page per test.
+// A test fails on a failed assertion, a thrown error, a timeout, or anything the page does
+// wrong while it runs (uncaught error, console error, failed request, the library not loaded
+// or the wrong version). Results use the page path as their id prefix, like suite pages.
+
+async function runAcceptance(browser, baseUrl, specRel) {
+    const spec = loadSpec(specRel);
+    const { createUi } = require(path.join(ROOT, ACCEPTANCE_HELPERS));
+    const tests = [];
+    for (const [id, fn] of Object.entries(spec.tests)) {
+        const context = await browser.newContext();
+        const tab = await context.newPage();
+        const observed = { consoleErrors: [], pageErrors: [], failedRequests: [], libraryLoads: 0 };
+        tab.on("console", (msg) => { if (msg.type() === "error") observed.consoleErrors.push(msg.text()); });
+        tab.on("pageerror", (error) => observed.pageErrors.push(String(error && error.message || error)));
+        tab.on("requestfailed", (req) => observed.failedRequests.push(`${req.url()} (${req.failure() && req.failure().errorText})`));
+        tab.on("response", (res) => {
+            const pathname = new URL(res.url()).pathname;
+            if (res.status() >= 400) observed.failedRequests.push(`${res.status()} ${pathname}`);
+            else if (LIBRARY_PATH.test(pathname)) observed.libraryLoads++;
+        });
+        const failures = [];
+        try {
+            const response = await tab.goto(`${baseUrl}/${spec.page}`, { waitUntil: "load", timeout: PAGE_TIMEOUT_MS });
+            if (!response || response.status() >= 400) {
+                failures.push(`page not found: ${spec.page} (HTTP ${response ? response.status() : "no response"})`);
+            } else {
+                const version = await tab.evaluate(() => window.Stitch ? window.Stitch.version : undefined);
+                if (observed.libraryLoads === 0 || version !== PKG.version) {
+                    failures.push(`the page did not load the build under test (Stitch.version ${JSON.stringify(version)}, expected ${PKG.version})`);
+                }
+                let timer;
+                const timeout = new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`timed out after ${ACCEPTANCE_TEST_TIMEOUT_MS} ms`)), ACCEPTANCE_TEST_TIMEOUT_MS);
+                });
+                try {
+                    await Promise.race([fn({ page: tab, ui: createUi(tab) }), timeout]);
+                } finally {
+                    clearTimeout(timer);
+                }
+                await tab.waitForTimeout(SETTLE_MS);
+            }
+        } catch (error) {
+            failures.push(String(error && error.message || error).split("\n").slice(0, 8).join(" | "));
+        }
+        for (const message of observed.pageErrors) failures.push(`uncaught page error: ${message}`);
+        for (const message of observed.consoleErrors) failures.push(`console error: ${message}`);
+        for (const message of observed.failedRequests) failures.push(`failed request: ${message}`);
+        await context.close();
+        tests.push({ id, status: failures.length ? "fail" : "pass", detail: failures.join("\n") });
+    }
+    return { page: spec.page, tests, problems: [] };
+}
+
 // ---------------------------------------------------------------------------
 // Classification
 
@@ -496,11 +629,13 @@ function copyTree(fromRel, toDir) {
 async function main() {
     const args = process.argv.slice(2);
     let fixtureName = null;
+    let acceptanceMode = false;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === "--fixture") fixtureName = args[++i];
+        else if (args[i] === "--acceptance") acceptanceMode = true;
         else throw new Error(`unknown argument "${args[i]}"`);
     }
-    const config = fixtureName ? fixtureConfig(fixtureName) : mainConfig();
+    const config = fixtureName ? fixtureConfig(fixtureName) : acceptanceMode ? acceptanceConfig() : mainConfig();
     const verdict = [];
     const report = { config: config.name, version: PKG.version, retries: [] };
 
@@ -546,8 +681,14 @@ async function main() {
                 }
                 const analysed = analysePage(raw, config.pageTimeoutMs);
                 runs[build].push(analysed);
-                const counts = analysed.tests.reduce((acc, t) => { acc[t.status] = (acc[t.status] || 0) + 1; return acc; }, {});
-                console.log(`  [${build}] ${page}: ${analysed.tests.length} test(s), pass ${counts.pass || 0}, fail ${counts.fail || 0}, skip ${counts.skip || 0}${analysed.problems.length ? `, ${analysed.problems.length} page problem(s)` : ""}`);
+                logRun(build, page, analysed);
+            }
+            for (const entry of config.acceptance) {
+                if (entry.pending && !config.runPendingAcceptance) continue;
+                if (!fs.existsSync(path.join(ROOT, entry.spec))) continue;
+                const analysed = await runAcceptance(browser, server.baseUrl, entry.spec);
+                runs[build].push(analysed);
+                logRun(build, `${entry.spec} -> ${analysed.page}`, analysed);
             }
         }
     } finally {
@@ -555,6 +696,11 @@ async function main() {
         await browser.close();
     }
 
+    for (const entry of config.acceptance) {
+        if (entry.pending && !config.runPendingAcceptance) {
+            console.log(`PENDING ${entry.spec}: not run until its page is built and the entry is no longer pending (npm run test:acceptance runs it)`);
+        }
+    }
     const { summary, fatal } = classify(config, runs);
     for (const line of fatal) console.log(line);
     printSummary(config, summary);

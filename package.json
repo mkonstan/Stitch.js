@@ -12,7 +12,8 @@
     "build": "npm run build:assembly && npm run build:min",
     "build:assembly": "node _tools/build-stitch-assembly.js",
     "build:assembly:all": "node _tools/build-stitch-assembly.js --mode=all",
-    "build:min": "node minify.js"
+    "build:min": "node minify.js",
+    "test:acceptance": "node _tools/run-tests.js --acceptance"
   },
   "license": "MIT",
   "keywords": [

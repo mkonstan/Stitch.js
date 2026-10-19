@@ -62,5 +62,16 @@
         "example-basic-demo.html",
         "example-nested-computed.html"
     ];
-    return { suites: suites, examples: examples };
+    // Acceptance tests (tests/acceptance/*.spec.js): Playwright specs that drive a page like a
+    // user, against the page path each spec names. The pages are built from the docs alone by an
+    // agent that has never seen Stitch (tests/acceptance/TASKS.md), so they do not exist until
+    // then. A pending entry is not run by `npm test` (it is listed as PENDING); it runs with
+    // `npm run test:acceptance`, which runs every entry on both builds. Set pending to false
+    // once its page is committed.
+    var acceptance = [
+        { spec: "tests/acceptance/tree.spec.js", pending: true },
+        { spec: "tests/acceptance/list.spec.js", pending: true },
+        { spec: "tests/acceptance/form.spec.js", pending: true }
+    ];
+    return { suites: suites, examples: examples, acceptance: acceptance };
 });

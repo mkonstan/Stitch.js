@@ -148,7 +148,8 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `_tools/doc-checks.js` | the documentation checks: doc-snippets, api-coverage, error-coverage, doc-hygiene |
 | `tests/doc-snippets.js` | the doc-snippet parser and browser runner; `DOC_SET` lists the documents whose code blocks run |
 | `test-doc-snippets.html` | the suite page that runs every runnable code block of `DOC_SET` |
-| `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`) |
+| `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`): suite pages, example pages, acceptance specs |
+| `tests/acceptance/` | acceptance specs (Playwright, drive a page like a user), their helpers, and `TASKS.md` (what each page must do) |
 | `tests/harness.js` | in-page reporting protocol every suite uses |
 | `tests/known-failing.json` | tests that fail today because of a known defect, with the defect and the planned fix |
 | `tests/gate-fixtures/` | gate self-test fixtures (pages plus `fixtures.js`) |
@@ -229,7 +230,9 @@ npm run build:assembly:all
    - doc-hygiene: public documents state rules, not private project history: no decision numbers, triage numbers or paths into private notes.
 2. **Browser suites**: every page in `tests/suites.js`, in headless Chromium, served over a local HTTP server.
    Each page's `stitch.js` request is answered with the build under test: first `stitch.js`, then `stitch.min.js`.
-3. **Gate self-tests**: each fixture in `tests/gate-fixtures/fixtures.js` re-runs the gate on a deliberately broken
+3. **Acceptance specs**: every entry of `acceptance` in `tests/suites.js` that is not `pending`, on both builds
+   (see 7.2).
+4. **Gate self-tests**: each fixture in `tests/gate-fixtures/fixtures.js` re-runs the gate on a deliberately broken
    input and requires a non-zero exit with the stated reason (controls must pass).
 
 A page fails the gate when it: never loads the build under test; logs an uncaught error or a console error; has a
@@ -267,6 +270,18 @@ docs/ERRORS.md: `DOC_SET` in `tests/doc-snippets.js`) are tests. `test-doc-snipp
 
 Gate fixtures prove that a snippet that throws, a `throws` block that does not throw or throws
 another message, a false check, and an error raised later in an update each fail the run.
+
+### 7.2 Acceptance specs
+
+`tests/acceptance/*.spec.js` export `{ page, tests: { id: async ({ page, ui }) => {...} } }`. Each test
+opens the page fresh and drives it through Playwright (`ui` is `tests/acceptance/helpers.js`:
+lookups by `data-testid`, retrying checks, typing like a user). A test fails on a failed assertion,
+a throw, a 15 s timeout, a missing page, or a page error, console error or failed request while it
+runs. The pages are written from the documentation alone (`tests/acceptance/TASKS.md`), so an entry
+stays `pending: true` until its page is committed: `npm test` prints it as PENDING and does not run
+it; `npm run test:acceptance` runs every entry, pending or not, on both builds. A non-pending entry
+whose page does not exist fails the suite list. Gate fixtures cover a failing spec, a console error,
+a missing page and the pending rule.
 
 ## 8. Common Change Workflows
 
