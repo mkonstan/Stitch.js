@@ -72,7 +72,9 @@ class ComputedRef {
             }
 
             try {
-                this.value = this.getter.call(this.context);
+                // this AND the first argument are the object that holds the computed, so an
+                // arrow function can read it too: total: m => m.price * m.qty.
+                this.value = this.getter.call(this.context, this.context);
             } catch (error) {
                 this.failed = true;
                 throw error;

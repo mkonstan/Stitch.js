@@ -27,10 +27,10 @@ function createComputedMarker(config, version) {
         fn = config.get;
         explicitDeps = config.deps || null;
         if (explicitDeps && !Array.isArray(explicitDeps)) {
-            throw new Error(`[Stitch.js ${version}] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
+            throw new Error(`[Stitch E722] Stitch.computed() deps must be an array of property names.\n` + `Example: Stitch.computed({ get() { ... }, deps: ['prop1', 'prop2'] })`);
         }
     } else {
-        throw new Error(`[Stitch.js ${version}] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
+        throw new Error(`[Stitch E721] Stitch.computed() expects either:\n` + `  - A function: Stitch.computed(function() { ... })\n` + `  - An object: Stitch.computed({ get() { ... }, deps: [...] })`);
     }
 
     return {
@@ -81,7 +81,7 @@ function createReactiveFactory(options = {}) {
             ? "JSON.stringify calls a property named toJSON, and Stitch defines toJSON() on every model object to serialise it"
             : `Stitch defines ${name}() on every model object`;
         return new Error(
-            `[Stitch.js ${Version}] "${formatPath(parts)}" is reserved: ${why}, so a data field with that name would be ` +
+            `[Stitch E709] "${formatPath(parts)}" is reserved: ${why}, so a data field with that name would be ` +
             `overwritten. Rename the field when the data arrives (e.g. to "${name.replace(/^\$/, "")}Value").`
         );
     }
@@ -95,6 +95,22 @@ function createReactiveFactory(options = {}) {
         }
     }
 
+    /**
+     * Stitch converts data in place (it defines accessors and hidden fields on the object), so
+     * frozen, sealed or non-extensible data cannot become a model. Throws a Stitch error naming
+     * where the object sits and the fix, instead of the browser's own TypeError.
+     */
+    function refuseLocked(obj, parts) {
+        if (!obj || typeof obj !== "object" || Object.isExtensible(obj)) return;
+        const state = Object.isFrozen(obj) ? "frozen" : Object.isSealed(obj) ? "sealed" : "not extensible";
+        const where = formatPath(typeof parts === "function" ? parts() : parts);
+        throw new TypeError(
+            `[Stitch E714] ${where ? `"${where}"` : "The data"} is ${state} (Object.freeze, Object.seal or ` +
+            `Object.preventExtensions): Stitch makes data reactive in place, which ${state} data does not allow. ` +
+            "Pass a copy instead, e.g. structuredClone(data) or { ...data }."
+        );
+    }
+
     /** Array items are made reactive when first read; their keys are checked when they arrive. */
     function checkArrayItems(items, arrayParts, firstIndex, container) {
         items.forEach((item, i) => {
@@ -104,6 +120,7 @@ function createReactiveFactory(options = {}) {
                 checkIncoming(item, container, parts);
                 return;
             }
+            if (!Object.isExtensible(item)) refuseLocked(item, parts);
             if (!Array.isArray(item) && !(item instanceof Map) && !(item instanceof Set)) {
                 checkReservedKeys(item, parts);
                 // A model one level down in a plain row is caught now, not when the row is read.
@@ -134,7 +151,7 @@ function createReactiveFactory(options = {}) {
         const last = parts[parts.length - 1];
         const name = typeof last === "string" && !/^\d+$/.test(last) ? last : "value";
         return new Error(
-            `[Stitch.js ${Version}] cannot put ${what} at "${formatPath(parts) || "(the model)"}": A model cannot be nested in ` +
+            `[Stitch E710] cannot put ${what} at "${formatPath(parts) || "(the model)"}": A model cannot be nested in ` +
             `another model: assign plain data, or Observable.toRaw(${name}). One page model is one root; events, change ` +
             "handlers and bindings follow that root only."
         );
@@ -172,7 +189,7 @@ function createReactiveFactory(options = {}) {
             const name = typeof last === "string" && !/^\d+$/.test(last) ? last : "list";
             const copy = target instanceof Map ? `new Map(${name})` : target instanceof Set ? `new Set(${name})` : `[...${name}]`;
             throw new Error(
-                `[Stitch.js ${Version}] "${formatPath(parts) || name}" already belongs to a model; give each model its own copy (${copy}). ` +
+                `[Stitch E711] "${formatPath(parts) || name}" already belongs to a model; give each model its own copy (${copy}). ` +
                 "The same array, Map or Set in two models would be one live object with two owners: it belongs to a different model."
             );
         }
@@ -195,7 +212,7 @@ function createReactiveFactory(options = {}) {
 
     function migrationError(name) {
         return new TypeError(
-            `[Stitch.js ${Version}] .${name}() is now .${NEW_NAMES[name]}() in Stitch v3: the helpers are $-prefixed, so that ` +
+            `[Stitch E802] .${name}() is now .${NEW_NAMES[name]}() in Stitch v3: the helpers are $-prefixed, so that ` +
             "data fields can be named on, off, get or set. Events: $on(event, callback) / $off(event, callback)."
         );
     }
@@ -226,7 +243,7 @@ function createReactiveFactory(options = {}) {
             : /^\d+$/.test(String(key)) ? `use ${where}.splice(${key}, 1)`
             : "model lists cannot lose properties; set a value instead";
         return new TypeError(
-            `[Stitch.js ${Version}] delete ${where}${/^\d+$/.test(String(key)) ? `[${String(key)}]` : `.${String(key)}`}: ${fix}. ` +
+            `[Stitch E712] delete ${where}${/^\d+$/.test(String(key)) ? `[${String(key)}]` : `.${String(key)}`}: ${fix}. ` +
             `Model data cannot be deleted (it would leave a hole the screen does not see; set it to null instead).`
         );
     }
@@ -238,8 +255,8 @@ function createReactiveFactory(options = {}) {
         return target._eventBus;
     }
 
-    function helperError(message) {
-        return new TypeError(`[Stitch.js ${Version}] ${message}`);
+    function helperError(code, message) {
+        return new TypeError(`[Stitch ${code}] ${message}`);
     }
 
     /**
@@ -250,7 +267,7 @@ function createReactiveFactory(options = {}) {
     function requireRoot(target, method, event) {
         if (!Object.prototype.hasOwnProperty.call(target, "_factory")) {
             const name = typeof event === "string" && event ? event : "saved";
-            throw helperError(
+            throw helperError("E801",
                 `${method}(): events live on the root model: use model.$emit('${name}') / model.$on('${name}', callback). ` +
                 "From a list row, call a root handler with $root.handler (data-click / data-event)."
             );
@@ -271,16 +288,16 @@ function createReactiveFactory(options = {}) {
         return {
             $onChange(...args) {
                 if (typeof args[0] === "string") {
-                    throw helperError("$onChange(fn) registers a change handler; for events use $on(event, callback).");
+                    throw helperError("E803", "$onChange(fn) registers a change handler; for events use $on(event, callback).");
                 }
                 if (args.length !== 1) {
-                    throw helperError(`$onChange(fn) takes one argument (the change handler), got ${args.length}.`);
+                    throw helperError("E804", `$onChange(fn) takes one argument (the change handler), got ${args.length}.`);
                 }
                 return addChangeHandler.call(target, args[0]);
             },
             $offChange(...args) {
                 if (typeof args[0] === "string") {
-                    throw helperError("$offChange(fn) removes a change handler; for events use $off(event, callback).");
+                    throw helperError("E806", "$offChange(fn) removes a change handler; for events use $off(event, callback).");
                 }
                 return removeChangeHandler.apply(target, args);
             },
@@ -288,13 +305,13 @@ function createReactiveFactory(options = {}) {
                 const [event, callback] = args;
                 requireRoot(target, "$on", event);
                 if (typeof event === "function" && typeof callback === "string") {
-                    throw helperError("$on(fn, event): the arguments are swapped. Use $on(event, callback).");
+                    throw helperError("E810", "$on(fn, event): the arguments are swapped. Use $on(event, callback).");
                 }
                 if (typeof event === "function") {
-                    throw helperError("$on(fn): $on needs an event name; for change handlers use $onChange(fn).");
+                    throw helperError("E811", "$on(fn): $on needs an event name; for change handlers use $onChange(fn).");
                 }
                 if (args.length !== 2) {
-                    throw helperError(`$on(event, callback) takes two arguments, got ${args.length}; for change handlers use $onChange(fn).`);
+                    throw helperError("E812", `$on(event, callback) takes two arguments, got ${args.length}; for change handlers use $onChange(fn).`);
                 }
                 return eventBusOf(target).subscribe(event, callback);
             },
@@ -302,7 +319,7 @@ function createReactiveFactory(options = {}) {
                 const [event, callback] = args;
                 requireRoot(target, "$off", event);
                 if (args.length !== 2 || typeof event !== "string") {
-                    throw helperError(
+                    throw helperError("E813",
                         "$off needs an event name and the callback: $off(event, callback) for events, " +
                         "$offChange(fn) for change handlers."
                     );
@@ -323,10 +340,10 @@ function createReactiveFactory(options = {}) {
             $once(event, callback) {
                 requireRoot(target, "$once", event);
                 if (typeof event === "function") {
-                    throw helperError("$once(fn): $once needs an event name: $once(event, callback).");
+                    throw helperError("E814", "$once(fn): $once needs an event name: $once(event, callback).");
                 }
                 if (typeof callback !== "function") {
-                    throw helperError(`$once(event, callback): callback must be a function, got ${typeof callback}.`);
+                    throw helperError("E815", `$once(event, callback): callback must be a function, got ${typeof callback}.`);
                 }
                 const bus = eventBusOf(target);
                 if (!pendingOnce.has(event)) pendingOnce.set(event, new Map());
@@ -621,7 +638,7 @@ function createReactiveFactory(options = {}) {
                     return;
                 }
                 if (typeof newValue === "function" && isArrowFunction(newValue)) {
-                    throw new Error(`Stitch.js ${Version}: Cannot set arrow function on property '${String(key)}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `Use regular function or ES6 method shorthand instead.`);
+                    throw new Error(`[Stitch E708] Cannot set arrow function on property '${String(key)}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `Use regular function or ES6 method shorthand instead.`);
                 }
                 newValue = makeDeepReactive(newValue, target, key);
                 internal[key] = newValue;
@@ -658,7 +675,7 @@ function createReactiveFactory(options = {}) {
         }
 
         const computedSetter = function () {
-            throw new Error(`[Stitch.js ${Version}] Cannot set computed property '${String(key)}'`);
+            throw new Error(`[Stitch E713] Cannot set computed property '${String(key)}'`);
         };
         computedSetter.stitchReadOnlyComputed = true;
         return {
@@ -731,6 +748,7 @@ function createReactiveFactory(options = {}) {
         if (seen.has(obj)) {
             return obj;
         }
+        if (!Object.isExtensible(obj)) refuseLocked(obj, parent ? pathParts(parent).concat([key]) : []);
         seen.add(obj);
         // Known before the children are converted, so a nested error can name its full path.
         attachParent(obj, parent, key);
@@ -745,7 +763,7 @@ function createReactiveFactory(options = {}) {
         // Arrow function validation
         for (const [childKey, value] of Object.entries(obj)) {
             if (typeof value === "function" && isArrowFunction(value)) {
-                throw new Error(`Stitch.js ${Version}: Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
+                throw new Error(`[Stitch E707] Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
             }
         }
         
@@ -864,7 +882,7 @@ function createReactiveFactory(options = {}) {
         // property (the way to add one after create).
         defineHidden(target, "$set", function (path, value) {
             if (typeof path !== "string" || path === "") {
-                throw new TypeError(`[Stitch.js ${Version}] $set(key, value): key must be a non-empty string, got ${typeof path}.`);
+                throw new TypeError(`[Stitch E816] $set(key, value): key must be a non-empty string, got ${typeof path}.`);
             }
             if (path.indexOf(".") === -1) {
                 const descriptor = Object.getOwnPropertyDescriptor(target, path);
@@ -915,6 +933,7 @@ function createReactiveFactory(options = {}) {
             repointRaw(target, parent, key);
             return cachedProxy;
         }
+        if (!Object.isExtensible(target)) refuseLocked(target, parent ? pathParts(parent).concat([key]) : []);
 
         if (!target._changeHandlers) {
             defineHidden(target, "_changeHandlers", new Set);
@@ -1151,6 +1170,7 @@ function createReactiveFactory(options = {}) {
             return cachedProxy;
         }
 
+        if (!Object.isExtensible(target)) refuseLocked(target, parent ? pathParts(parent).concat([key]) : []);
         const arrayMethods = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill"];
         checkArrayItems(target, parent ? pathParts(parent).concat([key]) : [], 0, parent);
         if (!target._changeHandlers) {
@@ -1326,7 +1346,7 @@ function createReactiveFactory(options = {}) {
         const resolved = new Set;
         for (const depKey of deps) {
             if (visited.has(depKey)) {
-                throw new Error(`[Stitch.js ${Version}] Stitch.computed() deps form a cycle: ${Array.from(visited).join(" → ")} → ${depKey}. ` +
+                throw new Error(`[Stitch E723] Stitch.computed() deps form a cycle: ${Array.from(visited).join(" → ")} → ${depKey}. ` +
                     "Remove the computed from its own dependency chain.");
             }
             visited.add(depKey);

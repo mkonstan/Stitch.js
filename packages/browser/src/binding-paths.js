@@ -20,10 +20,8 @@
  * name was looked up and where it does exist.
  */
 
-const { VERSION } = require("../../utils/src/version");
 const { isRowContext } = require("../../utils/src/foreach-row-context");
 
-const PREFIX = `[Stitch.js v${VERSION}]`;
 const NAME = /^[A-Za-z_$][\w$]*$/;
 const INDEX = /^\d+$/;
 const ROW_NAMES = ["$data", "$index", "$parent", "$root"];
@@ -39,43 +37,48 @@ function describeBinding(element, attribute, value) {
     return `<${tagOf(element)}${id} ${attribute}="${value}">`;
 }
 
-function bindingError(where, message) {
-    const error = new Error(`${PREFIX} ${where}: ${message}`);
-    return error;
+/** An error about one binding, with its stable code: `[Stitch E201] <span data-text="x">: message`. */
+function bindingError(code, where, message) {
+    return new Error(`[Stitch ${code}] ${where}: ${message}`);
+}
+
+/** Why a value is not what a binding needs: a stable code and the reason with its fix. */
+function problem(code, text) {
+    return { code, text };
 }
 
 // ---------------------------------------------------------------------------
 // Syntax
 
 /**
- * Why a value is not a property path, with the fix; null if it is one.
+ * Why a value is not a property path ({ code, text }: the reason with the fix); null if it is one.
  * @param {string} value - already trimmed
  */
 function pathSyntaxProblem(value) {
     if (value === "") {
-        return "the value is empty. Give the name of a model property, e.g. data-text=\"name\".";
+        return problem("E101", "the value is empty. Give the name of a model property, e.g. data-text=\"name\".");
     }
     if (value[0] === "{") {
-        return "an inline object is not supported; a binding names a property. Put the object on the model " +
+        return problem("E103", "an inline object is not supported; a binding names a property. Put the object on the model " +
             "(a computed if it changes), e.g. rowClasses: Stitch.computed(function () { return { active: this.on }; }), " +
-            "and bind its name: data-class=\"rowClasses\".";
+            "and bind its name: data-class=\"rowClasses\".");
     }
     if (value.indexOf("(") !== -1) {
-        return "a call is not supported; a binding names a property. Make the value a computed and bind its name.";
+        return problem("E104", "a call is not supported; a binding names a property. Make the value a computed and bind its name.");
     }
     if (/[,:;]/.test(value)) {
-        return "an attribute holds exactly one binding with no options. Split it into separate attributes, " +
-            "e.g. data-value=\"city\" data-visible=\"hasCity\".";
+        return problem("E105", "an attribute holds exactly one binding with no options. Split it into separate attributes, " +
+            "e.g. data-value=\"city\" data-visible=\"hasCity\".");
     }
     if (/[\s!=<>+\-*/%&|?'"`[\]]/.test(value)) {
-        return "an expression is not supported; a binding names a property. Put the expression in a computed, " +
-            "e.g. isOpen: Stitch.computed(function () { return !this.closed; }), and bind data-visible=\"isOpen\".";
+        return problem("E102", "an expression is not supported; a binding names a property. Put the expression in a computed, " +
+            "e.g. isOpen: Stitch.computed(function () { return !this.closed; }), and bind data-visible=\"isOpen\".");
     }
     const segments = value.split(".");
     for (const segment of segments) {
         if (!NAME.test(segment) && !INDEX.test(segment)) {
-            return "this is not a property path. Use names of letters, digits, _ and $ joined by dots, " +
-                "e.g. user.name or items.0.title.";
+            return problem("E106", "this is not a property path. Use names of letters, digits, _ and $ joined by dots, " +
+                "e.g. user.name or items.0.title.");
         }
     }
     return null;
@@ -87,9 +90,10 @@ function pathSyntaxProblem(value) {
  */
 function checkPathSyntax(element, attribute, rawValue) {
     const value = String(rawValue).trim();
-    const problem = pathSyntaxProblem(value);
-    if (problem) {
-        throw bindingError(describeBinding(element, attribute, rawValue), problem);
+    const found = pathSyntaxProblem(value);
+    if (found) {
+        // Relays the code and text made by problem() above.
+        throw bindingError(found.code, describeBinding(element, attribute, rawValue), found.text);
     }
     return value;
 }
@@ -180,13 +184,13 @@ function checkWritable(scope, path, describe) {
     }
     const own = Object.getOwnPropertyDescriptor(holder, key);
     if (own && own.set && own.set.stitchReadOnlyComputed) {
-        throw bindingError(describe(),
+        throw bindingError("E311", describe(),
             `"${path}" is a computed (read-only), so a two-way binding cannot write it. ` +
             "Bind it one-way (data-text), or bind the plain property it is computed from.");
     }
     const descriptor = own || inheritedGetter(holder, key);
     if (descriptor && descriptor.get && !descriptor.set) {
-        throw bindingError(describe(),
+        throw bindingError("E312", describe(),
             `"${path}" is read-only (a getter without a setter), so a two-way binding cannot write it. ` +
             "Bind it one-way (data-text) or bind a writable property.");
     }
@@ -268,14 +272,14 @@ function missingPropertyError(where, segments, index, holder) {
     const name = segments[index];
     const owner = describeHolder(segments, index, isRowScope);
     if (holder === null || typeof holder !== "object" && typeof holder !== "function") {
-        return bindingError(where,
+        return bindingError("E202", where,
             `"${name}" is not a property of ${owner}, which is ${typeof holder} ${JSON.stringify(holder)}. ` +
             "Fix the path, or make that value an object.");
     }
     const members = describeMembers(holder, isRowScope);
     const close = closeName(members.bindable, name);
     const suggestion = close ? `Did you mean "${segments.slice(0, index).concat(close).join(".")}"? ` : "";
-    return bindingError(where,
+    return bindingError("E201", where,
         `"${name}" is not a property of ${owner}. ${owner[0].toUpperCase() + owner.slice(1)} has: ` +
         `${members.text}. ${suggestion}` +
         "Declare every bound property in Observable.create() with a starting value (null is fine): a property " +
@@ -289,7 +293,7 @@ function notReactiveError(where, segments, index) {
           `Rename it without the _ (e.g. "${name.replace(/^_+/, "") || "value"}"), or keep it out of bindings.`
         : "it was added after Observable.create(), so it has no reactive accessor and a binding could not follow it. " +
           "Declare it in Observable.create() with a starting value (null is fine).";
-    return bindingError(where, `"${segments.slice(0, index + 1).join(".")}" is not reactive: ${why}`);
+    return bindingError("E203", where, `"${segments.slice(0, index + 1).join(".")}" is not reactive: ${why}`);
 }
 
 /**
@@ -335,11 +339,11 @@ function pathReader(element, attribute, path) {
  */
 function parseHandlerRef(where, rawValue) {
     const text = String(rawValue).trim();
-    const problem = pathSyntaxProblem(text);
+    const found = pathSyntaxProblem(text);
     const fix = "A handler is a bare name (on the current row; the model outside a list), $parent.name or $root.name; " +
         "it is called with the row item and the event.";
-    if (problem) {
-        throw bindingError(where, `${problem.split(". ")[0]}. ${fix}`);
+    if (found) {
+        throw bindingError("E108", where, `${found.text.split(". ")[0]}. ${fix}`);
     }
     let segments = text.split(".");
     let level = "row";
@@ -348,11 +352,11 @@ function parseHandlerRef(where, rawValue) {
         segments = segments.slice(1);
     }
     if (segments.length === 0) {
-        throw bindingError(where, `"${text}" names a scope but no handler. ${fix}`);
+        throw bindingError("E109", where, `"${text}" names a scope but no handler. ${fix}`);
     }
     const scoped = segments.find(segment => segment[0] === "$");
     if (scoped) {
-        throw bindingError(where,
+        throw bindingError("E110", where,
             `"${text}": only one scope prefix is allowed, and only $parent. or $root. ` +
             "For a handler more than one level up, put it on the root model and use $root.name. " + fix);
     }
@@ -415,7 +419,7 @@ function resolveHandler(scope, ref, where) {
     const target = levels.find(level => level.level === ref.level);
     const name = ref.segments.join(".");
     if (ref.level === "parent" && !isRowContext(scope)) {
-        throw bindingError(where,
+        throw bindingError("E403", where,
             `"$parent." is only available inside a foreach row; here the handler is on the model itself. ` +
             `Use data-${where.includes("data-event") ? "event" : "click"} with the bare name "${name}".`);
     }
@@ -435,10 +439,10 @@ function resolveHandler(scope, ref, where) {
         } else {
             hint = " It exists nowhere a handler can reach (the current row, $parent., $root.). Add it to the model.";
         }
-        throw bindingError(where, `handler "${ref.text}" was not found on ${target.label}.${hint}`);
+        throw bindingError("E401", where, `handler "${ref.text}" was not found on ${target.label}.${hint}`);
     }
     if (typeof hit.value !== "function") {
-        throw bindingError(where,
+        throw bindingError("E402", where,
             `"${ref.text}" on ${target.label} is ${hit.value === null ? "null" : typeof hit.value}, not a function. ` +
             "A handler must be a method of the model or row.");
     }

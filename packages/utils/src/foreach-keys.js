@@ -58,7 +58,7 @@ function missingKeyError(version, list, index, field, row) {
         fix = `Give every row an "id", or name the key field with data-key, e.g. <${(list.tagName || "ul").toLowerCase()} data-foreach="${list.name}" data-key="sku">.`;
     }
     return new Error(
-        `[Stitch.js ${version}] ${where}: row ${index} has no "${field}" (${which}). ` +
+        `[Stitch E501] ${where}: row ${index} has no "${field}" (${which}). ` +
         `Every row of a list needs a unique key. ${fix}`
     );
 }
@@ -89,13 +89,13 @@ function resolveRowKeys(items, list, version) {
             }
         } else if (row === undefined || row === null) {
             throw new Error(
-                `[Stitch.js ${version}] ${describeList(list)}: row ${index} is ${row}. ` +
+                `[Stitch E503] ${describeList(list)}: row ${index} is ${row}. ` +
                 `A list row must be an object with a key, or a plain value (string, number, boolean). ` +
                 `Remove the empty row from the list.`
             );
         } else if (list.keyField) {
             throw new Error(
-                `[Stitch.js ${version}] ${describeList(list)}: row ${index} is a plain ${typeof row} (${formatKey(row)}), ` +
+                `[Stitch E504] ${describeList(list)}: row ${index} is a plain ${typeof row} (${formatKey(row)}), ` +
                 `so it has no "${list.keyField}" field. data-key is for lists of objects; ` +
                 `remove data-key and each plain value is its own key.`
             );
@@ -109,7 +109,7 @@ function resolveRowKeys(items, list, version) {
                 ? `the same key ${formatKey(key)} (field "${field}")`
                 : `the same value ${formatKey(key)} (in a list of plain values each value is its own key)`;
             throw new Error(
-                `[Stitch.js ${version}] ${describeList(list)}: rows ${first} and ${index} have ${what}. ` +
+                `[Stitch E502] ${describeList(list)}: rows ${first} and ${index} have ${what}. ` +
                 `Keys must be unique within a list: remove the duplicate, or key the rows by a field that is unique.`
             );
         }

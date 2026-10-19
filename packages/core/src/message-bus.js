@@ -5,13 +5,13 @@ const { reportError } = require("../../utils/src/error-hook");
 
 function checkEvent(version, method, event) {
     if (typeof event !== "string" || event === "") {
-        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, ...): the event name must be a non-empty string, got ${event === "" ? "an empty string" : typeof event}.`);
+        throw new TypeError(`[Stitch E851] MessageBus.${method}(event, ...): the event name must be a non-empty string, got ${event === "" ? "an empty string" : typeof event}.`);
     }
 }
 
 function checkCallback(version, method, callback) {
     if (typeof callback !== "function") {
-        throw new TypeError(`[Stitch.js ${version}] MessageBus.${method}(event, callback): callback must be a function, got ${callback === null ? "null" : typeof callback}.`);
+        throw new TypeError(`[Stitch E852] MessageBus.${method}(event, callback): callback must be a function, got ${callback === null ? "null" : typeof callback}.`);
     }
 }
 
@@ -46,7 +46,7 @@ class MessageBus {
         checkCallback(this.version, "unsubscribe", callback);
         if (!this._remove(event, callback)) {
             throw new Error(
-                `[Stitch.js ${this.version}] MessageBus.unsubscribe("${event}", callback): that callback is not subscribed to "${event}". ` +
+                `[Stitch E853] MessageBus.unsubscribe("${event}", callback): that callback is not subscribed to "${event}". ` +
                 "Pass the same function that was subscribed (or call the function subscribe() returned)."
             );
         }
@@ -86,7 +86,7 @@ class MessageBus {
             this.flushDepth = 0;
             this.queue = [];
             reportError(new Error(
-                `[Stitch.js ${this.version}] MessageBus stopped an infinite loop: events kept publishing each other for ` +
+                `[Stitch E855] MessageBus stopped an infinite loop: events kept publishing each other for ` +
                 `${this.MAX_FLUSH_DEPTH} rounds; the queued events were dropped (${dropped.join(", ")}). ` +
                 "A subscriber probably publishes an event that leads back to itself."
             ), { source: "messageBus", event: dropped[0] });
@@ -152,7 +152,7 @@ class MessageBus {
 
     use(middlewareFn) {
         if (typeof middlewareFn !== "function") {
-            throw new TypeError(`[Stitch.js ${this.version}] MessageBus.use(middleware): middleware must be a function, got ${typeof middlewareFn}.`);
+            throw new TypeError(`[Stitch E854] MessageBus.use(middleware): middleware must be a function, got ${typeof middlewareFn}.`);
         }
         this.middleware.push(middlewareFn);
     }

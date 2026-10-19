@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js API contracts</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>API contracts</h1>
+    <p>
+        Every subscription can be undone with what it returned ($watch, $onChange); isReactive answers
+        true or false; a computed receives the object that holds it as its first argument (so an
+        arrow function works through the argument); frozen or sealed data is refused with a Stitch
+        message; every attribute a Stitch binding reads is reported as bound; a custom binding whose
+        value is not a path says how to declare a literal binding; every Stitch error starts with a
+        stable code, <code>[Stitch E###]</code>.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'watch-returns-a-remover',
+            'on-change-returns-a-remover',
+            'is-reactive-returns-booleans',
+            'computed-gets-its-object-as-argument',
+            'frozen-or-sealed-data-is-refused-with-a-stitch-message',
+            'bind-report-counts-data-type-as-ours',
+            'custom-binding-syntax-errors-name-the-literal-fix',
+            'errors-carry-stable-codes'
+        ]);
+
+        // Custom bindings must be registered before the first bind() on the page.
+        Stitch.DataBinder.registerBinding('tip', {
+            bind(element, model, path, context) {
+                const effect = context.reactiveSystem.effect(() => { element.title = String(model[path]); });
+                context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect));
+            }
+        });
+
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
+        const CODE = /^\[Stitch E\d{3}\] /;
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        function thrown(fn) {
+            try {
+                fn();
+            } catch (error) {
+                return error;
+            }
+            return null;
+        }
+
+        function messageOf(fn) {
+            const error = thrown(fn);
+            return error ? String(error.message) : '';
+        }
+
+        StitchTest.test('watch-returns-a-remover', async (t) => {
+            const base = Stitch.debug.stats().effects;
+            const model = Stitch.Observable.create({ a: 1 });
+            const seen = [];
+            const stop = model.$watch('a', (now, before) => seen.push(`${before}->${now}`));
+            t.equal(typeof stop, 'function', '$watch returns a function');
+            t.equal(Stitch.debug.stats().effects, base + 1, 'the watch is one live effect');
+            model.a = 2;
+            t.deepEqual(seen, ['1->2'], 'the watch runs while it is installed');
+            stop();
+            model.a = 3;
+            t.deepEqual(seen, ['1->2'], 'after the remover ran the watch never runs again');
+            t.equal(Stitch.debug.stats().effects, base, 'the remover releases the watch effect (no leak)');
+            t.equal(messageOf(() => stop()), '', 'calling the remover twice is safe');
+        });
+
+        StitchTest.test('on-change-returns-a-remover', (t) => {
+            const model = Stitch.Observable.create({ a: 1 });
+            const seen = [];
+            const handler = change => seen.push(change.field);
+            const remove = model.$onChange(handler);
+            t.equal(typeof remove, 'function', '$onChange returns a function');
+            model.a = 2;
+            remove();
+            model.a = 3;
+            t.deepEqual(seen, ['a'], 'after the remover ran the handler is not called');
+            t.equal(messageOf(() => remove()), '', 'calling the remover twice is safe');
+            t.match(messageOf(() => model.$offChange(handler)), /not a change handler of this object/,
+                '$offChange of a handler the remover already removed still throws');
+        });
+
+        StitchTest.test('is-reactive-returns-booleans', (t) => {
+            const isReactive = Stitch.Observable.isReactive;
+            const model = Stitch.Observable.create({ user: { name: 'Ada' }, list: [] });
+            t.deepEqual([null, undefined, 0, '', NaN, false].map(isReactive), [false, false, false, false, false, false],
+                'falsy values give false');
+            t.deepEqual([{}, [], 'text', 1].map(isReactive), [false, false, false, false], 'plain values give false');
+            t.deepEqual([model, model.user, model.list].map(isReactive), [true, true, true], 'model values give true');
+        });
+
+        StitchTest.test('computed-gets-its-object-as-argument', async (t) => {
+            const host = mount('<span id="ca-total" data-text="total"></span><ul id="ca-rows" data-foreach="rows"><li data-text="subtotal"></li></ul>');
+            let seenThis = null;
+            let seenArg = null;
+            const model = Stitch.Observable.create({
+                price: 2,
+                qty: 3,
+                total: Stitch.computed(m => m.price * m.qty),
+                both: Stitch.computed(function (m) { seenThis = this; seenArg = m; return this.qty; }),
+                rows: [{ id: 1, p: 2, q: 5, subtotal: Stitch.computed(r => r.p * r.q) }]
+            });
+            t.equal(model.total, 6, 'an arrow computed reads the model through its argument');
+            t.equal(model.rows[0].subtotal, 10, 'a row computed receives its row');
+            t.equal(model.both, 3, 'a function computed still has this');
+            t.ok(seenThis === model && seenArg === model, 'this and the argument are the same object');
+            new Stitch.DataBinder().bind(host, model);
+            model.qty = 4;
+            model.rows[0].q = 6;
+            await tick();
+            t.equal(host.querySelector('#ca-total').textContent, '8', 'a bound arrow computed follows its dependencies');
+            t.equal(host.querySelector('#ca-rows li').textContent, '12', 'a bound row arrow computed follows its row');
+        });
+
+        StitchTest.test('frozen-or-sealed-data-is-refused-with-a-stitch-message', (t) => {
+            const frozen = messageOf(() => Stitch.Observable.create(Object.freeze({ a: 1 })));
+            t.match(frozen, CODE, 'frozen data: a Stitch error with a code');
+            t.match(frozen, /frozen/, 'frozen data: the message says frozen');
+            t.match(frozen, /structuredClone|copy/, 'frozen data: the message names the fix (a copy)');
+            t.match(messageOf(() => Stitch.Observable.create({ user: Object.freeze({ n: 1 }) })), /"user" is frozen/,
+                'a frozen nested object is named by its path');
+            t.match(messageOf(() => Stitch.Observable.create(Object.seal({ a: 1 }))), /sealed/, 'sealed data says sealed');
+            t.match(messageOf(() => Stitch.Observable.create(Object.preventExtensions({ a: 1 }))), /not extensible/,
+                'non-extensible data says not extensible');
+            const model = Stitch.Observable.create({ rows: [], user: null, prices: new Map() });
+            t.match(messageOf(() => model.rows.push(Object.freeze({ id: 1 }))), /"rows\[0\]" is frozen/,
+                'pushing a frozen row throws at the push, naming the index');
+            t.equal(model.rows.length, 0, 'the refused push left the list unchanged');
+            t.match(messageOf(() => { model.user = Object.freeze({ n: 1 }); }), /"user" is frozen/, 'assigning frozen data throws');
+            t.match(messageOf(() => model.prices.set('x', Object.freeze({ v: 1 }))), /is frozen/, 'Map.set of frozen data throws');
+            t.match(messageOf(() => Stitch.Observable.createArray(Object.freeze([{ id: 1 }]))), /^$/,
+                'createArray copies its argument, so a frozen array itself is fine');
+        });
+
+        StitchTest.test('bind-report-counts-data-type-as-ours', (t) => {
+            const host = mount('<input data-value="qty" data-type="int"><span data-testid="x"></span>');
+            let report = null;
+            const remove = Stitch.onBindReport(r => { report = r; });
+            try {
+                new Stitch.DataBinder().bind(host, Stitch.Observable.create({ qty: 1 }));
+            } finally {
+                remove();
+            }
+            t.deepEqual(report.bound.map(e => e.attribute).sort(), ['data-type', 'data-value'], 'data-type is listed as bound');
+            t.deepEqual(report.ignored.map(e => e.attribute), ['data-testid'], 'only attributes Stitch does not read are ignored');
+        });
+
+        StitchTest.test('custom-binding-syntax-errors-name-the-literal-fix', (t) => {
+            const model = Stitch.Observable.create({ name: 'Ada' });
+            const literalText = messageOf(() => new Stitch.DataBinder().bind(mount('<b data-tip="Save changes"></b>'), model));
+            t.match(literalText, /an expression is not supported/, 'text with a space is still reported as not a path');
+            t.match(literalText, /registerBinding\("tip", \{ value: 'literal'/, 'and the message names the literal fix for the custom binding');
+            const oneWord = messageOf(() => new Stitch.DataBinder().bind(mount('<b data-tip="Save"></b>'), model));
+            t.match(oneWord, /"Save" is not a property of the model/, 'a one-word text is reported as a missing property');
+            t.match(oneWord, /registerBinding\("tip", \{ value: 'literal'/, 'and also names the literal fix');
+            const builtIn = messageOf(() => new Stitch.DataBinder().bind(mount('<b data-text="Save changes"></b>'), model));
+            t.match(builtIn, /an expression is not supported/, 'a built-in binding reports the expression');
+            t.equal(/registerBinding/.test(builtIn), false, 'and does not mention registerBinding (it is not custom)');
+        });
+
+        StitchTest.test('errors-carry-stable-codes', (t) => {
+            const model = Stitch.Observable.create({ name: 'Ada', items: [{ id: 1 }], user: { n: 1 } });
+            const cases = [
+                ['E102', () => new Stitch.DataBinder().bind(mount('<b data-visible="!name"></b>'), model)],
+                ['E201', () => new Stitch.DataBinder().bind(mount('<b data-text="nmae"></b>'), model)],
+                ['E401', () => new Stitch.DataBinder().bind(mount('<ul data-foreach="items"><li><i data-click="remove"></i></li></ul>'), model)],
+                ['E501', () => new Stitch.DataBinder().bind(mount('<ul data-foreach="rows"><li></li></ul>'), Stitch.Observable.create({ rows: [{ sku: 1 }] }))],
+                ['E511', () => new Stitch.DataBinder().bind(mount('<ul data-foreach="items"><li></li><li></li></ul>'), model)],
+                ['E602', () => new Stitch.DataBinder().bind('#no-such-element', model)],
+                ['E706', () => Stitch.Observable.create({}, { debug: true })],
+                ['E710', () => { model.user = Stitch.Observable.create({ n: 2 }); }],
+                ['E801', () => model.user.$emit('x')],
+                ['E802', () => model.on(() => {})],
+                ['E901', () => Stitch.onError(42)]
+            ];
+            for (const [code, fn] of cases) {
+                const message = messageOf(fn);
+                t.equal(message.slice(0, 13), `[Stitch ${code}]`, `${code}: the message starts with its code`);
+            }
+            t.equal(messageOf(() => Stitch.Observable.create({ a: 1 }).$get('b')).slice(0, 8), '[Stitch ', 'helper errors carry a code too');
+        });
+    </script>
+</body>
+</html>

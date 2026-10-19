@@ -1,6 +1,5 @@
 "use strict";
 
-const { VERSION } = require("./version");
 
 /**
  * A page-wide slot for one handler (Stitch.onError, Stitch.onBindReport).
@@ -16,11 +15,11 @@ function createHookSlot(apiName) {
             return () => {};
         }
         if (typeof fn !== "function") {
-            throw new TypeError(`[Stitch.js v${VERSION}] ${apiName}(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`);
+            throw new TypeError(`[Stitch E901] ${apiName}(fn): fn must be a function (or null to remove the handler), got ${typeof fn}.`);
         }
         if (current !== null && current !== fn) {
             throw new Error(
-                `[Stitch.js v${VERSION}] ${apiName}(fn): a handler is already installed. Remove it first with ` +
+                `[Stitch E902] ${apiName}(fn): a handler is already installed. Remove it first with ` +
                 `${apiName}(null) or the function the first ${apiName}() call returned, then install the new one.`
             );
         }

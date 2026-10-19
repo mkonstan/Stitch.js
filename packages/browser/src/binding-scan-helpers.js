@@ -13,6 +13,9 @@
 
 // Attributes Stitch reads that are not bindings. Each one belongs on a data-foreach element.
 const INTERNAL_ATTRIBUTES = ["data-key", "data-template", "data-default-text", "data-default-value"];
+// Attributes a binding reads on its own element (data-value reads data-type). They are
+// Stitch's (the bind report lists them as bound) but they do not make an element a target.
+const READ_ATTRIBUTES = ["data-type"];
 
 // A binding name becomes the attribute data-<name>; HTML lowercases attribute names, so
 // a name must be lowercase to ever match.
@@ -46,7 +49,7 @@ function readElementBindings(element, names) {
 
 /** True for an attribute Stitch acts on: a registered binding or an internal attribute. */
 function isOurAttribute(attributeName, names) {
-    if (INTERNAL_ATTRIBUTES.indexOf(attributeName) !== -1) return true;
+    if (INTERNAL_ATTRIBUTES.indexOf(attributeName) !== -1 || READ_ATTRIBUTES.indexOf(attributeName) !== -1) return true;
     return attributeName.startsWith("data-") && names.indexOf(attributeName.slice(5)) !== -1;
 }
 
@@ -71,6 +74,7 @@ function collectBindReport(root, names) {
 
 module.exports = {
     INTERNAL_ATTRIBUTES,
+    READ_ATTRIBUTES,
     BINDING_NAME,
     bindingSelector,
     readElementBindings,

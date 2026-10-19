@@ -38,7 +38,7 @@ function readKeyField(element, path, version) {
     const field = element.getAttribute("data-key").trim();
     if (!field) {
         throw new Error(
-            `[Stitch.js ${version}] ${describeList(element, path)}: data-key is empty. ` +
+            `[Stitch E505] ${describeList(element, path)}: data-key is empty. ` +
             `Set it to the field that identifies a row (e.g. data-key="sku"), or remove it to use "id".`
         );
     }
@@ -58,10 +58,10 @@ function readRowTemplate(element, path, version, doc) {
     if (templateId) {
         const templateElement = doc.getElementById(templateId);
         if (!templateElement) {
-            throw new Error(`[Stitch.js ${version}] ${where}: data-template="${templateId}" names no element. Add <template id="${templateId}"> with one row element inside.`);
+            throw new Error(`[Stitch E514] ${where}: data-template="${templateId}" names no element. Add <template id="${templateId}"> with one row element inside.`);
         }
         if (templateElement.tagName !== "TEMPLATE") {
-            throw new Error(`[Stitch.js ${version}] ${where}: data-template="${templateId}" must name a <template> element, got <${templateElement.tagName.toLowerCase()}>.`);
+            throw new Error(`[Stitch E515] ${where}: data-template="${templateId}" must name a <template> element, got <${templateElement.tagName.toLowerCase()}>.`);
         }
         nodes = Array.from(templateElement.content.childNodes);
         source = `the row template <template id="${templateId}">`;
@@ -75,7 +75,7 @@ function readRowTemplate(element, path, version, doc) {
 
     if (roots.length === 0) {
         throw new Error(
-            `[Stitch.js ${version}] ${where}: ${source} is empty. ` +
+            `[Stitch E512] ${where}: ${source} is empty. ` +
             (templateId
                 ? `Put one row element inside <template id="${templateId}">.`
                 : `Put one row element inside the list element, e.g. <li data-text="name"></li>, or point data-template at a <template>.`)
@@ -84,13 +84,13 @@ function readRowTemplate(element, path, version, doc) {
     if (roots.length > 1) {
         const kind = roots.every(node => node.nodeType === 1) ? "root elements" : "root nodes";
         throw new Error(
-            `[Stitch.js ${version}] ${where}: ${source} has ${roots.length} ${kind} (${roots.map(describeNode).join(", ")}), ` +
+            `[Stitch E511] ${where}: ${source} has ${roots.length} ${kind} (${roots.map(describeNode).join(", ")}), ` +
             `but a row must be exactly one element. Wrap them in one element, e.g. <div>...</div>.`
         );
     }
     if (roots[0].nodeType !== 1) {
         throw new Error(
-            `[Stitch.js ${version}] ${where}: ${source} is ${describeNode(roots[0])}, but a row must be one element. ` +
+            `[Stitch E513] ${where}: ${source} is ${describeNode(roots[0])}, but a row must be one element. ` +
             `Wrap it in an element, e.g. <span data-text="$data"></span>.`
         );
     }
@@ -240,7 +240,7 @@ function bindForeach(element, viewModel, path, context, deps) {
         }
         if (!Array.isArray(value)) {
             throw new TypeError(
-                `[Stitch.js ${version}] ${describeList(element, path)}: "${path}" must be an array (or null/undefined for no rows), ` +
+                `[Stitch E521] ${describeList(element, path)}: "${path}" must be an array (or null/undefined for no rows), ` +
                 `got ${typeof value}. Bind data-foreach to an array.`
             );
         }

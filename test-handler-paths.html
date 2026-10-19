@@ -123,12 +123,12 @@
 
             await StitchTest.test('miss-says-where-it-exists', async (t) => {
                 const onRoot = messageOf(tryBind(mount(NESTED('remove')), nestedModel([])));
-                t.match(onRoot, /handler "remove" was not found on the current row/, 'a bare name missing on the row throws, saying where it was looked up');
+                t.match(onRoot, /^\[Stitch E401\] .*handler "remove" was not found on the current row/, 'a bare name missing on the row throws, saying where it was looked up');
                 t.match(onRoot, /did you mean "\$root\.remove"/, 'and suggests $root.remove, where it exists');
                 const onParent = messageOf(tryBind(mount(NESTED('pick')), nestedModel([])));
                 t.match(onParent, /did you mean "\$parent\.pick"/, 'a handler on the parent row is suggested as $parent.pick');
                 const onRow = messageOf(tryBind(mount(NESTED('$root.own')), nestedModel([])));
-                t.match(onRow, /handler "\$root\.own" was not found on the root model.*use the bare name/, 'a $root. miss is caught at bind() (before any row exists) and points to the bare name for a row method');
+                t.match(onRow, /^\[Stitch E406\] .*handler "\$root\.own" was not found on the root model.*use the bare name/, 'a $root. miss is caught at bind() (before any row exists) and points to the bare name for a row method');
                 // Three levels: a handler on the grandparent row (not the root) cannot be named.
                 const deep = mount('<div data-foreach="a"><div data-foreach="b"><div data-foreach="c"><button data-click="far">x</button></div></div></div>');
                 const deepMessage = messageOf(tryBind(deep, Stitch.Observable.create({

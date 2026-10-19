@@ -1,6 +1,5 @@
 "use strict";
 
-const { VERSION } = require("./version");
 
 /**
  * Detects arrow functions. Mirrors Stitch runtime behavior for reactive function guards.
@@ -42,7 +41,7 @@ function setProperty(target, path, value) {
             // Creating the missing object here would make a non-reactive property: refuse.
             const step = keys.slice(0, i + 1).join(".");
             throw new Error(
-                `[Stitch.js v${VERSION}] cannot write "${path}": "${step}" is ${next === null ? "null" : next === undefined ? "undefined" : typeof next}. ` +
+                `[Stitch E314] cannot write "${path}": "${step}" is ${next === null ? "null" : next === undefined ? "undefined" : typeof next}. ` +
                 `Give "${step}" an object first (e.g. ${step}: { ${keys[i + 1]}: "" }), or hide the input while it is empty (data-visible).`
             );
         }
@@ -62,7 +61,7 @@ function setProperty(target, path, value) {
 function getProperty(target, path) {
     if (typeof path !== "string" || path.trim().startsWith("{")) {
         throw new Error(
-            `[Stitch.js v${VERSION}] "${path}" is not a property path. Use a dot-separated name such as "user.name"; ` +
+            `[Stitch E107] "${path}" is not a property path. Use a dot-separated name such as "user.name"; ` +
             "an inline object is not supported."
         );
     }
@@ -101,7 +100,7 @@ function assertPathExists(target, path, where) {
             const descriptor = Object.getOwnPropertyDescriptor(current, keys[i]);
             if (descriptor && !descriptor.get && descriptor.enumerable) {
                 throw new Error(
-                    `[Stitch.js v${VERSION}] ${where}: "${keys.slice(0, i + 1).join(".")}" is not reactive (${keys[i][0] === "_"
+                    `[Stitch E205] ${where}: "${keys.slice(0, i + 1).join(".")}" is not reactive (${keys[i][0] === "_"
                         ? "names starting with _ are never made reactive" : "it was added after Observable.create()"}), so it could never be followed.`
                 );
             }
@@ -110,7 +109,7 @@ function assertPathExists(target, path, where) {
             const owner = i === 0 ? "the model" : `"${keys.slice(0, i).join(".")}"`;
             const names = typeof current === "object" ? Object.keys(current).filter(k => k[0] !== "_").join(", ") : typeof current;
             throw new Error(
-                `[Stitch.js v${VERSION}] ${where}: "${keys[i]}" is not a property of ${owner} (it has: ${names || "no properties"}). ` +
+                `[Stitch E204] ${where}: "${keys[i]}" is not a property of ${owner} (it has: ${names || "no properties"}). ` +
                 "Declare it in Observable.create() with a starting value (a property added later is not reactive), or fix the name."
             );
         }

@@ -100,7 +100,7 @@
                     r = tryBind(build('name', ''), { rows: [{ id: 1, name: 'Ann' }, { id: 2, name: 'Bob' }, { name: 'Cy' }] });
                     t.ok(r.error instanceof Error, `${path}: a row without an id throws`);
                     let message = r.error ? r.error.message : '';
-                    t.match(message, /data-foreach="rows"/, `${path}: missing-key error names the list`);
+                    t.match(message, /^\[Stitch E501\] .*data-foreach="rows"/, `${path}: missing-key error has code E501 and names the list`);
                     t.match(message, /\brow 2\b/, `${path}: missing-key error names the row index`);
                     t.match(message, /"id"/, `${path}: missing-key error names the key field`);
                     t.match(message, /data-key/, `${path}: missing-key error names the fix`);
@@ -115,7 +115,7 @@
                     r = tryBind(build('name', ''), { rows: [{ id: 7, name: 'Ann' }, { id: 8, name: 'Bob' }, { id: 7, name: 'Cy' }] });
                     t.ok(r.error instanceof Error, `${path}: duplicate ids throw`);
                     message = r.error ? r.error.message : '';
-                    t.match(message, /data-foreach="rows"/, `${path}: duplicate-key error names the list`);
+                    t.match(message, /^\[Stitch E502\] .*data-foreach="rows"/, `${path}: duplicate-key error has code E502 and names the list`);
                     t.match(message, /\brows 0 and 2\b/, `${path}: duplicate-key error names both rows`);
                     t.match(message, /\bkey 7\b/, `${path}: duplicate-key error names the key`);
 
@@ -177,7 +177,7 @@
                 t.equal(lines.filter(line => /"rows" must be an array/.test(line)).length, 1, 'a non-array list is reported, not ignored');
 
                 const direct = tryBind('<ul data-foreach="rows"><li></li></ul>', { rows: { a: 1 } });
-                t.match(direct.error ? direct.error.message : '', /"rows" must be an array.*got object/, 'binding a non-array list throws from bind()');
+                t.match(direct.error ? direct.error.message : '', /^\[Stitch E521\] .*"rows" must be an array.*got object/, 'binding a non-array list throws from bind()');
             });
 
             // Keys are compared as values: 1 and "1" are different rows; no string collision.
@@ -196,7 +196,7 @@
 
             await StitchTest.test('data-key-misuse-throws', async (t) => {
                 let r = tryBind('<ul data-foreach="rows" data-key=" "><li data-text="name"></li></ul>', { rows: [{ id: 1, name: 'a' }] });
-                t.match(r.error ? r.error.message : '', /data-key is empty/, 'an empty data-key throws');
+                t.match(r.error ? r.error.message : '', /^\[Stitch E505\] .*data-key is empty/, 'an empty data-key throws (E505)');
                 r = tryBind('<ul data-foreach="rows" data-key="sku"><li data-text="$data"></li></ul>', { rows: ['a', 'b'] });
                 t.match(r.error ? r.error.message : '', /row 0 is a plain string.*remove data-key/, 'data-key on a list of plain values throws with the fix');
                 r = tryBind('<ul data-foreach="rows"><li data-text="$data"></li></ul>', { rows: ['a', null] });

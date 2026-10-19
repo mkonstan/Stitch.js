@@ -1,6 +1,5 @@
 "use strict";
 
-const { VERSION } = require("../../utils/src/version");
 const paths = require("./binding-paths");
 const { reportError, hasErrorHandler } = require("../../utils/src/error-hook");
 
@@ -32,9 +31,9 @@ function bindingErrorContext(element, type, path) {
     return { source: "binding", element, binding: `data-${type}="${path}"` };
 }
 
-/** An error about one binding: `[Stitch.js vX] <span data-text="x">: message`. */
-function bindingError(element, type, path, message) {
-    return new Error(`[Stitch.js v${VERSION}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
+/** An error about one binding, with its stable code: `[Stitch E301] <span data-text="x">: message`. */
+function bindingError(code, element, type, path, message) {
+    return new Error(`[Stitch ${code}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
 }
 
 function describeValue(value) {
@@ -93,7 +92,7 @@ const BINDING_HANDLERS = {
         bind(element, viewModel, path, context) {
             valueEffect(element, viewModel, "text", path, context, value => {
                 if (typeof value === "function") {
-                    throw bindingError(element, "text", path,
+                    throw bindingError("E301", element, "text", path,
                         `"${path}" is a function; data-text shows a value. Make it a computed ` +
                         "(Stitch.computed(function () { ... })) and bind that, or bind the property it returns.");
                 }
@@ -192,7 +191,7 @@ const BINDING_HANDLERS = {
             const eff = context.reactiveSystem.effect(() => {
                 const eventConfig = read(viewModel);
                 if (!eventConfig || typeof eventConfig !== "object" || Array.isArray(eventConfig)) {
-                    throw bindingError(element, "event", path,
+                    throw bindingError("E304", element, "event", path,
                         `the value must be an object that maps event names to handlers, e.g. { input: "validate" }; ` +
                         `got ${describeValue(eventConfig)}.`);
                 }
@@ -205,7 +204,7 @@ const BINDING_HANDLERS = {
                         return { eventName, listener: e => runHandler(element, "event", path, () => entry.call(item, item, e)) };
                     }
                     if (typeof entry !== "string") {
-                        throw new Error(`[Stitch.js v${VERSION}] ${entryWhere}: the handler must be a handler name ` +
+                        throw new Error(`[Stitch E305] ${entryWhere}: the handler must be a handler name ` +
                             `(e.g. "validate" or "$root.save") or a function; got ${describeValue(entry)}.`);
                     }
                     const ref = paths.parseHandlerRef(entryWhere, entry);
@@ -257,7 +256,7 @@ const BINDING_HANDLERS = {
                         element.classList.toggle(className, !!value[className]);
                     });
                 } else if (value !== null && value !== undefined) {
-                    throw bindingError(element, "class", path,
+                    throw bindingError("E302", element, "class", path,
                         `the value must be a class string or an object of { className: boolean }; got ${describeValue(value)}.`);
                 }
             });
@@ -285,7 +284,7 @@ const BINDING_HANDLERS = {
                         handler.apply(element, attrName, attrValue);
                     });
                 } else if (value !== null && value !== undefined) {
-                    throw bindingError(element, "attr", path,
+                    throw bindingError("E303", element, "attr", path,
                         `the value must be an object of { attributeName: value }, e.g. { href: url, target: "_blank" }; ` +
                         `got ${describeValue(value)}.`);
                 }
@@ -300,7 +299,7 @@ const BINDING_HANDLERS = {
     foreach: {
         bind(element, viewModel, path, context) {
             if (typeof bindForeach !== "function") {
-                throw new Error(`[Stitch.js v${VERSION}] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
+                throw new Error(`[Stitch E993] foreach binding is not available: createBindingRuntime() was given no bindForeach.`);
             }
             return bindForeach(element, viewModel, path, context);
         }

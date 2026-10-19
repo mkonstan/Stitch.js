@@ -87,6 +87,23 @@ function createDataBinderClass(deps = {}) {
     }
 
     /**
+     * A custom binding reads its value as a property path unless it was registered with
+     * value: "literal". When the value is not a path, or names nothing on the model, the error
+     * also says how to declare the binding literal (the likely intent: data-tooltip="Save").
+     */
+    function withLiteralHint(type, check) {
+        try {
+            return check();
+        } catch (error) {
+            if (error && typeof error.message === "string") {
+                error.message += ` data-${type} is a custom binding, which reads its value as a property path. If the value ` +
+                    `is text, register it as literal: registerBinding("${type}", { value: 'literal', bind(element, model, text) { ... } }).`;
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Stitch's internal attributes configure a list; on any other element they would do
      * nothing, silently, so they throw.
      */
@@ -95,7 +112,7 @@ function createDataBinderClass(deps = {}) {
         for (const attribute of ["data-key", "data-template"]) {
             if (element.hasAttribute(attribute) && !isList) {
                 throw new Error(
-                    `[Stitch.js ${Version}] ${paths.describeBinding(element, attribute, element.getAttribute(attribute))}: ` +
+                    `[Stitch E531] ${paths.describeBinding(element, attribute, element.getAttribute(attribute))}: ` +
                     `${attribute} only works on an element with data-foreach (it configures the list's rows). ` +
                     `Add data-foreach to this element, or remove ${attribute}.`
                 );
@@ -105,7 +122,7 @@ function createDataBinderClass(deps = {}) {
         for (const attribute of ["data-default-text", "data-default-value"]) {
             if (element.hasAttribute(attribute) && !(isList && element.tagName === "SELECT")) {
                 throw new Error(
-                    `[Stitch.js ${Version}] ${paths.describeBinding(element, attribute, element.getAttribute(attribute))}: ` +
+                    `[Stitch E532] ${paths.describeBinding(element, attribute, element.getAttribute(attribute))}: ` +
                     `${attribute} only works on a <select> with data-foreach (it adds a placeholder option). ` +
                     `Move it to the <select data-foreach>, or remove it.`
                 );
@@ -113,14 +130,14 @@ function createDataBinderClass(deps = {}) {
         }
         if (element.hasAttribute("data-default-value") && !hasDefaultText) {
             throw new Error(
-                `[Stitch.js ${Version}] ${paths.describeBinding(element, "data-default-value", element.getAttribute("data-default-value"))}: ` +
+                `[Stitch E533] ${paths.describeBinding(element, "data-default-value", element.getAttribute("data-default-value"))}: ` +
                 `data-default-value is the value of the placeholder option, which data-default-text creates. ` +
                 `Add data-default-text="Choose..." or remove data-default-value.`
             );
         }
         if (isList && element.hasAttribute("data-template") && element.firstElementChild) {
             throw new Error(
-                `[Stitch.js ${Version}] ${paths.describeBinding(element, "data-template", element.getAttribute("data-template"))}: ` +
+                `[Stitch E516] ${paths.describeBinding(element, "data-template", element.getAttribute("data-template"))}: ` +
                 `the list takes its rows from the <template>, so the elements written inside it (${describeOurs(element.firstElementChild)}) ` +
                 `would be discarded. Remove them, or remove data-template to use them as the row template.`
             );
@@ -136,7 +153,7 @@ function createDataBinderClass(deps = {}) {
         const types = bindings.map(binding => binding.type);
         if (types.indexOf("foreach") !== -1 && types.indexOf("text") !== -1) {
             throw new Error(
-                `[Stitch.js ${Version}] ${describeElement(element)} has data-foreach="${element.getAttribute("data-foreach")}" ` +
+                `[Stitch E534] ${describeElement(element)} has data-foreach="${element.getAttribute("data-foreach")}" ` +
                 `and data-text="${element.getAttribute("data-text")}": data-text would replace the list's rows. ` +
                 `Put the text on another element (e.g. a heading before the list).`
             );
@@ -146,7 +163,7 @@ function createDataBinderClass(deps = {}) {
                 const inner = element.querySelector(selector());
                 if (inner) {
                     throw new Error(
-                        `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)} contains ` +
+                        `[Stitch E535] ${paths.describeBinding(element, binding.attributeName, binding.path)} contains ` +
                         `${describeOurs(inner)}: ${binding.attributeName} would replace the element's content, destroying the ` +
                         "binding inside it. Put the text in its own element (e.g. a <span>) next to the bound elements."
                     );
@@ -159,13 +176,15 @@ function createDataBinderClass(deps = {}) {
                 paths.parseHandlerRef(paths.describeBinding(element, binding.attributeName, binding.path), binding.path);
                 continue;
             }
-            const path = paths.checkPathSyntax(element, binding.attributeName, binding.path);
+            const path = BUILT_IN_NAMES.has(binding.type)
+                ? paths.checkPathSyntax(element, binding.attributeName, binding.path)
+                : withLiteralHint(binding.type, () => paths.checkPathSyntax(element, binding.attributeName, binding.path));
             if (binding.type === "value") {
                 const segments = path.split(".");
                 // Any read-only context value, at any depth: $parent.$index, $root.$data, ...
                 if (ROW_NAMES.indexOf(segments[segments.length - 1]) !== -1 || segments.indexOf("$index") !== -1) {
                     throw new Error(
-                        `[Stitch.js ${Version}] ${paths.describeBinding(element, binding.attributeName, binding.path)}: ` +
+                        `[Stitch E313] ${paths.describeBinding(element, binding.attributeName, binding.path)}: ` +
                         `a two-way binding cannot write to ${path} (it is the row's own context value, so writing it ` +
                         "would not change the list); bind a property instead, e.g. data-value=\"$data.name\" with a list " +
                         "of objects, or data-value=\"$root.selected\"."
@@ -178,7 +197,7 @@ function createDataBinderClass(deps = {}) {
     /** Throws if element (or root) is already bound, by this binder or another one. */
     function alreadyBoundError(element, owner, self, asRoot) {
         return new Error(
-            `[Stitch.js ${Version}] ${describeOurs(element)}${asRoot ? " (a bind() root)" : ""} is already bound by ` +
+            `[Stitch E601] ${describeOurs(element)}${asRoot ? " (a bind() root)" : ""} is already bound by ` +
             `${owner === self ? "this DataBinder" : "another DataBinder"}. Binding it again would leave it on the first ` +
             "model or bind it twice. Call unbind() on the root that bound it first (or dispose() that binder), then bind again."
         );
@@ -217,11 +236,11 @@ class DataBinder {
             const selectorText = element;
             element = typeof document !== "undefined" ? document.querySelector(selectorText) : null;
             if (!element) {
-                throw new Error(`[Stitch.js ${Version}] ${method}("${selectorText}"): no element matches that selector.`);
+                throw new Error(`[Stitch E602] ${method}("${selectorText}"): no element matches that selector.`);
             }
         }
         if (!element || typeof element.querySelectorAll !== "function" || typeof element.matches !== "function") {
-            throw new Error(`[Stitch.js ${Version}] ${method}(element): element must be a DOM element or a selector, got ${element === null ? "null" : typeof element}.`);
+            throw new Error(`[Stitch E603] ${method}(element): element must be a DOM element or a selector, got ${element === null ? "null" : typeof element}.`);
         }
         return element;
     }
@@ -243,11 +262,11 @@ class DataBinder {
      */
     bind(element, viewModel) {
         if (this._disposed) {
-            throw new Error(`[Stitch.js ${Version}] bind(): this DataBinder was disposed. Create a new DataBinder to bind again.`);
+            throw new Error(`[Stitch E605] bind(): this DataBinder was disposed. Create a new DataBinder to bind again.`);
         }
         element = this._resolveElement(element, "bind");
         if (!viewModel || !viewModel._factory || !viewModel._factory.reactiveSystem) {
-            throw new Error(`[Stitch.js ${Version}] bind(element, model): model must be created with Stitch.Observable.create().`);
+            throw new Error(`[Stitch E604] bind(element, model): model must be created with Stitch.Observable.create().`);
         }
         const rootOwner = ROOT_OF.get(element);
         if (rootOwner) {
@@ -321,31 +340,31 @@ class DataBinder {
      */
     createHooks(userHooks = {}) {
         if (userHooks === null || typeof userHooks !== "object") {
-            throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): hooks must be an object, got ${userHooks === null ? "null" : typeof userHooks}.`);
+            throw new TypeError(`[Stitch E611] new DataBinder(hooks): hooks must be an object, got ${userHooks === null ? "null" : typeof userHooks}.`);
         }
         for (const name of Object.keys(userHooks)) {
             if (KNOWN_HOOKS.indexOf(name) === -1) {
-                throw new Error(`[Stitch.js ${Version}] new DataBinder(hooks): unknown hook "${name}". Known hooks: ${KNOWN_HOOKS.join(", ")}.`);
+                throw new Error(`[Stitch E612] new DataBinder(hooks): unknown hook "${name}". Known hooks: ${KNOWN_HOOKS.join(", ")}.`);
             }
         }
         for (const name of ["onBind", "onChange"]) {
             if (userHooks[name] !== undefined && userHooks[name] !== null && typeof userHooks[name] !== "function") {
-                throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): ${name} must be a function, got ${typeof userHooks[name]}.`);
+                throw new TypeError(`[Stitch E613] new DataBinder(hooks): ${name} must be a function, got ${typeof userHooks[name]}.`);
             }
         }
         if (userHooks.properties !== undefined && (userHooks.properties === null || typeof userHooks.properties !== "object")) {
-            throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`);
+            throw new TypeError(`[Stitch E614] new DataBinder(hooks): properties must be an object of { propertyName: { onBind, onChange } }.`);
         }
         for (const [property, hooks] of Object.entries(userHooks.properties || {})) {
             if (hooks === null || typeof hooks !== "object") {
-                throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property} must be an object of { onBind, onChange }.`);
+                throw new TypeError(`[Stitch E615] new DataBinder(hooks): properties.${property} must be an object of { onBind, onChange }.`);
             }
             for (const name of Object.keys(hooks)) {
                 if (name !== "onBind" && name !== "onChange") {
-                    throw new Error(`[Stitch.js ${Version}] new DataBinder(hooks): unknown hook "properties.${property}.${name}". Known: onBind, onChange.`);
+                    throw new Error(`[Stitch E616] new DataBinder(hooks): unknown hook "properties.${property}.${name}". Known: onBind, onChange.`);
                 }
                 if (typeof hooks[name] !== "function") {
-                    throw new TypeError(`[Stitch.js ${Version}] new DataBinder(hooks): properties.${property}.${name} must be a function.`);
+                    throw new TypeError(`[Stitch E617] new DataBinder(hooks): properties.${property}.${name} must be a function.`);
                 }
             }
         }
@@ -429,11 +448,11 @@ class DataBinder {
             const label = ref.level === "root" ? "the root model" : (paths.rowItemOf(listScope) === root ? "the model ($parent of a top-level row)" : "the parent row");
             const hit = paths.lookUp(data, ref.segments);
             if (!hit.found) {
-                throw new Error(`[Stitch.js ${Version}] ${where}: handler "${ref.text}" was not found on ${label}. ` +
+                throw new Error(`[Stitch E404] ${where}: handler "${ref.text}" was not found on ${label}. ` +
                     "If it is a method of each row, use the bare name; if it is on the root model, use $root.name.");
             }
             if (typeof hit.value !== "function") {
-                throw new Error(`[Stitch.js ${Version}] ${where}: "${ref.text}" on ${label} is ${hit.value === null ? "null" : typeof hit.value}, not a function.`);
+                throw new Error(`[Stitch E405] ${where}: "${ref.text}" on ${label} is ${hit.value === null ? "null" : typeof hit.value}, not a function.`);
             }
         };
         for (const element of elements) {
@@ -452,11 +471,11 @@ class DataBinder {
                         // No row exists yet, so only the root model can be asked.
                         const hit = paths.lookUp(root, ref.segments);
                         if (!hit.found) {
-                            throw new Error(`[Stitch.js ${Version}] ${where}: handler "${ref.text}" was not found on the root model. ` +
+                            throw new Error(`[Stitch E406] ${where}: handler "${ref.text}" was not found on the root model. ` +
                                 "If it is a method of each row, use the bare name; if it is on the enclosing row, use $parent.name.");
                         }
                         if (typeof hit.value !== "function") {
-                            throw new Error(`[Stitch.js ${Version}] ${where}: "${ref.text}" on the root model is ` +
+                            throw new Error(`[Stitch E407] ${where}: "${ref.text}" on the root model is ` +
                                 `${hit.value === null ? "null" : typeof hit.value}, not a function.`);
                         }
                     }
@@ -541,8 +560,13 @@ class DataBinder {
             // A handler reference: the binding parses and looks it up itself (D12).
             path = String(rawPath).trim();
         } else {
-            path = paths.checkPathSyntax(element, attribute, rawPath);
-            value = paths.readPath(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            if (BUILT_IN_NAMES.has(type)) {
+                path = paths.checkPathSyntax(element, attribute, rawPath);
+                value = paths.readPath(viewModel, path, () => paths.describeBinding(element, attribute, path));
+            } else {
+                path = withLiteralHint(type, () => paths.checkPathSyntax(element, attribute, rawPath));
+                value = withLiteralHint(type, () => paths.readPath(viewModel, path, () => paths.describeBinding(element, attribute, path)));
+            }
             if (type === "value") {
                 paths.checkWritable(viewModel, path, () => paths.describeBinding(element, attribute, path));
             }
@@ -594,7 +618,7 @@ class DataBinder {
      */
     unbind(element) {
         if (this._disposed) {
-            throw new Error(`[Stitch.js ${Version}] unbind(): this DataBinder was disposed; everything it bound is already released.`);
+            throw new Error(`[Stitch E606] unbind(): this DataBinder was disposed; everything it bound is already released.`);
         }
         element = this._resolveElement(element, "unbind");
         const roots = Array.from(this._roots).filter(root => root === element || element.contains(root));
@@ -602,7 +626,7 @@ class DataBinder {
             Array.from(element.querySelectorAll("*")).some(el => this._elementCleanups.has(el) || this.boundElements.has(el));
         if (!hasBound && roots.length === 0) {
             throw new Error(
-                `[Stitch.js ${Version}] unbind(${describeElement(element)}): nothing is bound by this DataBinder in that element. ` +
+                `[Stitch E607] unbind(${describeElement(element)}): nothing is bound by this DataBinder in that element. ` +
                 "Pass the element (or an ancestor of the elements) given to bind(), with the binder that bound it."
             );
         }
@@ -728,35 +752,35 @@ class DataBinder {
  */
 DataBinder.registerBinding = function (name, handler) {
     if (typeof name !== "string") {
-        throw new Error(`[Stitch.js ${Version}] registerBinding: name must be a string`);
+        throw new Error(`[Stitch E622] registerBinding: name must be a string`);
     }
     if (!discovery.BINDING_NAME.test(name)) {
         throw new Error(
-            `[Stitch.js ${Version}] registerBinding("${name}"): a binding name must be lowercase letters, digits and dashes ` +
+            `[Stitch E623] registerBinding("${name}"): a binding name must be lowercase letters, digits and dashes ` +
             `(e.g. "tooltip" or "date-format"): it becomes the attribute data-${name.toLowerCase()}, and HTML lowercases attribute names.`
         );
     }
-    if (discovery.INTERNAL_ATTRIBUTES.indexOf(`data-${name}`) !== -1) {
-        throw new Error(`[Stitch.js ${Version}] registerBinding("${name}"): data-${name} is reserved by Stitch (it configures foreach lists). Choose another name.`);
+    if (discovery.INTERNAL_ATTRIBUTES.concat(discovery.READ_ATTRIBUTES).indexOf(`data-${name}`) !== -1) {
+        throw new Error(`[Stitch E624] registerBinding("${name}"): data-${name} is reserved by Stitch (it configures lists or form-value conversion). Choose another name.`);
     }
     if (!handler || typeof handler.bind !== "function") {
-        throw new Error(`[Stitch.js ${Version}] registerBinding: handler must have a bind() method`);
+        throw new Error(`[Stitch E625] registerBinding: handler must have a bind() method`);
     }
     if (handler.value !== undefined && handler.value !== "path" && handler.value !== "literal") {
         throw new Error(
-            `[Stitch.js ${Version}] registerBinding("${name}"): value must be "path" or "literal": "path" (the default) when the ` +
+            `[Stitch E626] registerBinding("${name}"): value must be "path" or "literal": "path" (the default) when the ` +
             `attribute names a model property, "literal" when the attribute text is passed as is. Got ${JSON.stringify(handler.value)}.`
         );
     }
     if (Object.prototype.hasOwnProperty.call(BINDING_HANDLERS, name)) {
         throw new Error(
-            `[Stitch.js ${Version}] registerBinding("${name}"): data-${name} is already registered` +
+            `[Stitch E627] registerBinding("${name}"): data-${name} is already registered` +
             `${BUILT_IN_NAMES.has(name) ? " (a built-in binding)" : ""}. Choose another name.`
         );
     }
     if (bindStarted) {
         throw new Error(
-            `[Stitch.js ${Version}] registerBinding("${name}") was called after bind(): elements bound before it would ` +
+            `[Stitch E621] registerBinding("${name}") was called after bind(): elements bound before it would ` +
             "not get the binding. Register every custom binding before the first bind() on the page."
         );
     }

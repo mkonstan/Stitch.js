@@ -28,7 +28,7 @@ class BatchScheduler {
     queue(effect) {
         if (typeof effect !== "function") {
             throw new TypeError(
-                `[Stitch.js ${this.version} BatchScheduler] queue() expects a function, got ${typeof effect}`
+                `[Stitch E992] queue() expects a function, got ${typeof effect}`
             );
         }
         this._pendingEffects.add(effect);
@@ -51,7 +51,7 @@ class BatchScheduler {
             this.flushDepth = 0;
             this.flushScheduled = false;
             reportError(new Error(
-                `[Stitch.js ${this.version}] Stopped an infinite loop of updates: effects kept re-queuing each other ` +
+                `[Stitch E911] Stopped an infinite loop of updates: effects kept re-queuing each other ` +
                 `for ${this.MAX_FLUSH_DEPTH} rounds (${dropped} still queued were dropped). An effect, computed or ` +
                 "binding probably writes a value that it, or something it triggers, reads. Move the write out of " +
                 "the effect, or guard it so the value stops changing."

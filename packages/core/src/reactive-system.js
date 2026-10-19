@@ -174,7 +174,7 @@ class ReactiveSystem {
      */
     effect(fn, options = {}) {
         if (this.disposed) {
-            throw new Error(`[Stitch.js ${this.version}] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
+            throw new Error(`[Stitch E991] effect(): this ReactiveSystem was disposed; create a new model to bind again.`);
         }
         const effectId = ++nextEffectId;
 

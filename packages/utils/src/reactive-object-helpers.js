@@ -9,13 +9,17 @@ function defineHidden(target, name, value) {
     });
 }
 
-const { VERSION } = require("./version");
 
 function addChangeHandler(handler) {
     if (typeof handler !== "function") {
-        throw new TypeError(`[Stitch.js v${VERSION}] $onChange(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
+        throw new TypeError(`[Stitch E805] $onChange(handler): handler must be a function, got ${handler === null ? "null" : typeof handler}.`);
     }
-    this._changeHandlers.add(handler);
+    const handlers = this._changeHandlers;
+    handlers.add(handler);
+    // The remover, like the one $on returns (safe to call twice).
+    return function remove() {
+        handlers.delete(handler);
+    };
 }
 
 /**
@@ -26,18 +30,18 @@ function addChangeHandler(handler) {
 function removeChangeHandler(handler) {
     if (arguments.length !== 1) {
         throw new TypeError(
-            `[Stitch.js v${VERSION}] $offChange(handler) needs the handler to remove (exactly one argument, got ${arguments.length}). ` +
+            `[Stitch E807] $offChange(handler) needs the handler to remove (exactly one argument, got ${arguments.length}). ` +
             "Removing is explicit: call it once per handler given to $onChange()."
         );
     }
     if (typeof handler !== "function") {
         throw new TypeError(
-            `[Stitch.js v${VERSION}] $offChange(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
+            `[Stitch E808] $offChange(handler): handler is ${handler === null ? "null" : typeof handler}, not a function. ` +
             "Pass the handler given to $onChange()."
         );
     }
     if (!this._changeHandlers.delete(handler)) {
-        throw new Error(`[Stitch.js v${VERSION}] $offChange(handler): that function is not a change handler of this object. Pass the function given to $onChange().`);
+        throw new Error(`[Stitch E809] $offChange(handler): that function is not a change handler of this object. Pass the function given to $onChange().`);
     }
 }
 

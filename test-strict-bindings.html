@@ -113,9 +113,9 @@
         (async () => {
             await StitchTest.test('register-binding-rules', async (t) => {
                 t.equal(registerErrors.ok, null, 'a lowercase new name registers before any bind()');
-                t.match(messageOf(registerErrors.upper), /lowercase/, 'a name with capitals throws (HTML lowercases attribute names)');
-                t.match(messageOf(registerErrors.builtIn), /already registered.*built-in/, 'registering over a built-in binding throws');
-                t.match(messageOf(registerErrors.internal), /reserved/, 'a name of an internal attribute (data-key) throws');
+                t.match(messageOf(registerErrors.upper), /^\[Stitch E623\] .*lowercase/, 'a name with capitals throws (HTML lowercases attribute names)');
+                t.match(messageOf(registerErrors.builtIn), /^\[Stitch E627\] .*already registered.*built-in/, 'registering over a built-in binding throws');
+                t.match(messageOf(registerErrors.internal), /^\[Stitch E624\] .*reserved/, 'a name of an internal attribute (data-key) throws');
                 t.match(messageOf(registerErrors.twice), /already registered/, 'registering the same name twice throws');
             });
 
@@ -148,7 +148,7 @@
 
             await StitchTest.test('missing-nested-property-throws', async (t) => {
                 const error = tryBind(mount('<span data-text="user.nmae"></span>'), Stitch.Observable.create({ user: { name: 'Ann', email: 'a@x' } }));
-                t.match(messageOf(error), /"nmae" is not a property of "user"/, 'the error names the missing name and the object it was looked up on');
+                t.match(messageOf(error), /^\[Stitch E201\] .*"nmae" is not a property of "user"/, 'the error names the missing name and the object it was looked up on');
                 t.ok(/\bname\b/.test(messageOf(error)) && /\bemail\b/.test(messageOf(error)), 'the error lists that object\'s properties');
 
                 // A null step is a value (nothing to show), not a missing property.

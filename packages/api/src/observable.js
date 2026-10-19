@@ -26,7 +26,7 @@ function modelPathOf(obj) {
 function refuseNested(method, obj) {
     if (obj && obj.__isReactive && !Object.prototype.hasOwnProperty.call(obj, "_factory")) {
         throw new Error(
-            `[Stitch.js ${Version}] ${method}(): "${modelPathOf(obj) || "this object"}" already belongs to a model; use the root model ` +
+            `[Stitch E704] ${method}(): "${modelPathOf(obj) || "this object"}" already belongs to a model; use the root model ` +
             "(events, change handlers and bindings live there), or Observable.toRaw() it to make a separate model from a copy."
         );
     }
@@ -73,14 +73,14 @@ function toPlain(value, seen) {
 const KNOWN_OPTIONS = ["isolated"];
 function checkOptions(method, options) {
     if (options === null || typeof options !== "object") {
-        throw new TypeError(`[Stitch.js ${Version}] ${method}(data, options): options must be an object, got ${options === null ? "null" : typeof options}.`);
+        throw new TypeError(`[Stitch E705] ${method}(data, options): options must be an object, got ${options === null ? "null" : typeof options}.`);
     }
     for (const key of Object.keys(options)) {
         if (KNOWN_OPTIONS.indexOf(key) === -1) {
             const hint = key === "debug"
                 ? " There is no debug mode in v3: mistakes throw (or go to Stitch.onError), and Stitch.onBindReport lists what bind() did."
                 : "";
-            throw new Error(`[Stitch.js ${Version}] ${method}(): unknown option "${key}". Known options: ${KNOWN_OPTIONS.join(", ")}.${hint}`);
+            throw new Error(`[Stitch E706] ${method}(): unknown option "${key}". Known options: ${KNOWN_OPTIONS.join(", ")}.${hint}`);
         }
     }
 }
@@ -132,11 +132,11 @@ class Observable {
      */
     static create(data, options = {}) {
         if (!data || typeof data !== "object") {
-            throw new Error("Observable.create() requires an object as input");
+            throw new Error("[Stitch E701] Observable.create() requires an object as input");
         }
         checkOptions("Observable.create", options);
         if (data.__isReactive && Object.prototype.hasOwnProperty.call(data, "_factory")) {
-            throw new Error("Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
+            throw new Error("[Stitch E703] Observable.create() received an already-reactive object. Use the existing proxy or pass a plain object.");
         }
         refuseNested("Observable.create", data);
 
@@ -157,12 +157,12 @@ class Observable {
         defineHidden(reactiveData, "$watch", function (property, callback, options = {}) {
             runtimeHelpers.assertPathExists(reactiveData, property, `$watch("${property}")`);
             if (typeof callback !== "function") {
-                throw new TypeError(`[Stitch.js ${Version}] $watch("${property}", callback): callback must be a function, got ${typeof callback}.`);
+                throw new TypeError(`[Stitch E817] $watch("${property}", callback): callback must be a function, got ${typeof callback}.`);
             }
             let previousValue = getProperty(reactiveData, property);
 
             // Create effect that tracks the property
-            return factory.reactiveSystem.effect(() => {
+            const effect = factory.reactiveSystem.effect(() => {
                 const currentValue = getProperty(reactiveData, property);
 
                 // Call callback if value changed
@@ -179,6 +179,10 @@ class Observable {
                 batch: options.batch !== undefined ? options.batch : false,  // Immediate by default
                 errorContext: { source: "watch", property }
             });
+            // The remover: stops the watch for good and releases its effect (safe to call twice).
+            return function stop() {
+                factory.reactiveSystem.cleanup(effect);
+            };
         });
 
         return reactiveData;
@@ -198,7 +202,7 @@ class Observable {
      */
     static createArray(items = [], options = {}) {
         if (!Array.isArray(items)) {
-            throw new Error("Observable.createArray() requires an array as input");
+            throw new Error("[Stitch E702] Observable.createArray() requires an array as input");
         }
         checkOptions("Observable.createArray", options);
         const factory = options.isolated ? createReactiveFactory() : getDefaultFactory();
@@ -281,7 +285,7 @@ class Observable {
      * @returns {boolean} true if reactive, false otherwise
      */
     static isReactive(obj) {
-        return obj && typeof obj === "object" && obj.__isReactive === true;
+        return !!obj && typeof obj === "object" && obj.__isReactive === true;
     }
 
     /**
