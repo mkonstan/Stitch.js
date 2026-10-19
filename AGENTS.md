@@ -84,88 +84,133 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
    entries with `.delete(key)`.
 6. Write methods as `name() { ... }`, never as arrow functions. In a method, `this` is the object
    the method is on.
-7. Do not name data fields `toJSON` or `$on`, `$off`, `$onChange`, `$offChange`, `$get`, `$set`,
+7. A computed is `Stitch.computed(function () { return this.price * this.qty; })`, or an arrow
+   function that uses its ARGUMENT: `Stitch.computed(m => m.price * m.qty)`. The argument and
+   `this` are the object that holds the computed (the model, or the row for a row computed). Never
+   use `this` inside an arrow function: an arrow's `this` is not the model.
+8. Do not name data fields `toJSON` or `$on`, `$off`, `$onChange`, `$offChange`, `$get`, `$set`,
    `$emit`, `$once`, `$use`, `$watch`. Fields named `on`, `off`, `get`, `set` are fine.
-8. One model is one root. Never put a model inside another model: assign plain data, or
+9. One model is one root. Never put a model inside another model: assign plain data, or
    `Stitch.Observable.toRaw(otherModel)` (a deep plain copy).
-9. Never give two models the same array, Map or Set. Copy shared lookup data per model:
-   `[...countries]`, `new Map(rates)`, `new Set(codes)`.
-10. Do not pass frozen objects to `Observable.create()`; it converts data in place. Copy first.
+10. Never give two models the same array, Map or Set. Copy shared lookup data per model:
+    `[...countries]`, `new Map(rates)`, `new Set(codes)`.
+11. Do not pass frozen or sealed objects to Stitch (it converts data in place and refuses them).
+    Copy first: `structuredClone(data)`.
 
 ### Bindings
 
-11. Only these bindings exist: `data-text`, `data-value`, `data-visible`, `data-enabled`,
+12. Only these bindings exist: `data-text`, `data-value`, `data-visible`, `data-enabled`,
     `data-class`, `data-attr`, `data-loading`, `data-click`, `data-event`, `data-foreach`, plus the
     list attributes `data-key`, `data-template`, `data-default-text`, `data-default-value` and the
     input conversion `data-type`. Do not invent others (`data-if`, `data-show`, `data-html`,
     `data-for`, `data-model` do not exist; they are silently ignored as not Stitch's).
-12. A binding value is ONE property path: `name`, `user.email`, `items.0.title`, `$root.total`.
+13. A binding value is ONE property path: `name`, `user.email`, `items.0.title`, `$root.total`.
     Never an expression, a call, a comparison, a negation, a template or an object literal. Put any
     logic in a computed: `isOpen: Stitch.computed(function () { return !this.closed; })`, then
     `data-visible="isOpen"`.
-13. One binding per attribute. Two bindings on one element use two attributes.
-14. There is no HTML binding. `data-text` sets text only. Build structure with `data-foreach`, or
+14. One binding per attribute. Two bindings on one element use two attributes.
+15. There is no HTML binding. `data-text` sets text only. Build structure with `data-foreach`, or
     with a custom binding that creates elements; never insert HTML strings built from data.
-15. `data-text` must not be on an element that contains other bound elements; put the text in its
+16. `data-text` must not be on an element that contains other bound elements; put the text in its
     own `<span>`.
-16. `data-value` must name a writable property: not a computed, not `$index` / `$data` / `$parent` /
+17. `data-value` must name a writable property: not a computed, not `$index` / `$data` / `$parent` /
     `$root`. To write through a nested object (`address.city`), that object must not be `null`.
-17. `data-class` takes a class string (replaces all classes) or `{ className: boolean }`.
+18. `data-class` takes a class string (replaces all classes) or `{ className: boolean }`.
     `data-attr` takes `{ attributeName: value }`. Both usually come from a computed.
-18. Number inputs give numbers (`null` when empty or invalid). A `<select>` gives strings; add
-    `data-type="int"` for numbers. Checkboxes give booleans.
+19. Number inputs give numbers (`null` when empty or invalid); range inputs give numbers. A
+    `<select>` always gives strings, even if the model held a number: add `data-type="int"` for
+    numbers. Checkboxes give booleans.
 
 ### Lists
 
-19. Every object row needs a unique `id`. If the identifying field has another name, put
+20. Every object row needs a unique `id`. If the identifying field has another name, put
     `data-key="thatField"` on the list element. Plain values (strings, numbers) are their own key and
-    must be unique. Missing or duplicate keys throw.
-20. A row template is exactly ONE root element. Wrap several elements in one `<div>`, `<li>` or
+    must be unique. Missing or duplicate keys throw: from `bind()` for the first render, and to
+    `Stitch.onError` (rule 34) when a later change breaks the rule.
+21. A row template is exactly ONE root element. Wrap several elements in one `<div>`, `<li>` or
     `<tr>`.
-21. Inside a row, a bare name is a field of the row's item. Use `$root.name` for the model,
+22. Inside a row, a bare name is a field of the row's item. Use `$root.name` for the model,
     `$parent.name` for one level up, `$data` for the item itself, `$index` for its position.
-22. For a recursive tree, use `data-template="tpl-id"` on the list and a `<template id="tpl-id">`
+23. For a recursive tree, use `data-template="tpl-id"` on the list and a `<template id="tpl-id">`
     whose root element contains another list with the same `data-template`. Every node needs every
     field the template binds (including `children: []` on leaves).
-23. Filter and sort with a computed that returns a new array. Copy before sorting:
+24. Filter and sort with a computed that returns a new array. Copy before sorting:
     `this.items.slice().sort(...)`; `sort()` on the model's own array reorders the model.
-24. `data-foreach` takes an array, `null` or `undefined`. Anything else throws.
-25. For a `<select>`, put `data-foreach` on the select, `<option data-value="code" data-text="name">`
-    in the template, `data-value` on the select for the selection, and optionally
-    `data-default-text` for a placeholder.
+25. `data-foreach` takes an array, `null` or `undefined`. Anything else throws.
+26. A `<select>` with options from a list: put `data-foreach` on the select and `data-value` on the
+    select for the selection (optionally `data-default-text` for a placeholder). For a list of
+    objects, the option is `<option data-value="code" data-text="name">` (and `data-key` if the key is
+    not `id`). For a list of plain values (strings), the option is `<option data-text="$data">`, with
+    NO `data-value` (an option without a value uses its text). `data-value="$data"` throws.
+
+```html run
+<select id="sector" data-foreach="sectors" data-value="sector" data-default-text="All sectors">
+    <option data-text="$data"></option>
+</select>
+<script>
+    const model = Stitch.Observable.create({ sector: '', sectors: ['Energy', 'Technology'] });
+    new Stitch.DataBinder().bind('#sector', model);
+</script>
+```
+<!-- check: type('#sector', 'Technology') && model.sector === 'Technology' -->
 
 ### Handlers
 
-26. `data-click="name"` looks the name up on the current row's item (outside a list: the model).
+27. `data-click="name"` looks the name up on the current row's item (outside a list: the model).
     Methods live on the model, so from inside a row write `data-click="$root.name"`.
-27. A handler is called as `handler(item, event)`, with `this` = the object it is on. `item` is the
+28. A handler is called as `handler(item, event)`, with `this` = the object it is on. `item` is the
     row's item; outside a list it is the model itself. The event is the SECOND argument.
-28. `data-event="prop"` names a model property holding `{ eventName: 'handlerName' }`, e.g.
-    `{ input: 'touch', blur: 'validate' }`. Handler names resolve like `data-click`.
+29. `data-event="prop"` names a model property holding `{ eventName: 'handlerName' }`, e.g.
+    `{ input: 'touch', blur: 'validate' }`. Handler names resolve like `data-click`. Prefer names; a
+    function in that object must not be an arrow function.
+30. A `<button>` inside a `<form>` submits the form and RELOADS the page after your handler runs.
+    Give every such button `type="button"`, or put `data-event` on the form with
+    `{ submit: 'save' }` and call `event.preventDefault()` in `save(model, event)`.
+
+```html run
+<form id="signup">
+    <input data-value="name">
+    <button id="save" type="button" data-click="save">Save</button>
+    <p id="saved" data-text="message"></p>
+</form>
+<script>
+    const model = Stitch.Observable.create({
+        name: 'Ada',
+        message: '',
+        save(model, event) { this.message = 'Saved ' + this.name; }
+    });
+    new Stitch.DataBinder().bind('#signup', model);
+</script>
+```
+<!-- check: click('#save') -->
+<!-- check: text('#saved') === 'Saved Ada' && location.href === 'about:srcdoc' -->
 
 ### Events, changes, errors
 
-29. `$on(event, callback)`, `$off(event, callback)`, `$emit(event, payload)` and `$once` exist only on
+31. `$on(event, callback)`, `$off(event, callback)`, `$emit(event, payload)` and `$once` exist only on
     the root model. Never call them on a nested object or a row.
-30. `obj.$onChange(fn)` reports writes to `obj`; remove with `obj.$offChange(fn)`. `model.$watch(path, fn)`
-    watches one path and cannot be stopped; prefer computeds and bindings.
-31. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,
+32. `obj.$onChange(fn)` reports writes to `obj` and returns a remover. `model.$watch(path, fn)` calls
+    `fn(newValue, oldValue)` when one path changes and returns a remover too. Call the removers when
+    the listener should end; prefer computeds and bindings.
+33. Every Stitch error starts with a stable code, `[Stitch E###]`. Look it up in
+    [docs/ERRORS.md](docs/ERRORS.md); match errors by code, not by wording.
+34. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,
     handlers) go there; without it they are uncaught. Errors in `bind()` are thrown to your code.
-32. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
+35. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
     `Stitch.debug.stats()` gives live counts.
-33. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first
+36. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first
     `bind()`. Use `value: 'literal'` when the attribute holds text, not a property path.
 
 ### Timing
 
-34. `bind()` renders synchronously. After that, a model change reaches the page in a microtask.
+37. `bind()` renders synchronously. After that, a model change reaches the page in a microtask.
     To read the page after a change in code or a test, `await Promise.resolve()` (or a
-    `setTimeout(..., 0)`) first.
-35. Bind each element once. To rebind, `binder.unbind(root)` first; when the section goes away,
+    `setTimeout(..., 0)`) first. A button enabled by a change is still disabled until then.
+38. Bind each element once. To rebind, `binder.unbind(root)` first; when the section goes away,
     `binder.dispose()`.
 
 ## When something throws
 
-Read the message: it names the element (`<span data-text="nmae">`), what is wrong, what exists, and
-the fix. Look it up in [docs/ERRORS.md](docs/ERRORS.md) by a few words of the message. Do not catch
-and hide Stitch errors.
+Read the message: it starts with a code (`[Stitch E201]`), then names the element
+(`<span data-text="nmae">`), what is wrong, what exists, and the fix. Look the code up in
+[docs/ERRORS.md](docs/ERRORS.md). Do not catch and hide Stitch errors.

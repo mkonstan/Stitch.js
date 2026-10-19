@@ -34,12 +34,19 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
   `unbind()` after `dispose()` throw. A `bind()` that throws leaves nothing bound.
 - `data-value` on a computed, a read-only getter or a row-context value throws.
 - `Observable.toRaw()` returns a deep plain copy for every value.
+- Every error message starts with a stable code, `[Stitch E###]`, instead of the library version.
+  Codes are public API, documented in docs/ERRORS.md.
+- `$watch` returns a function that stops the watch (it returned an internal object).
+- `Observable.isReactive()` returns `true` or `false` (it returned falsy inputs as they were).
+- Frozen or sealed data is refused with a Stitch error (E714) instead of the browser's `TypeError`.
 
 ### Added
 
 - `data-key` (the key field of a list), `$root.` (paths and handlers).
 - `Stitch.onError(fn)`, `Stitch.onBindReport(fn)`, `Stitch.debug.stats()`.
-- `$onChange` / `$offChange`; `value: 'literal'` for custom bindings.
+- `$onChange` / `$offChange`; `$onChange` returns a remover; `value: 'literal'` for custom bindings.
+- A computed's function receives the object that holds it as its first argument as well as
+  `this`, so `Stitch.computed(m => m.price * m.qty)` works.
 - Documentation: Guide, API reference, error reference and AGENTS.md, with every code example
   executed by the test suite.
 
@@ -56,6 +63,9 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
 - Change handlers did not fire for properties nothing on the page was reading.
 - A `<select>` without `data-value` lost the user's choice whenever its list changed.
 - Initial `Map` values were not reactive.
+- `Stitch.onBindReport` listed `data-type` as ignored although `data-value` reads it.
+- A path-type custom binding given text (`data-tooltip="Save changes"`) now says how to register
+  it as literal.
 
 Earlier versions: see the [v1 to v2 section of MIGRATION.md](MIGRATION.md#history-stitchjs-v10-to-v20)
 and the archived v2 documents in `docs/history/`.

@@ -293,10 +293,11 @@ Stitch.DataBinder.registerBinding('tooltip', {
 });
 new Stitch.DataBinder().bind('#app', Stitch.Observable.create({}));
 ```
-Throws: `an expression is not supported`
+Throws: `registerBinding("tooltip", { value: 'literal'`
 
 The text is read as a property path; with a space in it, it is rejected as an expression (a
-single word would be reported as a missing property).
+single word would be reported as a missing property). Because data-tooltip is a custom binding,
+the message ends with the fix: register it with `value: 'literal'`.
 
 After (the binding is declared literal):
 
@@ -365,6 +366,9 @@ model.selected = null;
 
 ### Binding and unbinding are checked
 
+v2 ignored a second `bind()` of the same element, or bound it twice, and a needless `unbind()` did
+nothing. In v3 each of these throws:
+
 - Binding an element that is already bound (by any binder) throws; `unbind()` it first.
 - `unbind()` of an element with nothing bound by that binder throws, so a second `unbind()` throws.
 - `bind()` and `unbind()` on a disposed binder throw.
@@ -376,6 +380,60 @@ model.selected = null;
 - `data-value` on a computed, a read-only getter or a row-context value (`$index`, `$data`, ...)
   throws.
 
+Before (rebinding a section to new data):
+
+```html page
+<p id="app" data-text="title"></p>
+```
+
+```js throws
+const binder = new Stitch.DataBinder();
+binder.bind('#app', Stitch.Observable.create({ title: 'Draft' }));
+binder.bind('#app', Stitch.Observable.create({ title: 'Final' }));
+```
+Throws: `is already bound by this DataBinder`
+
+After (unbind first, or keep one model and change its data):
+
+```html page
+<p id="app" data-text="title"></p>
+```
+
+```js run
+const binder = new Stitch.DataBinder();
+binder.bind('#app', Stitch.Observable.create({ title: 'Draft' }));
+binder.unbind('#app');
+binder.bind('#app', Stitch.Observable.create({ title: 'Final' }));
+```
+<!-- check: text('#app') === 'Final' -->
+
+Before (a "just in case" second unbind):
+
+```html page
+<p id="app" data-text="title"></p>
+```
+
+```js throws
+const binder = new Stitch.DataBinder();
+binder.bind('#app', Stitch.Observable.create({ title: 'Draft' }));
+binder.unbind('#app');
+binder.unbind('#app');
+```
+Throws: `nothing is bound by this DataBinder in that element`
+
+After: unbind once (or call `binder.dispose()` once for everything the binder bound).
+
+```html page
+<p id="app" data-text="title"></p>
+```
+
+```js run
+const binder = new Stitch.DataBinder();
+binder.bind('#app', Stitch.Observable.create({ title: 'Draft' }));
+binder.dispose();
+binder.dispose(); // dispose() may be called again; it does nothing the second time
+```
+
 ### Other names that now throw
 
 - Data fields named `toJSON` or like a helper (`$on`, `$set`, `$watch`, ...) throw at creation.
@@ -384,11 +442,129 @@ model.selected = null;
 - `Observable.create()` / `Observable.reactive()` of an object inside a model throws.
 - `$get('{...}')` (an object literal instead of a path) throws.
 
+Before / after, one per line above:
+
+```js throws
+Stitch.Observable.create({ rows: [{ id: 1, toJSON: 'x' }] });
+```
+Throws: `"rows[0].toJSON" is reserved`
+
+```js run
+const fromServer = [{ id: 1, toJSON: 'x' }];
+const model = Stitch.Observable.create({ rows: fromServer.map(r => ({ id: r.id, jsonValue: r.toJSON })) });
+```
+
+```js throws
+const model = Stitch.Observable.create({ count: 0 });
+model.$watch('cuont', function () {});
+```
+Throws: `"cuont" is not a property of the model`
+
+```js run
+const model = Stitch.Observable.create({ count: 0 });
+const stop = model.$watch('count', function () {});
+stop();
+```
+
+```js throws
+const bus = new Stitch.MessageBus();
+bus.subscribe('saved', function () {});
+bus.unsubscribe('saved', function () {}); // a different function
+```
+Throws: `that callback is not subscribed to "saved"`
+
+```js run
+const bus = new Stitch.MessageBus();
+const unsubscribe = bus.subscribe('saved', function () {});
+unsubscribe();
+```
+
+```js throws
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+Stitch.Observable.create(model.user);
+```
+Throws: `already belongs to a model`
+
+```js run
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+const copy = Stitch.Observable.create(Stitch.Observable.toRaw(model.user));
+```
+
+```js throws
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+model.$get('{ user }');
+```
+Throws: `is not a property path`
+
+```js run
+const model = Stitch.Observable.create({ user: { name: 'Ada' } });
+const name = model.$get('user.name');
+```
+<!-- check: name === 'Ada' -->
+
+### Error messages start with a code
+
+v2 messages started with the library version (`[Stitch.js v2.x.y] ...`). v3 messages start with a
+stable code: `[Stitch E201] <span data-text="nmae">: "nmae" is not a property of the model. ...`.
+The code keeps its meaning across releases, so code that inspects Stitch errors should match the
+code, not the wording. The [error reference](docs/ERRORS.md) is keyed by code.
+
+Before (v2: matching the wording):
+
+```js fragment
+if (/is not a property/.test(error.message)) { /* ... */ }
+```
+
+After:
+
+```html page
+<span id="app" data-text="nmae"></span>
+```
+
+```js run
+const model = Stitch.Observable.create({ name: 'Ada' });
+let code = null;
+try {
+    new Stitch.DataBinder().bind('#app', model);
+} catch (error) {
+    code = error.message.slice(1, 12); // "Stitch E201"
+}
+```
+<!-- check: code === 'Stitch E201' -->
+
+### Watches and change handlers return removers
+
+In v2, `$watch` returned an internal object and a watch could not be stopped; `on(fn)` returned
+nothing. In v3, `$watch(path, fn)` and `$onChange(fn)` both return a function that removes what they
+installed (like `$on`). Call it when the listener should end; a stopped watch is released.
+
+```js run
+const model = Stitch.Observable.create({ count: 0 });
+const calls = [];
+const stopWatch = model.$watch('count', function (now) { calls.push('watch ' + now); });
+const stopChanges = model.$onChange(function (change) { calls.push('change ' + change.field); });
+model.count = 1;
+stopWatch();
+stopChanges();
+model.count = 2;
+```
+<!-- check: calls.join('|') === 'watch 1|change count' -->
+
+### Smaller changes
+
+- `Observable.isReactive(value)` returns `true` or `false` (v2 returned the falsy value itself for
+  `null`, `0` or `''`).
+- Frozen or sealed data is refused with a Stitch error (E714) naming where it sits; v2 failed with
+  the browser's own `TypeError`. Pass a copy.
+- A computed's function also receives the object that holds it as its first argument, so
+  `Stitch.computed(m => m.price * m.qty)` works. A v2 arrow computed that used `this` silently read
+  the wrong object; it still does, so rewrite it to use the argument.
+
 ### New in v3
 
 `data-key`, `$root.` handler and path prefixes, `Stitch.onError`, `Stitch.onBindReport`,
-`Stitch.debug.stats()`, `$onChange` / `$offChange`, `value: 'literal'` custom bindings. See the
-[API reference](docs/API.md).
+`Stitch.debug.stats()`, `$onChange` / `$offChange`, removers from `$watch` and `$onChange`,
+`value: 'literal'` custom bindings, error codes. See the [API reference](docs/API.md).
 
 <!-- history: the guide below describes the v1 to v2 upgrade and is not maintained -->
 

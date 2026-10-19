@@ -92,11 +92,17 @@ const model = Stitch.Observable.create({ people });
 To add a property after creation, use `model.$set(name, value)`. It defines a new reactive
 property (plain assignment does not):
 
+```html page
+<p id="app" data-text="title"></p>
+```
+
 ```js run
 const model = Stitch.Observable.create({ name: 'Ada' });
 model.$set('title', 'Countess');
+new Stitch.DataBinder().bind('#app', model); // a binding to it works
+model.title = 'Lady';                          // and follows later writes
 ```
-<!-- check: model.title === 'Countess' -->
+<!-- check: text('#app') === 'Lady' -->
 
 Names starting with `_` are never reactive; keep them out of bindings.
 
@@ -104,8 +110,11 @@ Names starting with `_` are never reactive; keep them out of bindings.
 
 - Plain values, nested objects, arrays, `Map` and `Set`. All of them are reactive at any depth.
 - Methods, written as `name() { ... }` or `name: function () { ... }`. Arrow functions are
-  rejected, because they cannot see the model through `this`.
+  rejected as methods, because they cannot see the model through `this`.
 - Computed properties, made with `Stitch.computed(...)` (see [Computed properties](#computed-properties)).
+  A computed's function gets the object as its argument as well as `this`, so it may be an arrow
+  function that uses the argument: `total: Stitch.computed(m => m.price * m.qty)`. An arrow
+  function's `this` is never the model.
 
 ```js throws
 Stitch.Observable.create({ count: 0, increment: () => this.count++ });
@@ -124,8 +133,20 @@ plain.user.name = 'Grace'; // a copy: the model is unchanged
 ```
 <!-- check: model.user.name === 'Ada' && Stitch.Observable.isReactive(plain) === false -->
 
-Do not pass frozen objects (`Object.freeze`): Stitch converts the data in place, so the browser
-refuses with a `TypeError`. Copy frozen data first (for example with `structuredClone(data)`).
+Do not pass frozen or sealed objects (`Object.freeze`, `Object.seal`): Stitch converts the data in
+place, so it refuses them with an error naming where the object sits. Copy frozen data first (for
+example with `structuredClone(data)`):
+
+```js throws
+const fromCache = Object.freeze({ name: 'Ada' });
+Stitch.Observable.create(fromCache);
+```
+Throws: `The data is frozen`
+
+```js run
+const fromCache = Object.freeze({ name: 'Ada' });
+const model = Stitch.Observable.create(structuredClone(fromCache));
+```
 
 A few names are reserved on every model object, because Stitch defines them there: `toJSON` and the
 `$` helpers (`$on`, `$off`, `$onChange`, `$offChange`, `$get`, `$set`, `$emit`, `$once`, `$use`,
@@ -301,15 +322,17 @@ a [custom binding](#custom-bindings) that creates elements with the DOM API.
 | Control | Model value |
 |---|---|
 | text, email, password, textarea | string |
-| `type="number"`, `type="range"` | number (`null` when the input is empty or not a number) |
+| `type="number"` | number (`null` when the input is empty or not a number) |
+| `type="range"` | number (a range always has a value; never `null`) |
 | `type="checkbox"` | boolean (`checked`) |
 | `type="radio"` (one input per option, same `name`, each with `data-value`) | the checked input's `value` |
 | `type="date"` / `type="datetime-local"` | a `Date` (or `null`) |
-| `select` | the selected option's value (a string) |
+| `select` | the selected option's value, always a string unless `data-type` says otherwise |
 | `select multiple` | an array of the selected values |
 
 `data-type` on the control sets the conversion explicitly: `int`, `float`, `bool` (or `boolean`),
-`string`, `date`, `datetime`. Use it for a `select` whose values are numbers:
+`string`, `date`, `datetime`. A `select` writes back strings even when the model held a number, so
+use `data-type="int"` for a `select` whose values are numbers:
 
 ```html page
 <div id="app">
@@ -541,6 +564,39 @@ new Stitch.DataBinder().bind('#country', model);
 <!-- check: document.getElementById('country').value === 'JP' && count('#country option') === 3 -->
 <!-- check: type('#country', 'FR') && model.selected === 'FR' -->
 
+Options from a list of **plain values** (strings or numbers) need no `data-value` on the option: an
+`<option>` without a `value` attribute uses its text as its value. Write only
+`<option data-text="$data"></option>`:
+
+```html page
+<select id="sector" data-foreach="sectors" data-value="sector" data-default-text="All sectors">
+    <option data-text="$data"></option>
+</select>
+```
+
+```js run
+const model = Stitch.Observable.create({ sector: '', sectors: ['Energy', 'Financials', 'Technology'] });
+new Stitch.DataBinder().bind('#sector', model);
+```
+<!-- check: texts('#sector option').join(',') === 'All sectors,Energy,Financials,Technology' -->
+<!-- check: type('#sector', 'Financials') && model.sector === 'Financials' -->
+
+`<option data-value="$data">` throws: `data-value` is a two-way binding, and `$data` is the row
+itself, which a binding cannot replace in the list. Use `data-text="$data"` as above, or a list of
+objects with a key field and `<option data-value="code" data-text="name">`.
+
+```html page
+<select id="sector" data-foreach="sectors" data-value="sector">
+    <option data-value="$data" data-text="$data"></option>
+</select>
+```
+
+```js throws
+const model = Stitch.Observable.create({ sector: '', sectors: ['Energy', 'Financials'] });
+new Stitch.DataBinder().bind('#sector', model);
+```
+Throws: `a two-way binding cannot write to $data`
+
 ## Handlers
 
 `data-click="name"` calls a method when the element is clicked. `data-event` does the same for any
@@ -683,11 +739,42 @@ Notes:
 - A two-way binding through a `null` object (`data-value="address.city"` while `address` is `null`)
   throws when the user types. Give the object a value first, or hide the input while it is empty.
 
+### Buttons inside a form
+
+A `<button>` inside a `<form>` is a submit button by default: clicking it runs your `data-click`
+handler and then submits the form, which reloads the page. Either give the button
+`type="button"` (as in the example above), or handle the form's `submit` event with `data-event`
+and call `event.preventDefault()` (the event is the handler's second argument):
+
+```html page
+<form id="search" data-event="formEvents">
+    <input id="q" data-value="query">
+    <button id="go" type="submit">Search</button>
+    <p id="result" data-text="result"></p>
+</form>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    query: 'stitch',
+    result: '',
+    formEvents: { submit: 'search' },
+    search(model, event) {
+        event.preventDefault(); // stay on the page
+        this.result = 'Searched for ' + this.query;
+    }
+});
+new Stitch.DataBinder().bind('#search', model);
+```
+<!-- check: click('#go') -->
+<!-- check: text('#result') === 'Searched for stitch' && location.href === 'about:srcdoc' -->
+
 ## Computed properties
 
 `Stitch.computed(function () { ... })` defines a read-only property whose value is computed from
-other properties. Inside the function, `this` is the object that holds the computed (the model, or
-a nested object or row), so it can read sibling properties:
+other properties. The function receives the object that holds the computed (the model, or a nested
+object or row) both as `this` and as its first argument, so it can read sibling properties either
+way:
 
 ```js run
 const model = Stitch.Observable.create({
@@ -699,6 +786,20 @@ const model = Stitch.Observable.create({
 model.qty = 3;
 ```
 <!-- check: model.total === 30 && model.lines[0].subtotal === 15 -->
+
+An arrow function has no `this` of its own (it would read `this` from the surrounding script, never
+the model), so an arrow computed must use its argument:
+
+```js run
+const model = Stitch.Observable.create({
+    price: 10,
+    qty: 2,
+    total: Stitch.computed(m => m.price * m.qty),
+    lines: [{ id: 1, price: 5, qty: 3, subtotal: Stitch.computed(line => line.price * line.qty) }]
+});
+model.qty = 4;
+```
+<!-- check: model.total === 40 && model.lines[0].subtotal === 15 -->
 
 - Read it as a property (`model.total`), never call it.
 - It is lazy: it runs when first read, and again only after something it read has changed and it is
@@ -717,18 +818,19 @@ properties up front; dependencies are tracked automatically either way.
 `obj.$onChange(fn)` calls `fn(change)` after every write to `obj`. `change` has `field`, `oldValue`,
 `newValue` and `target`. Writes to the object's own properties are reported synchronously. Writes
 deeper down are reported to each ancestor afterwards (in a microtask), with a dotted `field`
-(`'user.name'`) and `nestedChange: true`; a list mutation reports field `'<list>.items'`. Remove the
-handler with `obj.$offChange(fn)` (the same function):
+(`'user.name'`) and `nestedChange: true`; a list mutation reports field `'<list>.items'`.
+`$onChange` returns a function that removes the handler; `obj.$offChange(fn)` (with the same
+function) does the same:
 
 ```js run
 const model = Stitch.Observable.create({ name: 'Ada', user: { city: 'London' } });
 const fields = [];
-function record(change) { fields.push(change.field); }
-model.$onChange(record);
+const stop = model.$onChange(function (change) { fields.push(change.field); });
 model.name = 'Grace';
 model.user.city = 'Paris';
 setTimeout(function () {
-    model.$offChange(record);
+    stop();
+    model.name = 'Lin'; // not recorded: the handler is removed
     window.result = fields.join(',');
 }, 0);
 ```
@@ -738,15 +840,21 @@ setTimeout(function () {
 
 `model.$watch(path, callback)` calls `callback(newValue, oldValue, info)` when the value at `path`
 changes, synchronously (pass `{ batch: true }` as a third argument to run it once per batch instead).
-`$watch` exists on the model `Observable.create()` returned, not on nested objects. A watch lives as
-long as the model; there is no way to stop one, so for listeners you need to remove, use `$onChange`.
+`$watch` exists on the model `Observable.create()` returned, not on nested objects. It returns a
+function that stops the watch for good (and releases it); call it when the watch is no longer needed.
 
 ```js run
 const model = Stitch.Observable.create({ country: 'FR', city: 'Paris' });
-model.$watch('country', function (now, before) { model.city = null; });
+const seen = [];
+const stop = model.$watch('country', function (now, before, info) {
+    seen.push(before + '->' + now + ' (' + info.key + ')');
+    model.city = null;
+});
 model.country = 'JP';
+stop();
+model.country = 'DE'; // not seen: the watch is stopped
 ```
-<!-- check: model.city === null -->
+<!-- check: seen.join('|') === 'FR->JP (country)' && model.city === null -->
 
 ### Events: $emit, $on, $off, $once
 
@@ -779,7 +887,12 @@ naming the right method.
 
 ## Errors
 
-Stitch reports every mistake. Where an error goes depends on when it happens:
+Stitch reports every mistake. Every message starts with a stable code, `[Stitch E###]`, followed by
+the element and binding involved and the fix: `[Stitch E201] <span data-text="nmae">: "nmae" is not a
+property of the model. ...`. Codes never change meaning, so code that handles errors can match
+`error.message.startsWith('[Stitch E201]')`; the [error reference](ERRORS.md) is keyed by code.
+
+Where an error goes depends on when it happens:
 
 - **During `bind()`** (and any other call you make): the error is thrown to your code. Nothing of
   the failed `bind()` stays bound.
@@ -790,8 +903,9 @@ Stitch reports every mistake. Where an error goes depends on when it happens:
   `window.onerror`. The page keeps its last good state.
 
 `context` says what was running: `context.source` is one of `binding`, `watch`, `change-handler`,
-`handler`, `messageBus`, `unbind`, `dispose`, `scheduler`, `effect`, plus the `element` and `binding`
-text for bindings, or the `event` name for the message bus.
+`handler`, `messageBus`, `unbind`, `dispose`, `scheduler`, `effect` (or `unknown` when Stitch has no
+more to say), plus the `element` and `binding` text for bindings, or the `event` name for the
+message bus.
 
 ```html page
 <p id="out" data-text="label"></p>
@@ -823,7 +937,8 @@ messages, causes and fixes, see the [error reference](ERRORS.md).
 ## The bind report
 
 Stitch only looks at its own attributes: the bindings listed above, custom bindings you register,
-and the list attributes `data-key`, `data-template`, `data-default-text` and `data-default-value`.
+the list attributes `data-key`, `data-template`, `data-default-text` and `data-default-value`, and
+`data-type` (read by `data-value`).
 Every other `data-*` attribute (`data-testid`, `data-bs-toggle`, `data-id`) is left alone. This also
 means a misspelled binding name such as `data-txt` is not an error: it is simply not Stitch's.
 
@@ -864,6 +979,10 @@ cleanup with `context.binder._trackCleanup(element, cleanupFn)`, so `unbind()` a
 release it. Despite the underscore, `_trackCleanup` is the supported way for a custom binding to
 register cleanup.
 
+A path binding whose attribute holds text instead (`data-tooltip="Save changes"`) throws, and for
+a custom binding the message ends with how to register it as literal:
+`registerBinding("tooltip", { value: 'literal', ... })`.
+
 ```html page
 <div id="app">
     <button id="help" data-tooltip="helpText">?</button>
@@ -901,6 +1020,13 @@ strings that contain data: that is how script injection happens.
 - `binder.dispose()` releases everything that binder bound. After it, the binder cannot bind again;
   create a new one. Call it when a part of the page that Stitch manages goes away.
 - Rows that leave a list are released automatically.
+- `$watch` and `$onChange` return removers; `$on` returns an unsubscribe function. Call them for
+  listeners that should end before the model does.
+
+There is no separate "dispose the model" call, and none is needed: once nothing is bound to a model
+(`binder.dispose()` or `unbind()`), its watches are stopped and its change handlers and event
+subscriptions are removed, nothing outside the model refers to it, and it is garbage-collected like
+any object when your code drops it.
 
 `Stitch.debug.stats()` returns live counts for the page: `effects` (running effects, about one per
 live binding), `subscriptions` (links from properties to the effects and computeds that read them)
@@ -935,6 +1061,10 @@ window.result = Stitch.debug.stats().effects === before;
 | Name root methods from rows with `$root.name` | Expect a bare name in a row to find a model method |
 | Write handlers as `fn(item, event)` | Expect the event as the first argument |
 | Write methods as `name() {}` | Use arrow functions as model methods |
+| Write computeds as `function () { return this.x; }`, or as `m => m.x` using the argument | Use `this` inside an arrow computed |
+| Give buttons inside a `<form>` `type="button"`, or handle `submit` and call `event.preventDefault()` | Leave a plain `<button>` in a form (it submits and reloads the page) |
+| Build options from plain values with `<option data-text="$data">` | Put `data-value="$data"` on an option |
+| Match errors by their code, `[Stitch E###]` | Match errors by their wording |
 | Emit and listen on the root model | `$emit` / `$on` on nested objects or rows |
 | Copy shared lookup lists per model: `[...list]`, `new Map(map)` | Give two models the same array, Map or Set |
 | Assign plain data, or `Observable.toRaw(other)` | Put one model inside another |

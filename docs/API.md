@@ -18,9 +18,10 @@ executed.
 | `reactiveSystem` | the object a custom binding receives as `context.reactiveSystem` |
 | path | a property path: names of letters, digits, `_` and `$` joined by dots (`user.name`, `items.0.title`, `$root.rate`) |
 
-**Error messages** start with `[Stitch.js v<version>]` and name the element and binding involved,
-for example `[Stitch.js v3.x.y] <span data-text="nmae">: "nmae" is not a property of the model. ...`.
-This page leaves the prefix out.
+**Error messages** start with a stable code, `[Stitch E###]`, then name the element and binding
+involved, for example `[Stitch E201] <span data-text="nmae">: "nmae" is not a property of the model.
+...`. Codes are public API: a code keeps its meaning and is never reused. The
+[error reference](ERRORS.md) is keyed by code. This page leaves the prefix out.
 
 ## Contents
 
@@ -51,8 +52,11 @@ The library version: the `version` string of the release (major.minor.patch).
 Makes a computed property for a model. Put the result in the data you pass to
 `Stitch.Observable.create()` (at any depth, including inside list rows).
 
-- `config`: a function, or `{ get: function, deps: [names] }`. The function runs with `this` set to
-  the object that holds the computed and returns the value.
+- `config`: a function, or `{ get: function, deps: [names] }`. The function is called with the
+  object that holds the computed (the model, a nested object or a row) both as `this` and as its
+  first argument, and returns the value. Use `this` with `function` / method syntax, or the
+  argument with an arrow function (`m => m.price * m.qty`): an arrow function's `this` is never the
+  model.
 - Returns: a marker object that `Observable.create()` turns into a read-only property.
 - Throws: if `config` is neither form, or `deps` is not an array.
 
@@ -64,10 +68,11 @@ up front.
 ```js run
 const model = Stitch.Observable.create({
     first: 'Ada', last: 'Lovelace',
-    full: Stitch.computed(function () { return this.first + ' ' + this.last; })
+    full: Stitch.computed(function () { return this.first + ' ' + this.last; }),
+    initials: Stitch.computed(m => m.first[0] + m.last[0])
 });
 ```
-<!-- check: model.full === 'Ada Lovelace' -->
+<!-- check: model.full === 'Ada Lovelace' && model.initials === 'AL' -->
 
 ## Models: Stitch.Observable
 
@@ -93,7 +98,9 @@ Throws when:
 - a method is an arrow function (write `name() {}`);
 - a field uses a reserved name (`toJSON` or a `$` helper name);
 - `data` contains another model, or an array, Map or Set that already belongs to another model;
-- `data` is frozen or sealed (the browser's own `TypeError`: copy it first).
+- `data`, or an object inside it, is frozen, sealed or not extensible (E714: pass a copy, such as
+  `structuredClone(data)`). The same check runs when such data is assigned, pushed or put in a
+  Map or Set later.
 
 Every property a binding reads must be in `data` from the start; `null` is a fine starting value.
 Properties whose names start with `_` are not made reactive.
@@ -119,8 +126,8 @@ The same function as [`Stitch.computed(config)`](#stitchcomputedconfig).
 
 ### `Stitch.Observable.isReactive(value)`
 
-Returns `true` for a model and for any object, array, `Map` or `Set` inside one. For anything else
-it returns a falsy value (`false`, or the falsy value passed in, such as `null`).
+Returns `true` for a model and for any object, array, `Map` or `Set` inside one, and `false` for
+anything else (including `null` and `undefined`).
 
 ### `Stitch.Observable.toRaw(value)`
 
@@ -151,7 +158,7 @@ Calls `fn(change)` after every write to this object (or list, Map, Set).
   `field` (`'user.name'`) and `nestedChange: true`. A list mutation reports
   `{ field: 'items', action: 'push', args, target }` on the list, and `'<list>.items'` on its
   ancestors.
-- Returns: `undefined`. Remove the handler with `$offChange(fn)`.
+- Returns: a function that removes the handler (safe to call twice). `$offChange(fn)` removes it too.
 - Throws: `fn` is not a function; a string is passed (use `$on` for events); more than one argument.
 - An error thrown by `fn` goes to [`Stitch.onError`](#stitchonerrorfn); the write and the other
   handlers are not affected.
@@ -214,8 +221,7 @@ Calls `callback(newValue, oldValue, info)` whenever the value at `path` changes,
 
 - Runs synchronously after each change; with `options = { batch: true }`, once per batch (in a
   microtask) with the latest value.
-- Returns: the watch's effect. There is no public way to stop a watch: it lasts as long as the model.
-  Use `$onChange` / `$offChange` for listeners you need to remove.
+- Returns: a function that stops the watch for good and releases it (safe to call twice).
 - Throws: `path` names a property that does not exist or is not reactive; `callback` is not a
   function.
 
@@ -309,13 +315,17 @@ afterwards.
 Adds the attribute `data-<name>` for every binder on the page.
 
 - `name`: lowercase letters, digits and dashes (`tooltip`, `date-format`). Not a built-in binding,
-  not already registered, not `key`, `template`, `default-text` or `default-value`.
+  not already registered, not `key`, `template`, `default-text`, `default-value` or `type`.
 - `handler.bind(element, model, value, context)`: called once per element at bind. `model` is the
   model, or the row context inside a list. `context` is `{ reactiveSystem, binder }`.
 - `handler.value`: `'path'` (default) or `'literal'`. With `'path'`, the attribute value is a property
   path, checked like every binding (it must exist), and `value` is that path. With `'literal'`,
   `value` is the attribute text as written, and nothing is looked up.
 - Must be called before the first `bind()` on the page.
+- When a `'path'` binding's value is not a property path, or names a property the model does not
+  have, the error ends with how to register it as `'literal'` (the usual cause is text such as
+  `data-tooltip="Save changes"`).
+- `type` is reserved too (`data-type` configures `data-value`).
 - Throws if any rule above is broken.
 
 #### `binder._trackCleanup(element, fn)`
@@ -368,19 +378,26 @@ the user (on `input` and `change` events).
 | Element | Model value |
 |---|---|
 | text-like inputs, textarea | string |
-| `type="number"`, `type="range"` | number; `null` when empty or not a number |
+| `type="number"` | number; `null` when empty or not a number |
+| `type="range"` | number (a range always has a value, so never `null`) |
 | `type="checkbox"` | boolean |
 | `type="radio"` | the checked radio's `value` (put `data-value` on each radio of the group) |
 | `type="date"`, `type="datetime-local"` | `Date` or `null` |
-| `select` | the selected option's value (string; see `data-type`) |
+| `select` | the selected option's value, always a string (even if the model held a number); use `data-type="int"` for numbers |
 | `select multiple` | array of selected values |
 
 If the model holds a value no option of a `select` has, the select shows its placeholder (or its
 first option) and the model is left alone until the user picks.
 
+On an `<option>` inside a `<select data-foreach>`, `data-value` sets the option's value. For options
+from a list of plain values, leave it out and write `<option data-text="$data">`: an option without
+a `value` uses its text. `data-value="$data"` throws (E313): a two-way binding cannot replace the
+row itself.
+
 Throws: the path is a computed, a getter without a setter, or a row-context value (`$data`,
 `$index`, `$parent`, `$root`, at any depth). Writing through a `null` step (`address.city` while
-`address` is `null`) throws when the user types (to `Stitch.onError` if installed).
+`address` is `null`) throws when the user types (E314, to `Stitch.onError` if installed); the
+input listens to both `input` and `change`, so one edit can report it twice.
 
 ### `data-visible="path"`
 
@@ -435,8 +452,13 @@ Calls a method on click.
 
 The value names a property holding `{ eventName: handler }`. Each `handler` is a handler name
 (resolved exactly like `data-click`) or a function (called with `this` = the current item and
-arguments `(item, event)`). Replacing the object re-registers the listeners. All entries are checked
-before any listener changes.
+arguments `(item, event)`). The object is model data, so a function in it must not be an arrow
+function (E707); a handler name is usually simpler. Replacing the object re-registers the listeners.
+All entries are checked before any listener changes.
+
+To handle a form's submit, put `data-event` on the `<form>` with `{ submit: 'save' }` and call
+`event.preventDefault()` in `save(model, event)`; a `<button>` inside a form submits it (and reloads
+the page) unless it has `type="button"`.
 
 Throws: the value is not an object; an entry is neither a name nor a function; a name is not found.
 
@@ -482,8 +504,8 @@ The value of the placeholder option (default `""`). Needs `data-default-text`.
 
 On an element with `data-value`: the conversion between the control's text and the model value.
 `int`, `float`, `bool` (or `boolean`), `string`, `date`, `datetime`. Without it, the type follows the
-input type (see `data-value`) and, for a select, the model's current value. A value that does not
-convert becomes `null`.
+input type (see `data-value`); a `select` always writes back a string. A value that does not convert
+becomes `null`.
 
 ## Row context
 
@@ -491,7 +513,8 @@ Inside a list row, a binding can name the item's own fields, and these:
 
 ### `$data`
 
-The row's item itself. For a list of plain values, `data-text="$data"`.
+The row's item itself. For a list of plain values, `data-text="$data"` (also for `<option>`s of a
+`<select>`). It is read-only: `data-value="$data"` throws.
 
 ### `$index`
 
@@ -516,8 +539,9 @@ reconciling, a computed, a change handler, an event subscriber, a click or event
 returns a function that removes it. `Stitch.onError(null)` also removes it.
 
 - `fn(error, context)`. `context.source` is `binding`, `watch`, `change-handler`, `handler`,
-  `messageBus`, `unbind`, `dispose`, `scheduler` or `effect`; bindings add `element` and `binding`
-  (`'data-text="label"'`), change handlers add `field`, message-bus errors add `event`.
+  `messageBus`, `unbind`, `dispose`, `scheduler`, `effect`, or `unknown` when no context was
+  recorded; bindings add `element` and `binding` (`'data-text="label"'`), change handlers add
+  `field`, message-bus errors add `event`.
 - With no handler installed, such errors are re-thrown uncaught (in a new task), so they reach
   `window.onerror` and the console.
 - Errors during `bind()` and other direct calls are thrown to the caller, not passed here.
@@ -528,10 +552,9 @@ returns a function that removes it. `Stitch.onError(null)` also removes it.
 Installs the page-wide bind report and returns a function that removes it (`null` removes it too).
 After every successful `bind()`, `fn({ bound, ignored })` receives every `data-*` attribute in the
 bound root (rendered rows included), as `{ element, attribute, value }`: `bound` for Stitch's own
-attributes, `ignored` for all others (a misspelled `data-txt`, `data-testid`, `data-bs-*`). With no
-report installed, Stitch never looks at other `data-*` attributes. Throws like `onError`.
-
-Note: `data-type` is read by `data-value` but is listed under `ignored`.
+attributes (bindings, list attributes, and `data-type`), `ignored` for all others (a misspelled
+`data-txt`, `data-testid`, `data-bs-*`). With no report installed, Stitch never looks at other
+`data-*` attributes. Throws like `onError`.
 
 ## Diagnostics
 
@@ -634,8 +657,10 @@ Runs `fn` and returns its result without subscribing the running effect to what 
 ### `reactiveSystem.dispose()`
 
 Releases this system's whole reactive graph: every effect stops, every subscription is dropped.
-Models keep their values but nothing reacts any more, and `effect()` throws afterwards. For a page
-section, `binder.dispose()` is usually what you want.
+Models keep their values but nothing reacts any more, and `effect()` throws afterwards. It is
+reachable only from a custom binding, on purpose: tearing down a page section is
+`binder.dispose()`, plus the removers of any `$watch`, `$onChange` and `$on` you installed. After
+that nothing outside the model refers to it, and it is garbage-collected when your code drops it.
 
 ### Internal members
 

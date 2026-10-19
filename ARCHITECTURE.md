@@ -221,12 +221,12 @@ npm run build:assembly:all
    - version-literal: the `package.json` version string appears nowhere else (the generated bundles and npm's lock-file root fields are excepted, and checked);
    - stale-version: no other version is named as a Stitch version (`v` or `Version ` before x.y.z); history docs (`docs/history/`) are exempt, and so is the end of `MIGRATION.md` below its `<!-- history: ... -->` line;
    - local-path: no absolute local path (drive letters, home directories, file URLs) in any file;
-   - missing-reference: every file a doc or page points to exists, and every `npm run` script mentioned exists;
+   - missing-reference: every file a doc or page points to exists, every `#heading` a markdown link points to exists (GitHub anchor rules), and every `npm run` script mentioned exists;
    - build-match: see 6.4;
    - no-console, no-random-ids, bundle-require: the library never logs, ids are counters, the bundle never calls `require()`;
    - doc-snippets: every ```` ```html ```` / ```` ```js ```` block of a public markdown document carries a mode (`run`, `page`, `throws`, `fragment`), and every such document is in `DOC_SET` (see 7.1);
    - api-coverage: the public surface read from the code (`window.Stitch` and what hangs off it, the model helpers, the bindings and the attributes Stitch reads, the row-context names) and the `###` headings of `docs/API.md` match in both directions; code spans in the guides that name an API must name a real one;
-   - error-coverage: the error messages built in `packages/` (static text, with `…` for the parts filled in at run time) and the `**Message:**` lines of `docs/ERRORS.md` match in both directions, and each entry has a Cause and a Fix;
+   - error-coverage: by code, both ways. Every error built in `packages/` starts with a stable code (`[Stitch E###]`; an error without one fails); every code has one `### E###: title` entry in `docs/ERRORS.md` with a Cause, a Fix and a `**Message:**` line equal to the message's static text (`…` for run-time parts); every entry's code is thrown; two sites using one code for different messages fail. Codes are public API: grouped by area (first digit), numbered once, never reused;
    - doc-hygiene: public documents state rules, not private project history: no decision numbers, triage numbers or paths into private notes.
 2. **Browser suites**: every page in `tests/suites.js`, in headless Chromium, served over a local HTTP server.
    Each page's `stitch.js` request is answered with the build under test: first `stitch.js`, then `stitch.min.js`.
@@ -278,10 +278,19 @@ opens the page fresh and drives it through Playwright (`ui` is `tests/acceptance
 lookups by `data-testid`, retrying checks, typing like a user). A test fails on a failed assertion,
 a throw, a 15 s timeout, a missing page, or a page error, console error or failed request while it
 runs. The pages are written from the documentation alone (`tests/acceptance/TASKS.md`), so an entry
-stays `pending: true` until its page is committed: `npm test` prints it as PENDING and does not run
-it; `npm run test:acceptance` runs every entry, pending or not, on both builds. A non-pending entry
-whose page does not exist fails the suite list. Gate fixtures cover a failing spec, a console error,
-a missing page and the pending rule.
+stays pending until its page is committed: `pending: { reason, sprint }` (both required), and
+`npm test` prints it as PENDING (and counts it under the summary) but does not run it;
+`npm run test:acceptance` runs every entry, pending or not, on both builds. Guards, like the
+known-failing flip guard: only specs under `tests/acceptance/` may be pending; a pending entry whose
+page exists fails `npm test` ("remove pending"); a non-pending entry whose page does not exist fails
+the suite list. Gate fixtures cover a failing spec, a console error, a missing page, and each guard.
+
+### 7.3 What the documentation checks do not prove
+
+`api-coverage` proves that the API headings and the code name the same members; it does not read
+the signatures or the prose under a heading. `error-coverage` proves that codes and message texts
+match; it does not read the Cause and Fix prose. Prose is verified only where an executed snippet
+exercises it (`run` blocks with checks, `throws` blocks), so a new rule should come with one.
 
 ## 8. Common Change Workflows
 
