@@ -21,6 +21,8 @@
         "style-objects-are-written-through-the-cssom",
         "style-updates-remove-only-their-own-properties",
         "code-elements-cannot-be-bound",
+        "a-static-sandbox-cannot-be-removed-by-data",
+        "a-radio-group-name-with-quotes-still-binds",
         "no-payload-ever-ran"
     ]);
 
@@ -198,6 +200,45 @@
             t.equal(element.hasAttribute("src") || element.hasAttribute("href") || element.hasAttribute("content"), false,
                 c[1] + " on <" + c[0] + "> wrote no attribute");
         });
+    });
+
+    StitchTest.test("a-static-sandbox-cannot-be-removed-by-data", function (t) {
+        var frame = make("iframe");
+        frame.setAttribute("sandbox", "");
+        frame.setAttribute("data-attr", "attrs");
+        var error = thrown(function () { new Stitch.DataBinder().bind(frame, Stitch.Observable.create({ attrs: { title: "Report", sandbox: null } })); });
+        t.ok(error && String(error.message).indexOf("[Stitch E327]") === 0, "sandbox: null is refused with E327 (got " + (error ? String(error.message).slice(0, 60) : "no error") + ")");
+        t.equal(frame.getAttribute("sandbox"), "", "the static sandbox stays");
+        t.equal(frame.hasAttribute("title"), false, "and nothing else in the object is written");
+    });
+
+    StitchTest.test("a-radio-group-name-with-quotes-still-binds", async function (t) {
+        var host = document.createElement("div");
+        ["a", "b"].forEach(function (v) {
+            var radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = "pick\"one";
+            radio.value = v;
+            radio.setAttribute("data-value", "choice");
+            host.appendChild(radio);
+        });
+        document.body.appendChild(host);
+        // No onError handler here (another test holds it): an error in an update would be an
+        // uncaught page error, which fails the page.
+        try {
+            var model = Stitch.Observable.create({ choice: "a" });
+            var error = thrown(function () { new Stitch.DataBinder().bind(host, model); });
+            t.equal(error && String(error.message), null, "a group whose name holds a quote binds");
+            model.choice = "b";
+            await tick();
+            t.equal(host.querySelectorAll("input")[1].checked, true, "a model change checks the matching radio");
+            var clickError = thrown(function () { host.querySelectorAll("input")[0].click(); });
+            await tick();
+            t.equal(clickError, null, "a click does not throw");
+            t.equal(model.choice, "a", "and writes its value");
+        } finally {
+            host.remove();
+        }
     });
 
     StitchTest.test("no-payload-ever-ran", async function (t) {

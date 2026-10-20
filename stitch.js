@@ -2335,6 +2335,14 @@ function attrRefusalError(element, path, attrName, refusal) {
             return bindingError("E321", element, "attr", path,
                 `"${attrName}" is an event-handler attribute, whose value runs as script, so data may not set it. ` +
                 "Attach behaviour with data-click or data-event instead.");
+        case "sensitive":
+            return bindingError("E327", element, "attr", path,
+                `"${attrName}" decides what the page or an embedded document may do (or vouches for what it loads), ` +
+                "so data may neither set nor remove it. Write it in the markup.");
+        case "opener":
+            return bindingError("E328", element, "attr", path,
+                "rel \"opener\" gives the linked page a reference back to this window, so data may not set it. " +
+                "Leave it out (a link opened in a new tab gets noopener by default) or use \"noopener noreferrer\".");
         case "srcdoc":
             return bindingError("E322", element, "attr", path,
                 "srcdoc holds a whole HTML document, scripts included, so data may not set it. " +
@@ -4755,7 +4763,10 @@ module.exports = {
  *     and removing every control, space and invisible character;
  *   - a data: URL in a URL-bearing attribute, except data:image/... in an <img> src;
  *   - style as a string (a strict Content-Security-Policy blocks style strings; an object
- *     is written through the CSSOM, property by property).
+ *     is written through the CSSOM, property by property);
+ *   - a security-sensitive attribute name (SENSITIVE_ATTRIBUTES), whatever the value: these
+ *     decide what the page or an embedded document may do, so data may neither set nor
+ *     remove them (removing a static sandbox would lift it).
  */
 
 // Attributes whose value the browser reads as a URL, on any element.
@@ -4772,6 +4783,17 @@ const URL_LIST_ATTRIBUTES = ["ping", "archive"];
 const SVG_ANIMATION_ELEMENTS = ["animate", "set", "animatemotion", "animatetransform", "animatecolor"];
 const SVG_ANIMATION_VALUES = ["values", "from", "to", "by"];
 const SCRIPT_SCHEMES = ["javascript", "vbscript"];
+// Attributes that grant or withhold capabilities, or vouch for what is loaded:
+//   sandbox, allow, allowfullscreen, allowpaymentrequest, allowusermedia, csp, credentialless
+//     (what an iframe's document may do), http-equiv (a <meta> acting as a header),
+//   integrity, crossorigin, nonce (whether a resource is trusted and with which credentials),
+//   referrerpolicy (what is leaked to the target), is (which custom element class runs).
+// rel is not on the list: rel="noopener noreferrer" (or none) from data is the common, safe
+// pattern; only the "opener" token, which hands the target page this window, is refused.
+const SENSITIVE_ATTRIBUTES = [
+    "sandbox", "allow", "allowfullscreen", "allowpaymentrequest", "allowusermedia", "csp", "credentialless",
+    "http-equiv", "integrity", "crossorigin", "nonce", "referrerpolicy", "is"
+];
 
 // Named character references that decode to characters a scheme or its separator can be
 // made of (the rest cannot form "javascript:", "vbscript:" or "data:"). Looked up in lower case.
@@ -4903,11 +4925,17 @@ function attrRefusal(element, write) {
     if (name === "srcdoc") {
         return { kind: "srcdoc" };
     }
+    if (SENSITIVE_ATTRIBUTES.indexOf(name) !== -1) {
+        return { kind: "sensitive" };
+    }
     if (write.remove) {
         return null;
     }
     if (name === "style") {
         return write.style ? null : { kind: "style-string" };
+    }
+    if (name === "rel" && write.text.toLowerCase().split(/[\s]+/).indexOf("opener") !== -1) {
+        return { kind: "opener" };
     }
     if (!isUrlAttribute(element, name)) {
         return null;
@@ -4975,6 +5003,7 @@ function applyAttrWrite(element, write) {
 }
 
 module.exports = {
+    SENSITIVE_ATTRIBUTES,
     planAttrWrite,
     attrRefusal,
     applyAttrWrite
@@ -5748,6 +5777,15 @@ module.exports = {
   __stitchModuleFactories[24] = function(module, exports, __stitchRequire){
 "use strict";
 
+/** A value made safe for a quoted CSS attribute selector (CSS.escape where it exists). */
+function cssEscape(value) {
+    const text = String(value);
+    if (typeof CSS !== "undefined" && CSS && typeof CSS.escape === "function") {
+        return CSS.escape(text);
+    }
+    return text.replace(/["\\]/g, "\\$&").replace(/[\r\n\f]/g, " ");
+}
+
 /**
  * Builds value validators with injected runtime dependencies.
  *
@@ -5814,7 +5852,8 @@ function createValueValidators(deps) {
                 if (!name) return value;
                 if (!doc) return value;
                 const converter = getTypeConverter(element, value);
-                const radios = doc.querySelectorAll(`input[type="radio"][name="${name}"]`);
+                // The name is escaped: a quote or bracket in it must not break the selector.
+                const radios = doc.querySelectorAll(`input[type="radio"][name="${cssEscape(name)}"]`);
                 const valueExists = Array.from(radios).some(radio => converter.equals(radio.value, value));
                 if (!valueExists && value !== "") {
                     radios.forEach(radio => {

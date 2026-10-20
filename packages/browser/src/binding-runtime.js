@@ -43,6 +43,14 @@ function attrRefusalError(element, path, attrName, refusal) {
             return bindingError("E321", element, "attr", path,
                 `"${attrName}" is an event-handler attribute, whose value runs as script, so data may not set it. ` +
                 "Attach behaviour with data-click or data-event instead.");
+        case "sensitive":
+            return bindingError("E327", element, "attr", path,
+                `"${attrName}" decides what the page or an embedded document may do (or vouches for what it loads), ` +
+                "so data may neither set nor remove it. Write it in the markup.");
+        case "opener":
+            return bindingError("E328", element, "attr", path,
+                "rel \"opener\" gives the linked page a reference back to this window, so data may not set it. " +
+                "Leave it out (a link opened in a new tab gets noopener by default) or use \"noopener noreferrer\".");
         case "srcdoc":
             return bindingError("E322", element, "attr", path,
                 "srcdoc holds a whole HTML document, scripts included, so data may not set it. " +

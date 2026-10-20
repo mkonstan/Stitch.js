@@ -18,7 +18,10 @@
  *     and removing every control, space and invisible character;
  *   - a data: URL in a URL-bearing attribute, except data:image/... in an <img> src;
  *   - style as a string (a strict Content-Security-Policy blocks style strings; an object
- *     is written through the CSSOM, property by property).
+ *     is written through the CSSOM, property by property);
+ *   - a security-sensitive attribute name (SENSITIVE_ATTRIBUTES), whatever the value: these
+ *     decide what the page or an embedded document may do, so data may neither set nor
+ *     remove them (removing a static sandbox would lift it).
  */
 
 // Attributes whose value the browser reads as a URL, on any element.
@@ -35,6 +38,17 @@ const URL_LIST_ATTRIBUTES = ["ping", "archive"];
 const SVG_ANIMATION_ELEMENTS = ["animate", "set", "animatemotion", "animatetransform", "animatecolor"];
 const SVG_ANIMATION_VALUES = ["values", "from", "to", "by"];
 const SCRIPT_SCHEMES = ["javascript", "vbscript"];
+// Attributes that grant or withhold capabilities, or vouch for what is loaded:
+//   sandbox, allow, allowfullscreen, allowpaymentrequest, allowusermedia, csp, credentialless
+//     (what an iframe's document may do), http-equiv (a <meta> acting as a header),
+//   integrity, crossorigin, nonce (whether a resource is trusted and with which credentials),
+//   referrerpolicy (what is leaked to the target), is (which custom element class runs).
+// rel is not on the list: rel="noopener noreferrer" (or none) from data is the common, safe
+// pattern; only the "opener" token, which hands the target page this window, is refused.
+const SENSITIVE_ATTRIBUTES = [
+    "sandbox", "allow", "allowfullscreen", "allowpaymentrequest", "allowusermedia", "csp", "credentialless",
+    "http-equiv", "integrity", "crossorigin", "nonce", "referrerpolicy", "is"
+];
 
 // Named character references that decode to characters a scheme or its separator can be
 // made of (the rest cannot form "javascript:", "vbscript:" or "data:"). Looked up in lower case.
@@ -166,11 +180,17 @@ function attrRefusal(element, write) {
     if (name === "srcdoc") {
         return { kind: "srcdoc" };
     }
+    if (SENSITIVE_ATTRIBUTES.indexOf(name) !== -1) {
+        return { kind: "sensitive" };
+    }
     if (write.remove) {
         return null;
     }
     if (name === "style") {
         return write.style ? null : { kind: "style-string" };
+    }
+    if (name === "rel" && write.text.toLowerCase().split(/[\s]+/).indexOf("opener") !== -1) {
+        return { kind: "opener" };
     }
     if (!isUrlAttribute(element, name)) {
         return null;
@@ -238,6 +258,7 @@ function applyAttrWrite(element, write) {
 }
 
 module.exports = {
+    SENSITIVE_ATTRIBUTES,
     planAttrWrite,
     attrRefusal,
     applyAttrWrite

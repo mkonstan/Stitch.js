@@ -94,6 +94,23 @@
     add("iframe", "srcdoc", "<script>" + RUN + "</script>", "E322", "srcdoc");
     add("iframe", "SRCDOC", "<img src=x onerror=" + RUN + ">", "E322", "SRCDOC");
 
+    // Security-sensitive names: they decide what the page or an embedded document may do, so
+    // data may neither set nor remove them (removing a static sandbox lifts it).
+    [["iframe", "sandbox"], ["iframe", "SANDBOX"], ["iframe", "allow"], ["iframe", "allowfullscreen"],
+        ["iframe", "allowpaymentrequest"], ["iframe", "allowusermedia"], ["iframe", "csp"], ["iframe", "credentialless"],
+        ["div", "http-equiv"], ["link", "integrity"],
+        ["img", "crossorigin"], ["a", "referrerpolicy"], ["iframe", "referrerpolicy"], ["link", "nonce"], ["div", "nonce"],
+        ["div", "is"]].forEach(function (pair) {
+        [null, "", "allow-scripts allow-same-origin", true].forEach(function (value) {
+            add(pair[0], pair[1], value, "E327", pair[1] + " on <" + pair[0] + "> = " + JSON.stringify(value));
+        });
+    });
+
+    // rel="opener" hands the linked page this window.
+    ["opener", "OPENER", "noreferrer opener", "opener\tnoreferrer"].forEach(function (value) {
+        add("a", "rel", value, "E328", "rel " + JSON.stringify(value));
+    });
+
     // javascript:/vbscript: in every URL-bearing attribute.
     var urlTargets = [["a", "href"], ["area", "href"], ["iframe", "src"], ["frame", "src"], ["embed", "src"],
         ["object", "data"], ["form", "action"], ["button", "formaction"], ["input", "formaction"],
@@ -154,6 +171,8 @@
         { element: "a", attribute: "aria-label", value: "Open the report", expected: "Open the report" },
         { element: "a", attribute: "data-row", value: 7, expected: "7" },
         { element: "a", attribute: "target", value: "_blank", expected: "_blank" },
+        { element: "a", attribute: "rel", value: "noopener noreferrer", expected: "noopener noreferrer" },
+        { element: "a", attribute: "rel", value: null, expected: null },
         { element: "img", attribute: "src", value: PNG, expected: PNG },
         { element: "img", attribute: "alt", value: "Chart", expected: "Chart" },
         { element: "source", attribute: "srcset", value: "a.png 1x, b.png 2x", expected: "a.png 1x, b.png 2x" },

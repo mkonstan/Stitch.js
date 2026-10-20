@@ -1,5 +1,14 @@
 "use strict";
 
+/** A value made safe for a quoted CSS attribute selector (CSS.escape where it exists). */
+function cssEscape(value) {
+    const text = String(value);
+    if (typeof CSS !== "undefined" && CSS && typeof CSS.escape === "function") {
+        return CSS.escape(text);
+    }
+    return text.replace(/["\\]/g, "\\$&").replace(/[\r\n\f]/g, " ");
+}
+
 /**
  * Builds value validators with injected runtime dependencies.
  *
@@ -66,7 +75,8 @@ function createValueValidators(deps) {
                 if (!name) return value;
                 if (!doc) return value;
                 const converter = getTypeConverter(element, value);
-                const radios = doc.querySelectorAll(`input[type="radio"][name="${name}"]`);
+                // The name is escaped: a quote or bracket in it must not break the selector.
+                const radios = doc.querySelectorAll(`input[type="radio"][name="${cssEscape(name)}"]`);
                 const valueExists = Array.from(radios).some(radio => converter.equals(radio.value, value));
                 if (!valueExists && value !== "") {
                     radios.forEach(radio => {

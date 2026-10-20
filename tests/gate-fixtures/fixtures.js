@@ -118,7 +118,8 @@ const browser = {
     "control-csp": { suites: [{ page: `${F}csp-control.html`, csp: true }], engines: ALL_ENGINES, expect: PASS },
     "csp-inline-style": { suites: [{ page: `${F}csp-inline-style.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-inline-style.html", ALL_ENGINES, "style-src")) },
     "csp-inline-script": { suites: [{ page: `${F}csp-inline-script.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-inline-script.html", ALL_ENGINES, "script-src")) },
-    "csp-eval": { suites: [{ page: `${F}csp-eval.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-eval.html", ALL_ENGINES, "")) },
+    "csp-eval": { suites: [{ page: `${F}csp-eval.html`, csp: true }], engines: ALL_ENGINES, // Chromium and WebKit report eval under Trusted Types, Firefox under script-src.
+        expect: FAIL(VIOLATION_ON("csp-eval.html", ["chromium", "webkit"], "require-trusted-types-for").concat(VIOLATION_ON("csp-eval.html", ["firefox"], "script-src"))) },
     "csp-innerhtml-trusted-types": { suites: [{ page: `${F}csp-innerhtml.html`, csp: true }], engines: ["chromium", "webkit"], expect: FAIL(VIOLATION_ON("csp-innerhtml.html", ["chromium", "webkit"], "require-trusted-types-for")) },
     "late-assertion": { suites: [`${F}late-assertion.html`], expect: FAIL("harness: assertion after test 'a' settled (failed): fixture: late assertion") },
     "page-missing-from-list": {

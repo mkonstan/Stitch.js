@@ -192,9 +192,9 @@ Throws: `[Stitch E201]`
 
 ## E3xx: Binding values and two-way bindings
 
-Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state). `data-value` writes the user's input back, so its path must be writable. E321-E326 are the values that could make the page run script: `data-attr` checks every entry of its object first and writes none of them if one is refused.
+Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state). `data-value` writes the user's input back, so its path must be writable. E321-E327 are the values that could make the page run script or lift a restriction: `data-attr` checks every entry of its object first and writes none of them if one is refused.
 
-[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object) · [E321](#e321-event-handler-attribute-from-data) · [E322](#e322-srcdoc-from-data) · [E323](#e323-javascript-or-vbscript-url-from-data) · [E324](#e324-data-url-from-data) · [E325](#e325-style-string-from-data) · [E326](#e326-binding-on-a-script-style-base-or-meta-element)
+[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object) · [E321](#e321-event-handler-attribute-from-data) · [E322](#e322-srcdoc-from-data) · [E323](#e323-javascript-or-vbscript-url-from-data) · [E324](#e324-data-url-from-data) · [E325](#e325-style-string-from-data) · [E326](#e326-binding-on-a-script-style-base-or-meta-element) · [E327](#e327-security-sensitive-attribute-from-data) · [E328](#e328-relopener-from-data)
 
 ### E301: data-text bound to a function
 
@@ -345,6 +345,32 @@ const model = Stitch.Observable.create({ code: 'alert(1)' });
 new Stitch.DataBinder().bind('#app', model);
 ```
 Throws: `[Stitch E326]`
+
+### E327: Security-sensitive attribute from data
+
+**Message:** `"…" decides what the page or an embedded document may do (or vouches for what it loads), so data may neither set nor remove it. Write it in the markup.`
+
+**Cause:** A `data-attr` object lists one of `sandbox`, `allow`, `allowfullscreen`, `allowpaymentrequest`, `allowusermedia`, `csp`, `credentialless`, `http-equiv`, `integrity`, `crossorigin`, `nonce`, `referrerpolicy`, `is`. These decide what an embedded document may do (`sandbox`, `allow`, `csp`, ...), whether a loaded resource is trusted (`integrity`, `crossorigin`, `nonce`), what is sent to another page (`referrerpolicy`), how a `<meta>` acts (`http-equiv`) or which custom element runs (`is`). Data may neither set nor remove them, whatever the value: `{ sandbox: null }` would remove a static `sandbox` and lift it. Nothing in the object is written.
+
+**Fix:** Write the attribute in the markup. If it must differ by case, render the variants in the markup and show one with `data-visible`.
+
+```html page
+<iframe id="app" sandbox="" data-attr="frame"></iframe>
+```
+
+```js throws
+const model = Stitch.Observable.create({ frame: { title: 'Report', sandbox: null } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E327]`
+
+### E328: rel="opener" from data
+
+**Message:** `rel "opener" gives the linked page a reference back to this window, so data may not set it. Leave it out (a link opened in a new tab gets noopener by default) or use "noopener noreferrer".`
+
+**Cause:** A `data-attr` object gives `rel` a value with the token `opener`, which would let the linked page reach this window (`window.opener`) and navigate it. Other `rel` values, `noopener noreferrer` included, are written as given.
+
+**Fix:** Leave `rel` out, or use `rel: 'noopener noreferrer'`.
 
 ## E4xx: Handlers
 
