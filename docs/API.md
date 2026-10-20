@@ -329,6 +329,11 @@ Adds the attribute `data-<name>` for every binder on the page.
   `data-tooltip="Save changes"`).
 - `type` is reserved too (`data-type` configures `data-value`).
 - Throws if any rule above is broken.
+- **Safety is yours.** A custom binding writes to the page with your code, so the checks of the
+  built-in bindings do not cover it: text only, no `on...` / `srcdoc` / security-sensitive
+  attributes, no `javascript:` or `data:` URLs, no binding on `<script>`, `<style>`, `<base>` or
+  `<meta>` (see [data-attr](#data-attrpath)). Set text with `textContent`, styles with
+  `element.style.setProperty`, and never assign data to `innerHTML`.
 
 #### `binder._trackCleanup(element, fn)`
 
@@ -445,6 +450,8 @@ state:
 | a `javascript:` or `vbscript:` URL in a URL-bearing attribute | E323 |
 | a `data:` URL in a URL-bearing attribute, except `data:image/...` in an `<img>` `src` | E324 |
 | `style` as a string or an array (use an object) | E325 |
+| a security-sensitive name, whatever the value (`null` too): `sandbox`, `allow`, `allowfullscreen`, `allowpaymentrequest`, `allowusermedia`, `csp`, `credentialless`, `http-equiv`, `integrity`, `crossorigin`, `nonce`, `referrerpolicy`, `is` | E327 |
+| `rel` with the token `opener` (other `rel` values, such as `noopener noreferrer`, are written) | E328 |
 
 The URL-bearing attributes are `href`, `src`, `action`, `formaction`, `xlink:href`, `xml:base`,
 `poster`, `cite`, `background`, `data`, `codebase`, `classid`, `longdesc`, `lowsrc`, `dynsrc`,
@@ -457,6 +464,12 @@ known evasion forms are refused. Allowed: relative URLs, `#anchor`, `?query`, `h
 `mailto:`, `tel:`, and any URL whose scheme is not one of the three above. Attributes that are not
 URLs (`title`, `aria-*`, `data-*`, ...) take any text. Built-in bindings are not allowed on
 `<script>`, `<style>`, `<base>` or `<meta>` at all (E326).
+
+The checks read URL **schemes** only: an `https:` URL to any host is written (a link, an image, a
+stylesheet `href`, a form `action`). Which origins a page may load from, frame or submit to is the
+page's Content-Security-Policy's job (see the README's browser support section). Attribute **names**
+other than the refused ones are written as given (`id`, `name`, `target`, ...): keep the names in
+your code (a computed), and let only the values come from data.
 
 ### `data-loading="path"`
 

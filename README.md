@@ -94,13 +94,24 @@ this table against the code):
 
 Minimum versions: Chrome 86, Edge 86, Firefox 78, Safari 14.
 
-Older versions than the policy's are not tested and not supported, even where they meet these
+These minimums are derived from the APIs the library uses; they are not tested on those versions.
+Versions older than the policy's are not tested and not supported, even where they meet these
 minimums. Internet Explorer is not supported.
 
 Under a strict Content-Security-Policy (no `'unsafe-inline'`, no `'unsafe-eval'`,
 `require-trusted-types-for 'script'`) Stitch needs nothing allowed: it never writes HTML strings,
-script strings or style strings. Chrome, Edge and Safari enforce Trusted Types; Firefox ignores
-that directive and enforces the rest.
+script strings or style strings. Chrome and Edge enforce Trusted Types, and so does the current
+Safari (verified on the WebKit 26 engine the tests run); older Safari versions do not, and Firefox
+ignores that directive and enforces the rest of the policy.
+
+What Stitch guards and what the page must: `data-attr` refuses values that could run script
+(`javascript:`, `vbscript:` and most `data:` URLs, event handlers, `srcdoc`, style strings) and
+security-sensitive attribute names. Its URL check is a **scheme check only**: an `https:` URL to any
+host is written, whether it is a link, an image, a stylesheet or a form `action`. Which origins
+the page may load from, frame or submit to is the page's own policy. With data in attributes, a
+client-facing page should also set `form-action 'self'` (not covered by `default-src`),
+`frame-src` / `object-src`, and `img-src 'self' data:` if it shows `data:image` sources (which
+`default-src 'self'` blocks).
 
 ## Development
 

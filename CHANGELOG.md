@@ -31,7 +31,9 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
 - `data-attr` refuses, with a coded error and without writing anything, every value that could run
   script: an attribute name starting with `on`, `srcdoc`, a `javascript:` / `vbscript:` URL (in its
   filter-evasion forms too), a `data:` URL other than `data:image/...` in an `<img>` `src`, and a
-  `style` string (give `style` an object; it is written through the CSSOM). Built-in bindings on
+  `style` string (give `style` an object; it is written through the CSSOM), and security-sensitive
+  names (`sandbox`, `allow`, `csp`, `integrity`, `crossorigin`, `nonce`, `referrerpolicy`,
+  `is`, ...) whatever the value, and `rel="opener"`. Built-in bindings on
   `<script>`, `<style>`, `<base>` and `<meta>` throw.
 - Model properties cannot be deleted (set them to `null`); `delete` on a list, Map or Set throws.
 - Data fields named `toJSON` or like a `$` helper throw.
@@ -57,8 +59,8 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
 - docs/ACCESSIBILITY.md: what Stitch does and does not do for assistive technology, with runnable
   patterns (labels, ARIA states, live regions, loading, validation, focus after list changes).
 - Tested on Chromium, Firefox and WebKit, both builds, including a page served with a strict
-  Content-Security-Policy with Trusted Types. The supported browsers and the minimum versions are
-  in the README.
+  Content-Security-Policy with Trusted Types. The supported browsers, and the minimum versions
+  derived from the APIs the library uses (not tested on those versions), are in the README.
 
 ### Fixed
 
@@ -80,6 +82,7 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
   `display: none` of `data-visible` on the same element; it now sets and removes only its own
   properties.
 - The license banner names the real repository.
+- A radio group whose `name` held a quote broke its own selector; the name is now escaped.
 
 Earlier versions: see the [v1 to v2 section of MIGRATION.md](MIGRATION.md#history-stitchjs-v10-to-v20)
 and the archived v2 documents in `docs/history/`.

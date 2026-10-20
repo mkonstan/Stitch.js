@@ -321,7 +321,9 @@ a [custom binding](#custom-bindings) that creates elements with the DOM API.
 page run script, and writes nothing from that object (the element keeps its last good state): an
 attribute name starting with `on` (E321), `srcdoc` (E322), a `javascript:` or `vbscript:` URL in a
 URL attribute such as `href` or `src` (E323), a `data:` URL there, except `data:image/...` in an
-`<img>` `src` (E324), and `style` as a string (E325). Ordinary links (relative, `#anchor`,
+`<img>` `src` (E324), `style` as a string (E325), and a security-sensitive name such as `sandbox`
+or `integrity`, whatever the value, so data cannot lift a restriction written in the markup
+(E327), and `rel="opener"` (E328). Ordinary links (relative, `#anchor`,
 `https:`, `mailto:`, `tel:`) and ordinary attributes (`title`, `aria-*`, `data-*`) work. Give `style`
 an object; each property is set through the CSSOM, so it works under a strict
 Content-Security-Policy. Built-in bindings are refused on `<script>`, `<style>`, `<base>` and

@@ -119,7 +119,10 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
     `data-attr` takes `{ attributeName: value }`. Both usually come from a computed. `data-attr`
     throws, and writes nothing, for: an attribute name starting with `on`, `srcdoc`, a
     `javascript:`/`vbscript:` URL, a `data:` URL (except `data:image/...` in an `<img>` `src`), and
-    `style` as a string (give `style` an object: `{ color: 'red' }`). Never put a binding on
+    `style` as a string (give `style` an object: `{ color: 'red' }`), and a security-sensitive name
+    (`sandbox`, `allow`, `csp`, `http-equiv`, `integrity`, `crossorigin`, `nonce`,
+    `referrerpolicy`, `is`, ...) whatever the value: write those in the markup; and `rel` with
+    `opener`. Never put a binding on
     `<script>`, `<style>`, `<base>` or `<meta>` (it throws). Behaviour goes in `data-click` /
     `data-event`, never in an attribute.
 19. Number inputs give numbers (`null` when empty or invalid); range inputs give numbers. A
@@ -214,7 +217,10 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 37. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
     `Stitch.debug.stats()` gives live counts.
 38. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first
-    `bind()`. Use `value: 'literal'` when the attribute holds text, not a property path.
+    `bind()`. Use `value: 'literal'` when the attribute holds text, not a property path. A custom
+    binding is your code: the built-in checks (rule 18) do not cover it. Set text with
+    `textContent`, never `innerHTML`; never write `on...`, `srcdoc`, security-sensitive attributes
+    or `javascript:`/`data:` URLs from data; never bind `<script>`, `<style>`, `<base>`, `<meta>`.
 
 ### Timing
 

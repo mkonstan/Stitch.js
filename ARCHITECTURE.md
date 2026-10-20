@@ -228,7 +228,7 @@ npm run build:assembly:all
    - build-match: see 6.4;
    - no-console, no-random-ids, bundle-require: the library never logs, ids are counters, the bundle never calls `require()`;
    - no-html-sinks: nothing the library ships (`packages/`, `stitch.entry.js`, the generated bundles; comments included) writes an HTML string (`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `createContextualFragment`, `DOMParser`, `srcdoc`), a script string (`eval`, `new Function`, a string timer) or a style string (`cssText`, a `style` attribute, `element.style = ...`); so the library runs under Trusted Types and `style-src` without `'unsafe-inline'`;
-   - browser-support: the newest JavaScript and DOM features the library uses (read from `packages/` with comments and strings removed) are each listed in README's "Browser support" table, and its minimum versions are the highest of theirs; no browser version is claimed anywhere else outside `docs/history/`;
+   - browser-support: the newest JavaScript and DOM features the library uses (read from `packages/` with comments and strings removed) are each listed in README's "Browser support" table, and its minimum versions are the highest of theirs; no browser version is claimed anywhere else outside `docs/history/`. It sees only the features in its `FEATURES` table and reads `packages/`, not what terser emits; the minified build is run only on the three current engines, and the minimums are derived, never run on old browsers;
    - doc-snippets: every ```` ```html ```` / ```` ```js ```` block of a public markdown document carries a mode (`run`, `page`, `throws`, `fragment`), and every such document is in `DOC_SET` (see 7.1);
    - api-coverage: the public surface read from the code (`window.Stitch` and what hangs off it, the model helpers, the bindings and the attributes Stitch reads, the row-context names) and the `###` headings of `docs/API.md` match in both directions; code spans in the guides that name an API must name a real one;
    - error-coverage: by code, both ways. Every error built in `packages/` starts with a stable code (`[Stitch E###]`; an error without one fails); every code has one `### E###: title` entry in `docs/ERRORS.md` with a Cause, a Fix and a `**Message:**` line equal to the message's static text (`…` for run-time parts); every entry's code is thrown; two sites using one code for different messages fail. Codes are public API: grouped by area (first digit), numbered once, never reused;
@@ -321,7 +321,8 @@ On every page (CSP or not) the runner installs a `securitypolicyviolation` recor
 script runs (a Playwright init script, which the policy does not block); every recorded violation is
 a page problem, and so is a CSP page whose response did not carry the policy. Gate fixtures prove,
 on each engine, that an inline style, an inline script and a swallowed `eval` fail the run, and, on
-Chromium and WebKit, that a swallowed `innerHTML` write does (Trusted Types). Firefox ignores
+Chromium and WebKit (WebKit 26; older Safari versions do not enforce Trusted Types), that a
+swallowed `innerHTML` write does (Trusted Types). Firefox ignores
 `require-trusted-types-for` (it logs "unknown directive"), so on Firefox the HTML-sink guarantee
 rests on the `no-html-sinks` static check.
 

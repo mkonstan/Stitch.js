@@ -367,7 +367,8 @@ model.selected = null;
 ### data-attr refuses values that could run script
 
 In v2, `data-attr` wrote whatever the data said: an `onclick` attribute, a `javascript:` link, a
-`srcdoc` document, a `data:` URL, a style string. In v3 each of those throws (E321-E325) and the
+`srcdoc` document, a `data:` URL, a style string, or removed a static `sandbox`. In v3 each of those
+throws (E321-E325, E327, E328) and the
 object writes nothing; built-in bindings on `<script>`, `<style>`, `<base>` and `<meta>` throw
 (E326). The change most pages notice is `style`: a style string is refused (a strict
 Content-Security-Policy would block it); give `style` an object, which is written through the
