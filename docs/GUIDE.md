@@ -854,7 +854,7 @@ Notes:
 ### Which events mark a field as touched
 
 `data-value` keeps the model in step on both `input` and `change`. For "touched" or "dirty"
-flags, map the event that matches what you want to know, with `data-event` (verified in Chromium):
+flags, map the event that matches what you want to know, with `data-event` (verified in Chromium, Firefox and WebKit):
 
 | Control | `input` fires | `change` fires |
 |---|---|---|
@@ -1122,6 +1122,13 @@ In development, `Stitch.onBindReport(console.log)` (or `console.table`) is often
 `Stitch.DataBinder.registerBinding(name, handler)` adds the attribute `data-<name>`. Register every
 custom binding before the first `bind()` on the page; registering later throws. The name is
 lowercase letters, digits and dashes, and must not be taken.
+
+A custom binding writes to the page with your own code, so the checks of the built-in bindings
+(text only; no script-bearing attributes or URLs, see [Attributes from data](#attributes-from-data))
+do not protect it. Set text with `textContent`, build elements with `document.createElement`,
+never assign data to `innerHTML`, an `on...` attribute, `srcdoc` or a URL attribute without the same
+checks, and set styles with `element.style.setProperty`. Such code also keeps working under a strict
+Content-Security-Policy.
 
 The handler declares how its attribute value is read:
 

@@ -21,6 +21,9 @@ const F = "tests/gate-fixtures/";
 const FAIL = (output) => ({ exitCode: 1, output });
 const PASS = { exitCode: 0 };
 const QUICK = 3000; // ms: fixtures that are meant to time out do so quickly
+const ALL_ENGINES = ["chromium", "firefox", "webkit"];
+// One "<page> [<engine> stitch.js]: CSP violation: <directive>" line per engine.
+const VIOLATION_ON = (page, engines, directive) => engines.map((engine) => `${F}${page} [${engine} stitch.js]: CSP violation: ${directive}`);
 const PENDING = { reason: "waiting for a page that is not written yet", sprint: "T9" };
 
 const browser = {
@@ -108,6 +111,15 @@ const browser = {
         knownFailing: { [`${F}fail-two.html#broken`]: { defect: 99, sprint: "T9", expect: ["the value is wrong in step o", "the value is wrong in step two"] } },
         expect: FAIL('expected failure(s) absent: "the value is wrong in step o"')
     },
+    // The strict-CSP gate: a page listed with csp: true is served with the policy, and any
+    // violation fails the run, on every engine that enforces the directive. Trusted Types
+    // (require-trusted-types-for) is enforced by Chromium and WebKit; Firefox ignores the
+    // directive, so the innerHTML fixture runs where it is enforced.
+    "control-csp": { suites: [{ page: `${F}csp-control.html`, csp: true }], engines: ALL_ENGINES, expect: PASS },
+    "csp-inline-style": { suites: [{ page: `${F}csp-inline-style.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-inline-style.html", ALL_ENGINES, "style-src")) },
+    "csp-inline-script": { suites: [{ page: `${F}csp-inline-script.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-inline-script.html", ALL_ENGINES, "script-src")) },
+    "csp-eval": { suites: [{ page: `${F}csp-eval.html`, csp: true }], engines: ALL_ENGINES, expect: FAIL(VIOLATION_ON("csp-eval.html", ALL_ENGINES, "")) },
+    "csp-innerhtml-trusted-types": { suites: [{ page: `${F}csp-innerhtml.html`, csp: true }], engines: ["chromium", "webkit"], expect: FAIL(VIOLATION_ON("csp-innerhtml.html", ["chromium", "webkit"], "require-trusted-types-for")) },
     "late-assertion": { suites: [`${F}late-assertion.html`], expect: FAIL("harness: assertion after test 'a' settled (failed): fixture: late assertion") },
     "page-missing-from-list": {
         suites: [`${F}pass.html`],
@@ -126,7 +138,7 @@ const browser = {
     "control-doc-snippets": { suites: [`${F}doc-snippets-control.html`], expect: PASS },
     "doc-snippet-run-throws": {
         suites: [`${F}doc-snippets-run-throws.html`],
-        expect: FAIL(`FAILED  ${F}doc-snippets-run-throws.html#doc-snippets-run-throws.md:3 [stitch.js]: the snippet threw`)
+        expect: FAIL(`FAILED  ${F}doc-snippets-run-throws.html#doc-snippets-run-throws.md:3 [chromium stitch.js]: the snippet threw`)
     },
     "doc-snippet-throw-absent": {
         suites: [`${F}doc-snippets-throw-absent.html`],
@@ -184,7 +196,7 @@ const browser = {
     "acceptance-assertion-fails": {
         suites: [`${F}pass.html`],
         acceptance: [{ spec: `${F}acceptance-fail.spec.js`, pending: false }],
-        expect: FAIL(`FAILED  ${F}acceptance-page.html#click-increments [stitch.js]: text of [data-testid="count"]`)
+        expect: FAIL(`FAILED  ${F}acceptance-page.html#click-increments [chromium stitch.js]: text of [data-testid="count"]`)
     },
     "acceptance-console-error": {
         suites: [`${F}pass.html`],
@@ -212,6 +224,11 @@ const OLD = "v" + "1.0.0";
 const CONSOLE = "con" + "sole";
 const BUILD_TREE = ["package.json", "stitch.entry.js", "packages", "stitch.js", "stitch.min.js", "dist"];
 
+const OPTIONAL_CHAINING = "| Optional chaining (`?.`) | 80 | 80 | 74 | 13.1 |";
+// A README whose "Browser support" section has the given feature rows and minimum line.
+const SUPPORT_README = (rows, minimum) => "# Readme\n\n## Browser support\n\n| Feature | Chrome | Edge | Firefox | Safari |\n|---|---|---|---|---|\n" +
+    rows.join("\n") + "\n\nMinimum versions: " + minimum + ".\n\n## License\n\nMIT.\n";
+
 const staticFixtures = {
     "version-literal-control": {
         check: "version-literal",
@@ -227,6 +244,22 @@ const staticFixtures = {
         check: "version-literal",
         create: (dir) => write(dir, { "package.json": PKG, "packages/core/package.json": "{ \"name\": \"core\", \"version\": \"9.8.7\" }\n" }),
         expect: FAIL("packages/core/package.json:1: version literal")
+    },
+    "version-literal-changelog-heading": {
+        check: "version-literal",
+        // The release's own CHANGELOG heading may carry the version (dated or not).
+        create: (dir) => write(dir, { "package.json": PKG, "CHANGELOG.md": "# Changelog\n\n## 9.8.7 (2026-10-20)\n\nFirst.\n\n## 9.8.7\n" }),
+        expect: PASS
+    },
+    "version-literal-changelog-prose": {
+        check: "version-literal",
+        create: (dir) => write(dir, { "package.json": PKG, "CHANGELOG.md": "# Changelog\n\n## 9.8.7 (2026-10-20)\n\nUpgrade to 9.8.7 now.\n" }),
+        expect: FAIL('CHANGELOG.md:5: version literal "9.8.7"')
+    },
+    "version-literal-heading-elsewhere": {
+        check: "version-literal",
+        create: (dir) => write(dir, { "package.json": PKG, "README.md": "# Readme\n\n## 9.8.7\n" }),
+        expect: FAIL('README.md:3: version literal "9.8.7"')
     },
     "stale-version-control": {
         check: "stale-version",
@@ -381,6 +414,98 @@ const staticFixtures = {
         check: "bundle-require",
         create: (dir) => write(dir, { "package.json": PKG, "stitch.js": "var ok = 1;\nvar m = (function(){ try { return re" + "quire(\"./packages/x\"); } catch (e) {} })();\n", "stitch.min.js": "var m=1;\n" }),
         expect: FAIL("stitch.js:2: require() in the bundle")
+    },
+    // no-html-sinks: nothing the library ships writes an HTML, script or style string.
+    "no-html-sinks-control": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "packages/browser/src/a.js": "el.textContent = text;\nel.replaceChildren(row);\nel.style.setProperty('color', c);\nif (el.style == null) {}\nsetTimeout(flush, 0);\n",
+            "stitch.js": "var t = document.createElement('template');\n",
+            // Pages and tools may use sinks; only what the library ships is checked.
+            "page.html": "<script>document.body." + "inner" + "HTML = '<b>ok in a page</b>';</script>\n"
+        }),
+        expect: PASS
+    },
+    "no-html-sinks-innerhtml": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/browser/src/a.js": "function f(el, html) {\n    el." + "inner" + "HTML = html;\n}\n" }),
+        expect: FAIL("packages/browser/src/a.js:2: an HTML-string sink in the library")
+    },
+    "no-html-sinks-in-the-bundle-only": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "stitch.min.js": "a.insertAdjacent" + "HTML('beforeend',b);\n" }),
+        expect: FAIL("stitch.min.js:1: an HTML-string sink in the library")
+    },
+    "no-html-sinks-entry": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "stitch.entry.js": "document." + "write('<p>');\n" }),
+        expect: FAIL("stitch.entry.js:1: an HTML-string sink in the library")
+    },
+    "no-html-sinks-eval": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/core/src/a.js": "const f = new " + "Function('a', 'return a');\n" }),
+        expect: FAIL("packages/core/src/a.js:1: a script-string sink in the library")
+    },
+    "no-html-sinks-style-text": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/utils/src/a.js": "el.style." + "cssText = css;\n" }),
+        expect: FAIL("packages/utils/src/a.js:1: a style string in the library")
+    },
+    "no-html-sinks-style-attribute": {
+        check: "no-html-sinks",
+        create: (dir) => write(dir, { "package.json": PKG, "packages/utils/src/a.js": "el.setAttribute(\"" + "style\", css);\n" }),
+        expect: FAIL("packages/utils/src/a.js:1: a style string in the library")
+    },
+    // browser-support: README's table follows the features the code uses; no claim elsewhere.
+    "browser-support-control": {
+        check: "browser-support",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            // A feature inside a comment or a string does not count.
+            "packages/core/src/a.js": "const v = a?.b; // x.replaceAll(y)\nconst s = 'structuredClone(x)';\n",
+            "README.md": SUPPORT_README([OPTIONAL_CHAINING], "Chrome 80, Edge 80, Firefox 74, Safari 13.1"),
+            "docs/history/old.md": "Works in Chrome 49+.\n",
+            "docs/GUIDE.md": "Tested in Chromium, Firefox and WebKit.\n"
+        }),
+        expect: PASS
+    },
+    "browser-support-feature-without-row": {
+        check: "browser-support",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "packages/core/src/a.js": "const v = a?.b;\nconst c = structuredClone(v);\n",
+            "README.md": SUPPORT_README([OPTIONAL_CHAINING], "Chrome 80, Edge 80, Firefox 74, Safari 13.1")
+        }),
+        expect: FAIL("the library uses `structuredClone()` but \"Browser support\" has no row for it")
+    },
+    "browser-support-stale-minimum": {
+        check: "browser-support",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "packages/core/src/a.js": "const v = a?.b;\n",
+            "README.md": SUPPORT_README([OPTIONAL_CHAINING], "Chrome 49, Edge 79, Firefox 74, Safari 13.1")
+        }),
+        expect: FAIL("must say \"Minimum versions: Chrome 80, Edge 80, Firefox 74, Safari 13.1.\"")
+    },
+    "browser-support-row-without-feature": {
+        check: "browser-support",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "packages/core/src/a.js": "const v = a?.b;\n",
+            "README.md": SUPPORT_README([OPTIONAL_CHAINING, "| `structuredClone()` | 98 | 98 | 94 | 15.4 |"], "Chrome 80, Edge 80, Firefox 74, Safari 13.1")
+        }),
+        expect: FAIL("lists `structuredClone()`, which the library does not use")
+    },
+    "browser-support-claim-elsewhere": {
+        check: "browser-support",
+        create: (dir) => write(dir, {
+            "package.json": PKG,
+            "packages/core/src/a.js": "const v = a?.b;\n",
+            "README.md": SUPPORT_README([OPTIONAL_CHAINING], "Chrome 80, Edge 80, Firefox 74, Safari 13.1"),
+            "docs/GUIDE.md": "# Guide\n\nWorks in Chrome 49+ and IE11.\n"
+        }),
+        expect: FAIL("docs/GUIDE.md:3: browser version claim \"Chrome 49\"")
     },
     "build-match-control": {
         check: "build-match",

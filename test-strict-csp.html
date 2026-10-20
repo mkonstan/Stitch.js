@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js under a strict Content-Security-Policy</title>
+</head>
+<body>
+    <h1>Strict CSP</h1>
+    <p>
+        The test runner serves this page with: default-src 'self'; script-src 'self'; style-src 'self';
+        require-trusted-types-for 'script'; object-src 'none'; base-uri 'none'. The page has no inline
+        script and no inline style. Every binding, keyed lists, templates, custom bindings, onError and
+        the error paths run here; any policy violation or Trusted Types error fails the run.
+    </p>
+
+    <section id="values">
+        <input id="name" data-value="name">
+        <input id="agree" type="checkbox" data-value="agree">
+        <input id="qty" type="number" data-value="qty">
+        <p id="greeting" data-text="greeting"></p>
+        <p id="shown" data-visible="showDetails">Details</p>
+        <button id="save" type="button" data-enabled="canSave" data-class="saveClass">Save</button>
+        <a id="link" data-attr="linkAttrs">Profile</a>
+        <div id="styled" data-attr="styleAttrs">Styled</div>
+        <button id="busy" type="button" data-loading="loading">Busy</button>
+    </section>
+
+    <section id="handlers">
+        <button id="inc" type="button" data-click="increment">+1</button>
+        <input id="typed" data-event="typedEvents">
+        <span id="count" data-text="count"></span>
+        <span id="typed-count" data-text="typedCount"></span>
+    </section>
+
+    <section id="lists">
+        <ul id="rows" data-foreach="visibleRows" data-key="sku">
+            <li><span data-text="label"></span> <button type="button" data-click="$root.remove">x</button></li>
+        </ul>
+        <select id="pick" data-foreach="options" data-value="picked" data-default-text="Choose...">
+            <option data-text="$data"></option>
+        </select>
+        <ul id="tree" data-foreach="nodes" data-template="tpl-node"></ul>
+        <table><tbody id="table" data-foreach="rows" data-key="sku" data-template="tpl-row"></tbody></table>
+    </section>
+
+    <template id="tpl-node">
+        <li><span data-text="name"></span><ul data-foreach="children" data-template="tpl-node"></ul></li>
+    </template>
+    <template id="tpl-row">
+        <tr><td data-text="sku"></td><td data-text="$index"></td></tr>
+    </template>
+
+    <section id="custom">
+        <span id="tip" data-tip="tipText">tip</span>
+        <span id="note" data-note="Saved">note</span>
+    </section>
+
+    <section id="later">
+        <a id="later-link" data-attr="attrs">later</a>
+        <span id="later-class" data-class="cls">class</span>
+        <ul id="later-list" data-foreach="items"><li data-text="name"></li></ul>
+    </section>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script src="tests/xss-corpus.js"></script>
+    <script src="tests/strict-csp.js"></script>
+</body>
+</html>

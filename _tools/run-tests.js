@@ -6,9 +6,12 @@
  *   1. Static checks (_tools/check-repo.js): version literal, local paths,
  *      missing references, build-match (stitch.js and stitch.min.js equal a
  *      fresh build of packages/*).
- *   2. Every page in tests/suites.js, in Chromium, against stitch.js AND
- *      stitch.min.js. The page's own <script src="stitch.js"> is answered with
- *      the build under test. Pages report through tests/harness.js.
+ *   2. Every page in tests/suites.js, in three browser engines (Playwright
+ *      Chromium, Firefox and WebKit), against stitch.js AND stitch.min.js. The
+ *      page's own <script src="stitch.js"> is answered with the build under test.
+ *      Pages report through tests/harness.js. A page listed with csp: true is
+ *      served with the strict Content-Security-Policy header (STRICT_CSP); any
+ *      policy violation on any page is a page problem.
  *   3. Acceptance specs (tests/acceptance/*.spec.js) listed in tests/suites.js and
  *      not pending, on both builds: Playwright drives the spec's page like a user.
  *   4. Gate self-tests: each fixture in tests/gate-fixtures/fixtures.js is a way
@@ -17,10 +20,11 @@
  *
  * Exit 0 only when: static checks pass; every listed page exists, finishes, and
  * reports a non-empty plan with one result per planned test; no page logs an
- * uncaught error or console error or fails a request; failed = 0 and
- * skipped = 0 on both builds; every tests/known-failing.json entry names a real
- * test that FAILED on both builds; no test page is missing from the list; and
- * every self-test behaves as expected.
+ * uncaught error or console error, fails a request or violates its Content
+ * Security Policy; failed = 0 and skipped = 0 on every engine and both builds;
+ * every tests/known-failing.json entry names a real test that FAILED on every
+ * engine and both builds; no test page is missing from the list; and every
+ * self-test behaves as expected.
  *
  * Usage:
  *   node _tools/run-tests.js                  full run (what CI and `npm test` do)
@@ -43,6 +47,13 @@ const FIXTURES_FILE = "tests/gate-fixtures/fixtures.js";
 const FIXTURE_DIR = "tests/gate-fixtures/";
 const REPORT_FILE = "_scratch/test-report.json";
 const BUILDS = ["stitch.js", "stitch.min.js"];
+// Every supported browser family has its engine here: Chrome and Edge (Chromium), Firefox,
+// Safari (WebKit). A failure on any engine fails the run.
+const ENGINES = ["chromium", "firefox", "webkit"];
+// The policy a csp: true suite page is served with: no inline script or style, no eval, no
+// plugins, no <base>, and Trusted Types required for every script-bearing DOM sink.
+const STRICT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; " +
+    "require-trusted-types-for 'script'; object-src 'none'; base-uri 'none'";
 const PAGE_TIMEOUT_MS = 20000;
 const ACCEPTANCE_TEST_TIMEOUT_MS = 15000;
 const ACCEPTANCE_HELPERS = "tests/acceptance/helpers.js";
@@ -71,6 +82,7 @@ function mainConfig() {
         knownFailingLabel: KNOWN_FAILING_FILE,
         discoverDir: "",
         excludeDirs: [FIXTURE_DIR],
+        engines: ENGINES,
         builds: BUILDS,
         pageTimeoutMs: PAGE_TIMEOUT_MS,
         staticChecks: true,
@@ -84,7 +96,7 @@ function fixtureConfig(name) {
     if (!fixture) throw new Error(`unknown fixture "${name}" (see ${FIXTURES_FILE})`);
     return {
         name: `fixture:${name}`,
-        suites: loadSuites(fixture.suites.map((page) => ({ page }))),
+        suites: loadSuites(fixture.suites.map((page) => (typeof page === "string" ? { page } : page))),
         examples: loadExamples(fixture.examples || []),
         acceptance: loadAcceptance(fixture.acceptance || [], fixture.pendingDir || PENDING_DIR, `${FIXTURES_FILE}#${name}`),
         runPendingAcceptance: false,
@@ -92,6 +104,9 @@ function fixtureConfig(name) {
         knownFailingLabel: `${FIXTURES_FILE}#${name}`,
         discoverDir: fixture.discoverDir || null,
         excludeDirs: [],
+        // Fixtures test the gate, not the library: one engine, unless the fixture is about
+        // what each engine enforces (the CSP fixtures run on every engine).
+        engines: fixture.engines || ["chromium"],
         builds: ["stitch.js"],
         pageTimeoutMs: fixture.pageTimeoutMs || PAGE_TIMEOUT_MS,
         staticChecks: false,
@@ -114,6 +129,7 @@ function acceptanceConfig() {
         knownFailingLabel: KNOWN_FAILING_FILE,
         discoverDir: null,
         excludeDirs: [],
+        engines: ENGINES,
         builds: BUILDS,
         pageTimeoutMs: PAGE_TIMEOUT_MS,
         staticChecks: false,
@@ -173,7 +189,8 @@ function loadSuites(list) {
         if (!entry || typeof entry.page !== "string") throw new Error(`suite entry without a page: ${JSON.stringify(entry)}`);
         if (seen.has(entry.page)) throw new Error(`suite listed twice: ${entry.page}`);
         seen.add(entry.page);
-        return { page: entry.page.replace(/\\/g, "/") };
+        if (entry.csp !== undefined && typeof entry.csp !== "boolean") throw new Error(`suite ${entry.page}: "csp" must be true or false`);
+        return { page: entry.page.replace(/\\/g, "/"), csp: entry.csp === true };
     });
 }
 
@@ -300,7 +317,8 @@ function checkSuiteList(config) {
 const CONTENT_TYPES = { ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".json": "application/json", ".css": "text/css" };
 
 function startServer() {
-    const state = { buildBytes: null };
+    // buildBytes: the build under test; cspPages: page paths served with STRICT_CSP.
+    const state = { buildBytes: null, cspPages: new Set() };
     const server = http.createServer((req, res) => {
         const urlPath = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
         if (urlPath === "/favicon.ico") { res.writeHead(204); res.end(); return; }
@@ -313,7 +331,9 @@ function startServer() {
         if (!file.startsWith(ROOT) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
             res.writeHead(404); res.end("not found"); return;
         }
-        res.writeHead(200, { "Content-Type": CONTENT_TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
+        const headers = { "Content-Type": CONTENT_TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" };
+        if (state.cspPages.has(urlPath.replace(/^\//, ""))) headers["Content-Security-Policy"] = STRICT_CSP;
+        res.writeHead(200, headers);
         res.end(fs.readFileSync(file));
     });
     return new Promise((resolve) => {
@@ -326,27 +346,44 @@ function startServer() {
 // ---------------------------------------------------------------------------
 // Browser
 
-async function launchBrowser() {
-    const { chromium } = require("playwright");
-    const attempts = [
-        { label: "playwright chromium", options: {} },
-        { label: "installed Chrome (channel chrome)", options: { channel: "chrome" } },
-        { label: "installed Edge (channel msedge)", options: { channel: "msedge" } }
-    ];
+async function launchBrowser(engine) {
+    const playwright = require("playwright");
+    // Chromium may fall back to an installed Chrome or Edge; Firefox and WebKit have no
+    // fallback: an engine that cannot start fails the run (its coverage is never faked).
+    const attempts = engine === "chromium"
+        ? [
+            { label: "playwright chromium", options: {} },
+            { label: "installed Chrome (channel chrome)", options: { channel: "chrome" } },
+            { label: "installed Edge (channel msedge)", options: { channel: "msedge" } }
+        ]
+        : [{ label: `playwright ${engine}`, options: {} }];
     const errors = [];
     for (const attempt of attempts) {
         try {
-            const browser = await chromium.launch({ headless: true, ...attempt.options });
-            return { browser, label: attempt.label };
+            const browser = await playwright[engine].launch({ headless: true, ...attempt.options });
+            return { browser, label: `${attempt.label} ${browser.version()}` };
         } catch (error) {
             errors.push(`${attempt.label}: ${String(error.message || error).split("\n")[0]}`);
         }
     }
-    throw new Error(`no browser could be launched:\n  ${errors.join("\n  ")}\nRun: npx playwright install chromium`);
+    throw new Error(`no ${engine} browser could be launched:\n  ${errors.join("\n  ")}\nRun: npx playwright install chromium firefox webkit`);
 }
 
-async function runPage(browser, baseUrl, page, timeoutMs) {
+// Installed before any page script (Playwright init scripts are not subject to the page's
+// policy): every Content-Security-Policy violation on any page is recorded, so the runner
+// sees violations that happen before the harness loads, or that a browser does not log.
+function recordViolations() {
+    window.__stitchCspViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+        window.__stitchCspViolations.push(`${event.effectiveDirective || event.violatedDirective} blocked ${event.blockedURI || "inline"}` +
+            (event.sourceFile ? ` at ${event.sourceFile.replace(/^.*\//, "")}:${event.lineNumber}` : "") +
+            (event.sample ? ` (${event.sample.slice(0, 60)})` : ""));
+    }, true);
+}
+
+async function runPage(browser, baseUrl, page, timeoutMs, csp) {
     const context = await browser.newContext();
+    await context.addInitScript(recordViolations);
     const tab = await context.newPage();
     const observed = { consoleErrors: [], pageErrors: [], failedRequests: [], libraryLoads: 0 };
     tab.on("console", (msg) => { if (msg.type() === "error") observed.consoleErrors.push(msg.text()); });
@@ -359,8 +396,10 @@ async function runPage(browser, baseUrl, page, timeoutMs) {
     });
 
     let navigationError = null;
+    let servedPolicy = null;
     try {
-        await tab.goto(`${baseUrl}/${page}`, { waitUntil: "load", timeout: timeoutMs });
+        const response = await tab.goto(`${baseUrl}/${page}`, { waitUntil: "load", timeout: timeoutMs });
+        servedPolicy = response ? (response.headers()["content-security-policy"] || null) : null;
     } catch (error) {
         navigationError = String(error.message || error).split("\n")[0];
     }
@@ -378,10 +417,11 @@ async function runPage(browser, baseUrl, page, timeoutMs) {
     const snapshot = await tab.evaluate(() => ({
         report: window.__stitchTestReport ? JSON.parse(JSON.stringify(window.__stitchTestReport)) : null,
         version: window.Stitch ? window.Stitch.version : undefined,
-        exports: window.Stitch ? Object.keys(window.Stitch).sort() : null
-    })).catch((error) => ({ report: null, version: undefined, evalError: String(error.message || error) }));
+        exports: window.Stitch ? Object.keys(window.Stitch).sort() : null,
+        violations: window.__stitchCspViolations || null
+    })).catch((error) => ({ report: null, version: undefined, violations: null, evalError: String(error.message || error) }));
     await context.close();
-    return { page, navigationError, finished, ...observed, ...snapshot };
+    return { page, csp, servedPolicy, navigationError, finished, ...observed, ...snapshot };
 }
 
 /** Turn one page run into per-test statuses plus page-level problems. */
@@ -402,6 +442,11 @@ function analysePage(raw, timeoutMs) {
     const problems = [];
     const tests = [];
     if (raw.navigationError) problems.push(`navigation failed: ${raw.navigationError}`);
+    if (raw.csp && !raw.navigationError && raw.servedPolicy !== STRICT_CSP) {
+        problems.push(`the page was not served under the strict Content-Security-Policy (got ${JSON.stringify(raw.servedPolicy)})`);
+    }
+    if (raw.violations === null && !raw.navigationError) problems.push("the policy-violation recorder did not run on this page");
+    for (const violation of raw.violations || []) problems.push(`CSP violation: ${violation}`);
     for (const message of raw.pageErrors) problems.push(`uncaught page error: ${message}`);
     for (const message of raw.consoleErrors) problems.push(`console error: ${message}`);
     for (const message of raw.failedRequests) problems.push(`failed request: ${message}`);
@@ -460,6 +505,7 @@ async function runAcceptance(browser, baseUrl, specRel) {
     const tests = [];
     for (const [id, fn] of Object.entries(spec.tests)) {
         const context = await browser.newContext();
+        await context.addInitScript(recordViolations);
         const tab = await context.newPage();
         const observed = { consoleErrors: [], pageErrors: [], failedRequests: [], libraryLoads: 0 };
         tab.on("console", (msg) => { if (msg.type() === "error") observed.consoleErrors.push(msg.text()); });
@@ -490,6 +536,8 @@ async function runAcceptance(browser, baseUrl, specRel) {
                     clearTimeout(timer);
                 }
                 await tab.waitForTimeout(SETTLE_MS);
+                const violations = await tab.evaluate(() => window.__stitchCspViolations || []);
+                for (const violation of violations) failures.push(`CSP violation: ${violation}`);
             }
         } catch (error) {
             failures.push(String(error && error.message || error).split("\n").slice(0, 8).join(" | "));
@@ -506,13 +554,22 @@ async function runAcceptance(browser, baseUrl, specRel) {
 // ---------------------------------------------------------------------------
 // Classification
 
+/** Every engine x build pair a config runs, labelled "chromium stitch.js". */
+function targetsOf(config) {
+    const targets = [];
+    for (const engine of config.engines) {
+        for (const build of config.builds) targets.push({ engine, build, label: `${engine} ${build}` });
+    }
+    return targets;
+}
+
 function classify(config, runs) {
     const known = config.knownFailing;
     const summary = {};
     const fatal = [];
     const seenIds = new Set();
 
-    for (const build of config.builds) {
+    for (const { label: build } of targetsOf(config)) {
         const counts = { passed: 0, knownFailing: 0, failed: 0, skipped: 0, flipped: 0, pageProblems: 0 };
         for (const run of runs[build]) {
             for (const problem of run.problems) {
@@ -580,13 +637,76 @@ function firstLine(text) {
 }
 
 function printSummary(config, summary) {
-    const header = "build".padEnd(16) + "passed".padStart(8) + "known-failing".padStart(15) + "failed".padStart(8) + "skipped".padStart(9) + "flipped".padStart(9) + "page-problems".padStart(15);
+    const header = "engine build".padEnd(24) + "passed".padStart(8) + "known-failing".padStart(15) + "failed".padStart(8) + "skipped".padStart(9) + "flipped".padStart(9) + "page-problems".padStart(15);
     console.log(header);
-    for (const build of config.builds) {
+    for (const { label: build } of targetsOf(config)) {
         const c = summary[build];
-        console.log(build.padEnd(16) + String(c.passed).padStart(8) + String(c.knownFailing).padStart(15) + String(c.failed).padStart(8) +
+        console.log(build.padEnd(24) + String(c.passed).padStart(8) + String(c.knownFailing).padStart(15) + String(c.failed).padStart(8) +
             String(c.skipped).padStart(9) + String(c.flipped).padStart(9) + String(c.pageProblems).padStart(15));
     }
+}
+
+// ---------------------------------------------------------------------------
+// One engine: launch it, run every build's pages and acceptance specs. Returns null, or why
+// the engine could not run (which fails the run: no engine is ever skipped).
+
+async function runEngine(config, engine, runs, report) {
+    const started = Date.now();
+    let launched;
+    try {
+        launched = await launchBrowser(engine);
+    } catch (error) {
+        for (const build of config.builds) runs[`${engine} ${build}`] = [];
+        return String(error.message || error);
+    }
+    const { browser, label } = launched;
+    console.log(`  [${engine}] ${label}`);
+    report.browsers[engine] = label;
+    const server = await startServer();
+    for (const { page, csp } of config.suites) if (csp) server.state.cspPages.add(page);
+    try {
+        for (const build of config.builds) {
+            const target = `${engine} ${build}`;
+            server.state.buildBytes = fs.readFileSync(path.join(ROOT, build));
+            runs[target] = [];
+            for (const { page, csp } of config.suites) {
+                if (!fs.existsSync(path.join(ROOT, page))) continue;
+                let raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs, csp);
+                const connectFailure = connectionFailure(raw);
+                if (connectFailure) {
+                    // Retry ONCE, only for a connect-phase failure (the request never reached
+                    // this server; see connectionFailure). The second run is judged on its own;
+                    // anything it gets wrong, including the same failure, is fatal.
+                    // Say what the discarded run got wrong, so a retry never hides a real failure
+                    // that happened to coincide with the connect failure.
+                    const discarded = analysePage(raw, config.pageTimeoutMs);
+                    const discardedFailures = discarded.tests.filter((t) => t.status !== "pass")
+                        .map((t) => `${t.status} ${t.id}: ${String(t.detail).split("\n")[0]}`);
+                    console.log(`RETRY   ${page} [${target}]: ${connectFailure}. Re-running the page once. ` +
+                        `The discarded run had ${discarded.problems.length} page problem(s) and ${discardedFailures.length} non-passing test(s):`);
+                    for (const line of discarded.problems.concat(discardedFailures)) console.log(`        discarded: ${line}`);
+                    report.retries.push({ page, build: target, reason: connectFailure, discardedProblems: discarded.problems, discardedFailures });
+                    raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs, csp);
+                }
+                const analysed = analysePage(raw, config.pageTimeoutMs);
+                runs[target].push(analysed);
+                logRun(target, page, analysed);
+            }
+            for (const entry of config.acceptance) {
+                if (entry.pending && !config.runPendingAcceptance) continue;
+                if (!fs.existsSync(path.join(ROOT, entry.spec))) continue;
+                const analysed = await runAcceptance(browser, server.baseUrl, entry.spec);
+                runs[target].push(analysed);
+                logRun(target, `${entry.spec} -> ${analysed.page}`, analysed);
+            }
+        }
+    } finally {
+        server.server.close();
+        await browser.close();
+    }
+    report.timing[engine] = Math.round((Date.now() - started) / 1000);
+    console.log(`  [${engine}] done in ${report.timing[engine]} s`);
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -618,10 +738,12 @@ async function mapLimit(items, limit, fn) {
 function judge(name, kind, expect, outcome) {
     const wantFail = expect.exitCode !== 0;
     const exitOk = wantFail ? outcome.code !== 0 : outcome.code === 0;
-    const textOk = !expect.output || outcome.output.includes(expect.output);
+    // output: one text, or several that must all appear (e.g. one per engine).
+    const texts = expect.output ? [].concat(expect.output) : [];
+    const textOk = texts.every((text) => outcome.output.includes(text));
     const ok = exitOk && textOk;
     const why = wantFail
-        ? `runner must exit non-zero and say "${expect.output}"`
+        ? `runner must exit non-zero and say ${texts.map((text) => `"${text}"`).join(" and ")}`
         : "control: runner must exit 0";
     return { name, kind, ok, code: outcome.code, why, output: outcome.output };
 }
@@ -677,49 +799,16 @@ async function main() {
     for (const problem of listProblems) console.log(`LIST    ${problem}`);
     if (listProblems.length) verdict.push(`${listProblems.length} suite-list problem(s)`);
 
-    const { browser, label } = await launchBrowser();
-    console.log(`== Browser suites (${label}): ${config.suites.length} page(s) x ${config.builds.length} build(s)`);
-    report.browser = label;
-    const server = await startServer();
+    // The engines run side by side, each with its own server (the server answers
+    // /stitch.js with that engine's build under test); within an engine, pages run one at a time.
+    console.log(`== Browser suites: ${config.suites.length} page(s) x ${config.builds.length} build(s) x ${config.engines.length} engine(s) (${config.engines.join(", ")})`);
+    report.browsers = {};
+    report.timing = {};
     const runs = {};
-    try {
-        for (const build of config.builds) {
-            server.state.buildBytes = fs.readFileSync(path.join(ROOT, build));
-            runs[build] = [];
-            for (const { page } of config.suites) {
-                if (!fs.existsSync(path.join(ROOT, page))) continue;
-                let raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
-                const connectFailure = connectionFailure(raw);
-                if (connectFailure) {
-                    // Retry ONCE, only for a connect-phase failure (the request never reached
-                    // this server; see connectionFailure). The second run is judged on its own;
-                    // anything it gets wrong, including the same failure, is fatal.
-                    // Say what the discarded run got wrong, so a retry never hides a real failure
-                    // that happened to coincide with the connect failure.
-                    const discarded = analysePage(raw, config.pageTimeoutMs);
-                    const discardedFailures = discarded.tests.filter((t) => t.status !== "pass")
-                        .map((t) => `${t.status} ${t.id}: ${String(t.detail).split("\n")[0]}`);
-                    console.log(`RETRY   ${page} [${build}]: ${connectFailure}. Re-running the page once. ` +
-                        `The discarded run had ${discarded.problems.length} page problem(s) and ${discardedFailures.length} non-passing test(s):`);
-                    for (const line of discarded.problems.concat(discardedFailures)) console.log(`        discarded: ${line}`);
-                    report.retries.push({ page, build, reason: connectFailure, discardedProblems: discarded.problems, discardedFailures });
-                    raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs);
-                }
-                const analysed = analysePage(raw, config.pageTimeoutMs);
-                runs[build].push(analysed);
-                logRun(build, page, analysed);
-            }
-            for (const entry of config.acceptance) {
-                if (entry.pending && !config.runPendingAcceptance) continue;
-                if (!fs.existsSync(path.join(ROOT, entry.spec))) continue;
-                const analysed = await runAcceptance(browser, server.baseUrl, entry.spec);
-                runs[build].push(analysed);
-                logRun(build, `${entry.spec} -> ${analysed.page}`, analysed);
-            }
-        }
-    } finally {
-        server.server.close();
-        await browser.close();
+    const engineOutcomes = await Promise.all(config.engines.map((engine) => runEngine(config, engine, runs, report)));
+    for (const failure of engineOutcomes.filter(Boolean)) {
+        console.log(`ENGINE  ${failure}`);
+        verdict.push(failure);
     }
 
     for (const entry of config.acceptance) {

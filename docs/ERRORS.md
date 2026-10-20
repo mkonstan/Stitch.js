@@ -21,9 +21,10 @@ a computed, a change handler, an event subscriber, a click handler), go to the h
 with `Stitch.onError(fn)`; with none installed they are re-thrown as uncaught errors. See
 [Errors in the Guide](GUIDE.md#errors).
 
-One error comes from the browser, not from Stitch: `TypeError: Cannot delete property '…' of
-#<Object>` from `delete model.x` in strict-mode code. Model properties cannot be deleted; set them
-to `null` instead.
+One error comes from the browser, not from Stitch: a `TypeError` from `delete model.x` in
+strict-mode code. Its text depends on the browser: `Cannot delete property '…' of #<Object>`
+(Chrome, Edge), `property "…" is non-configurable and can't be deleted` (Firefox), `Unable to
+delete property.` (Safari). Model properties cannot be deleted; set them to `null` instead.
 
 ## Contents
 

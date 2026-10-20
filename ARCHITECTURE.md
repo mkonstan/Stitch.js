@@ -25,7 +25,7 @@ Use this when you need to:
 1. Install dependencies:
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 2. Build generated artifacts from modular sources:
@@ -143,11 +143,13 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 |---|---|
 | `_tools/build-stitch-assembly.js` | assembly builder: module discovery, reachability graph, inline prelude, version stamping, metadata |
 | `minify.js` | terser minification of `stitch.js` into `stitch.min.js` |
-| `_tools/run-tests.js` | `npm test`: static checks, browser suites on both builds, gate self-tests |
-| `_tools/check-repo.js` | static checks: version literal, stale version, local paths, missing references, build-match, no console, no random ids, bundle require, and the documentation checks |
+| `_tools/run-tests.js` | `npm test`: static checks, browser suites on three engines and both builds, gate self-tests |
+| `_tools/check-repo.js` | static checks: version literal, stale version, local paths, missing references, build-match, no console, no random ids, bundle require, no HTML sinks, browser support, and the documentation checks |
 | `_tools/doc-checks.js` | the documentation checks: doc-snippets, api-coverage, error-coverage, doc-hygiene |
 | `tests/doc-snippets.js` | the doc-snippet parser and browser runner; `DOC_SET` lists the documents whose code blocks run |
 | `test-doc-snippets.html` | the suite page that runs every runnable code block of `DOC_SET` |
+| `test-strict-csp.html`, `tests/strict-csp.js` | the strict-CSP suite (served with the policy; see 7.4) |
+| `test-attr-safety.html`, `tests/attr-safety.js`, `tests/xss-corpus.js` | the attribute XSS corpus: every payload refused with its code, legitimate values still work |
 | `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`): suite pages, example pages, acceptance specs |
 | `tests/acceptance/` | acceptance specs (Playwright, drive a page like a user), their helpers, and `TASKS.md` (what each page must do) |
 | `tests/harness.js` | in-page reporting protocol every suite uses |
@@ -169,7 +171,8 @@ The list lives in `tests/suites.js`; do not repeat it elsewhere. Every `test-*.h
 
 - Node.js 18+
 - npm workspace install complete
-- Playwright Chromium installed for the browser suites
+- Playwright Chromium, Firefox and WebKit installed for the browser suites
+  (`npx playwright install chromium firefox webkit`; CI adds `--with-deps`)
 
 ### 6.2 Build Commands
 
@@ -204,7 +207,7 @@ npm run build:assembly:all
 8. Stamps a `/*!` metadata comment (preserved through Terser minification):
 - `source`, `mode`, `moduleCount`, `availableModuleCount`, `modules[]`, `moduleMap`.
 - No timestamp: the output depends only on the sources, so a rebuild of unchanged sources is byte-identical.
-9. Prepends a `/*!` license banner with the `package.json` version.
+9. Prepends a `/*!` license banner with the `package.json` version and the repository URL.
 10. Writes output to both `dist/stitch.assembled.js` and `stitch.js`.
 
 ### 6.4 Output Integrity Expectations
@@ -224,20 +227,26 @@ npm run build:assembly:all
    - missing-reference: every file a doc or page points to exists, every `#heading` a markdown link points to exists (GitHub anchor rules), and every `npm run` script mentioned exists;
    - build-match: see 6.4;
    - no-console, no-random-ids, bundle-require: the library never logs, ids are counters, the bundle never calls `require()`;
+   - no-html-sinks: nothing the library ships (`packages/`, `stitch.entry.js`, the generated bundles; comments included) writes an HTML string (`innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `createContextualFragment`, `DOMParser`, `srcdoc`), a script string (`eval`, `new Function`, a string timer) or a style string (`cssText`, a `style` attribute, `element.style = ...`); so the library runs under Trusted Types and `style-src` without `'unsafe-inline'`;
+   - browser-support: the newest JavaScript and DOM features the library uses (read from `packages/` with comments and strings removed) are each listed in README's "Browser support" table, and its minimum versions are the highest of theirs; no browser version is claimed anywhere else outside `docs/history/`;
    - doc-snippets: every ```` ```html ```` / ```` ```js ```` block of a public markdown document carries a mode (`run`, `page`, `throws`, `fragment`), and every such document is in `DOC_SET` (see 7.1);
    - api-coverage: the public surface read from the code (`window.Stitch` and what hangs off it, the model helpers, the bindings and the attributes Stitch reads, the row-context names) and the `###` headings of `docs/API.md` match in both directions; code spans in the guides that name an API must name a real one;
    - error-coverage: by code, both ways. Every error built in `packages/` starts with a stable code (`[Stitch E###]`; an error without one fails); every code has one `### E###: title` entry in `docs/ERRORS.md` with a Cause, a Fix and a `**Message:**` line equal to the message's static text (`…` for run-time parts); every entry's code is thrown; two sites using one code for different messages fail. Codes are public API: grouped by area (first digit), numbered once, never reused;
    - doc-hygiene: public documents state rules, not private project history: no decision numbers, triage numbers or paths into private notes.
-2. **Browser suites**: every page in `tests/suites.js`, in headless Chromium, served over a local HTTP server.
-   Each page's `stitch.js` request is answered with the build under test: first `stitch.js`, then `stitch.min.js`.
-3. **Acceptance specs**: every entry of `acceptance` in `tests/suites.js` that is not `pending`, on both builds
-   (see 7.2).
+2. **Browser suites**: every page in `tests/suites.js`, on three engines (Playwright Chromium, Firefox and
+   WebKit, which stand for Chrome and Edge, Firefox, and Safari), each served over its own local HTTP server.
+   The engines run side by side; within an engine, pages run one at a time. Each page's `stitch.js` request is
+   answered with the build under test: first `stitch.js`, then `stitch.min.js`. An engine that cannot be launched
+   fails the run (Chromium alone may fall back to an installed Chrome or Edge).
+3. **Acceptance specs**: every entry of `acceptance` in `tests/suites.js` that is not `pending`, on every engine and
+   both builds (see 7.2).
 4. **Gate self-tests**: each fixture in `tests/gate-fixtures/fixtures.js` re-runs the gate on a deliberately broken
    input and requires a non-zero exit with the stated reason (controls must pass).
 
 A page fails the gate when it: never loads the build under test; logs an uncaught error or a console error; has a
 failed request; never finishes; plans zero tests; reports a test twice, late, unplanned or skipped; or leaves a
-planned test unreported; or makes an assertion after its test has settled. `window.Stitch` must expose exactly the public surface and the `package.json` version.
+planned test unreported; or makes an assertion after its test has settled; or violates a Content-Security-Policy
+(every page, see 7.4). `window.Stitch` must expose exactly the public surface and the `package.json` version.
 
 Per test, against `tests/known-failing.json`:
 - failed and listed, with exactly the failures named in its `expect` list: counted as known-failing (not fatal).
@@ -249,14 +258,15 @@ Per test, against `tests/known-failing.json`:
 - failed and not listed: FATAL;
 - a listed entry that matches no test: FATAL.
 
-The summary prints `passed / known-failing / failed / skipped` per build. The full report is `_scratch/test-report.json`.
+The summary prints `passed / known-failing / failed / skipped` per engine and build. The full report is
+`_scratch/test-report.json` (with each engine's browser version and time).
 
-CI (`.github/workflows/test.yml`) runs `npm run build`, `git diff --exit-code`, then `npm test`.
+CI (`.github/workflows/test.yml`) installs the three engines, runs `npm run build`, `git diff --exit-code`, then `npm test`.
 
 ### 7.1 Executable documentation
 
 The public documents (README, AGENTS.md, CHANGELOG.md, MIGRATION.md, docs/GUIDE.md, docs/API.md,
-docs/ERRORS.md: `DOC_SET` in `tests/doc-snippets.js`) are tests. `test-doc-snippets.html` runs every
+docs/ERRORS.md, docs/ACCESSIBILITY.md: `DOC_SET` in `tests/doc-snippets.js`) are tests. `test-doc-snippets.html` runs every
 `run` and `throws` block in its own iframe against the build under test:
 
 - `run`: must not throw (now or in a later update) and must not log a console error;
@@ -291,6 +301,35 @@ the suite list. Gate fixtures cover a failing spec, a console error, a missing p
 the signatures or the prose under a heading. `error-coverage` proves that codes and message texts
 match; it does not read the Cause and Fix prose. Prose is verified only where an executed snippet
 exercises it (`run` blocks with checks, `throws` blocks), so a new rule should come with one.
+
+### 7.4 The strict-CSP suite
+
+A page listed in `tests/suites.js` with `csp: true` is served with
+
+```text
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self';
+  require-trusted-types-for 'script'; object-src 'none'; base-uri 'none'
+```
+
+(`STRICT_CSP` in `_tools/run-tests.js`): no inline script or style, no `eval`, Trusted Types
+required for every script-bearing DOM sink. `test-strict-csp.html` is that page: it has no inline
+script and no inline style (its tests are in `tests/strict-csp.js`) and exercises every binding,
+keyed lists (reorder, filter, removal), a select list, recursive templates, path and literal custom
+bindings, errors routed to `Stitch.onError`, coded errors from `bind()`, and the whole XSS corpus.
+
+On every page (CSP or not) the runner installs a `securitypolicyviolation` recorder before any page
+script runs (a Playwright init script, which the policy does not block); every recorded violation is
+a page problem, and so is a CSP page whose response did not carry the policy. Gate fixtures prove,
+on each engine, that an inline style, an inline script and a swallowed `eval` fail the run, and, on
+Chromium and WebKit, that a swallowed `innerHTML` write does (Trusted Types). Firefox ignores
+`require-trusted-types-for` (it logs "unknown directive"), so on Firefox the HTML-sink guarantee
+rests on the `no-html-sinks` static check.
+
+`test-doc-snippets.html` is NOT a CSP page, by design: it runs documentation snippets in `srcdoc`
+iframes with inline scripts and evaluates their checks with `eval`. The library code those snippets
+call is the same code the CSP suite runs under the policy. Most other suite pages also use inline
+scripts and are not CSP pages: they test the library's behaviour, and the CSP suite tests that the
+same behaviour holds under the policy.
 
 ## 8. Common Change Workflows
 
@@ -334,7 +373,7 @@ when they break existing pages, `MIGRATION.md` and `CHANGELOG.md`.
 
 ### 8.6 Release a New Version
 
-Change `version` in the root `package.json` only, run `npm install` (for the lock file) and `npm run build`, then `npm test`.
+Follow [RELEASE.md](RELEASE.md): bump the version at its single source (`npm version X.Y.Z --no-git-tag-version`), date the `CHANGELOG.md` heading, `npm run build`, `npm test`, commit, merge to `main`, tag.
 
 ## 9. Constraints and Invariants
 

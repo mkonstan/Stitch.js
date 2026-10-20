@@ -6,7 +6,9 @@
  *   version-literal   The release version lives in ONE place: the root package.json.
  *                     Any other occurrence of that version string fails, except the
  *                     generated bundles (stamped by the build, compared byte-for-byte
- *                     by build-match) and npm's own lock-file fields (compared).
+ *                     by build-match), npm's own lock-file fields (compared), and the
+ *                     release's own heading in CHANGELOG.md ("## X.Y.Z" or
+ *                     "## X.Y.Z (date)", nothing else on the line).
  *   stale-version     No OTHER version is named either (x.y.z after "v" or "Version "):
  *                     a stale version on a page or in a doc is a false claim. Archived
  *                     history docs (ARCHIVE_PATHS) are exempt, and so is the history
@@ -26,6 +28,19 @@
  *   no-random-ids     No Math.random in packages/: ids are counters (triage #14).
  *   bundle-require    The generated bundles call no require(): every module is inlined, so
  *                     the browser bundle never reaches for a file system (triage #9).
+ *   no-html-sinks     No HTML-string, script-string or style-string sink anywhere in what the
+ *                     library ships (packages/, stitch.entry.js and the generated bundles,
+ *                     comments included): no innerHTML / outerHTML / insertAdjacentHTML /
+ *                     document.write / createContextualFragment / DOMParser / srcdoc writes,
+ *                     no eval / new Function / string timers, no style strings (cssText, a
+ *                     style attribute, element.style = ...). So the library works under
+ *                     require-trusted-types-for 'script' and style-src without
+ *                     'unsafe-inline'.
+ *   browser-support   README's "Browser support" section lists every newer language and DOM
+ *                     feature the library uses (FEATURES below, found in packages/ with
+ *                     comments and strings removed), one table row each, and its "Minimum
+ *                     versions" line is the highest of theirs. No browser version is claimed
+ *                     anywhere else outside docs/history/ (a stale claim like "Chrome 49+").
  *   doc-snippets,     The documentation checks (_tools/doc-checks.js): every html/js block
  *   api-coverage,     in the docs has a mode and is run by test-doc-snippets.html; docs/API.md
  *   error-coverage,   and the code name the same API; docs/ERRORS.md and packages/ name the
@@ -111,12 +126,22 @@ function checkVersionLiterals(root, files) {
             continue;
         }
         const text = readText(root, rel);
+        const heading = new RegExp(`^##\\s+${escapeRegExp(version)}(?:\\s+\\([^()\\n]*\\))?\\s*$`);
         let match;
         while ((match = literal.exec(text)) !== null) {
+            if (rel === CHANGELOG && heading.test(lineAround(text, match.index))) continue;
             problems.push(`${rel}:${lineOf(text, match.index)}: version literal "${version}" outside package.json (import it from packages/utils/src/version.js, or drop it)`);
         }
     }
     return problems;
+}
+
+const CHANGELOG = "CHANGELOG.md";
+
+function lineAround(text, index) {
+    const start = text.lastIndexOf("\n", index - 1) + 1;
+    const end = text.indexOf("\n", index);
+    return text.slice(start, end === -1 ? text.length : end).replace(/\r$/, "");
 }
 
 function checkLockVersions(root, version) {
@@ -462,6 +487,134 @@ function checkNoRandomIds(root, files) {
     return findAll(root, libraryFiles(files), RANDOM, "Math.random in the library (use a counter)");
 }
 
+// This file is not scanned (only what the library ships), so the patterns are plain literals.
+const SINKS = [
+    [/innerHTML/g, "an HTML-string sink"],
+    [/outerHTML/g, "an HTML-string sink"],
+    [/insertAdjacentHTML/g, "an HTML-string sink"],
+    [/document\s*\.\s*write(?:ln)?\b/g, "an HTML-string sink"],
+    [/createContextualFragment/g, "an HTML-string sink"],
+    [/DOMParser/g, "an HTML-string sink"],
+    [/parseFromString/g, "an HTML-string sink"],
+    [/\.\s*srcdoc\b/g, "an HTML-string sink"],
+    [/\beval\s*\(/g, "a script-string sink"],
+    [/\bnew\s+Function\b/g, "a script-string sink"],
+    [/\bset(?:Timeout|Interval)\s*\(\s*["'`]/g, "a script-string sink (a string timer)"],
+    [/cssText/g, "a style string"],
+    [/setAttribute(?:NS)?\s*\((?:[^,)]*,)?\s*["'`]style["'`]/g, "a style string"],
+    [/\.\s*style\s*=(?!=)/g, "a style string"]
+].map(([regex, kind]) => ({ regex, kind }));
+
+function checkNoHtmlSinks(root, files) {
+    const shipped = files.filter((rel) => (rel.startsWith(LIBRARY_DIR) && rel.endsWith(".js")) || rel === "stitch.entry.js");
+    const bundles = GENERATED_BUNDLES.filter((rel) => files.indexOf(rel) !== -1 || fs.existsSync(path.join(root, rel)));
+    const problems = [];
+    for (const { regex, kind } of SINKS) {
+        problems.push(...findAll(root, shipped.concat(bundles), regex,
+            `${kind} in the library (build DOM nodes, set textContent, use element.style.setProperty)`));
+    }
+    return problems;
+}
+
+// ---------------------------------------------------------------------------
+// browser-support
+
+// Language and DOM features newer than ES2017-era browsers, with the first version of each
+// browser that has them (MDN browser-compat-data). `test` runs on the library's code with
+// comments, strings and regex literals removed and tokens separated by single spaces.
+// Add a row here when the library starts using a newer feature; the check then asks for it
+// in README.
+const FEATURES = [
+    { name: "Optional chaining (`?.`)", test: /\? \.(?! [0-9])/, chrome: 80, edge: 80, firefox: 74, safari: 13.1 },
+    { name: "Nullish coalescing (`??`)", test: /\? \?(?! =)/, chrome: 80, edge: 80, firefox: 72, safari: 13.1 },
+    { name: "Logical assignment (`??=`, `||=`, `&&=`)", test: /(?:\? \?|\| \||& &) =/, chrome: 85, edge: 85, firefox: 79, safari: 14 },
+    { name: "`Element.replaceChildren()`", test: /\. replaceChildren \(/, chrome: 86, edge: 86, firefox: 78, safari: 14 },
+    { name: "`String.prototype.replaceAll()`", test: /\. replaceAll \(/, chrome: 85, edge: 85, firefox: 77, safari: 13.1 },
+    { name: "Private class members (`#name`)", test: /# [A-Za-z_$]/, chrome: 84, edge: 84, firefox: 90, safari: 15 },
+    { name: "`WeakRef` / `FinalizationRegistry`", test: /\b(?:WeakRef|FinalizationRegistry)\b/, chrome: 84, edge: 84, firefox: 79, safari: 14.1 },
+    { name: "`Array.prototype.at()`", test: /\. at \(/, chrome: 92, edge: 92, firefox: 90, safari: 15.4 },
+    { name: "`Object.hasOwn()`", test: /\bObject \. hasOwn\b/, chrome: 93, edge: 93, firefox: 92, safari: 15.4 },
+    { name: "`structuredClone()`", test: /\bstructuredClone \(/, chrome: 98, edge: 98, firefox: 94, safari: 15.4 },
+    { name: "`Array.prototype.findLast()`", test: /\. findLast(?:Index)? \(/, chrome: 97, edge: 97, firefox: 104, safari: 15.4 },
+    { name: "Static class blocks", test: /\bstatic \{/, chrome: 94, edge: 94, firefox: 93, safari: 16.4 },
+    { name: "`Array.prototype.toSorted()` and other copying array methods", test: /\. (?:toSorted|toReversed|toSpliced|with) \(/, chrome: 110, edge: 110, firefox: 115, safari: 16 },
+    { name: "`Object.groupBy()` / `Map.groupBy()`", test: /\b(?:Object|Map) \. groupBy\b/, chrome: 117, edge: 117, firefox: 119, safari: 17.4 },
+    { name: "`Promise.withResolvers()`", test: /\bPromise \. withResolvers\b/, chrome: 119, edge: 119, firefox: 121, safari: 17.4 },
+    { name: "Set methods (`union`, `intersection`, ...)", test: /\. (?:union|intersection|symmetricDifference|isSubsetOf|isSupersetOf|isDisjointFrom) \(/, chrome: 122, edge: 122, firefox: 127, safari: 17 }
+];
+const BROWSERS = [["chrome", "Chrome"], ["edge", "Edge"], ["firefox", "Firefox"], ["safari", "Safari"]];
+const SUPPORT_HEADING = /^##\s+Browser support\s*$/m;
+const VERSION_CLAIM = /\b(Chrome|Chromium|Edge|Firefox|Safari|Opera|Internet Explorer|IE)\s*v?(\d+(?:\.\d+)?)\b/g;
+
+/** The library's code with comments, strings and regex literals removed, tokens space-separated. */
+function codeOnly(src) {
+    return docChecks.tokenize(src)
+        .map((t) => (t.type === "str" || t.type === "tpl" || t.type === "regex" ? '""' : src.slice(t.start, t.end)))
+        .join(" ");
+}
+
+/** README's "Browser support" section: [start, end) character offsets, or null. */
+function supportSection(text) {
+    const m = SUPPORT_HEADING.exec(text);
+    if (!m) return null;
+    const rest = text.slice(m.index + m[0].length);
+    const next = /^##\s/m.exec(rest);
+    return { start: m.index, end: next ? m.index + m[0].length + next.index : text.length };
+}
+
+function formatVersion(v) {
+    return String(v);
+}
+
+function checkBrowserSupport(root, files) {
+    const problems = [];
+    const used = FEATURES.filter((feature) => libraryFiles(files).some((rel) => feature.test.test(codeOnly(readText(root, rel)))));
+    const minimum = {};
+    for (const [key] of BROWSERS) minimum[key] = Math.max(0, ...used.map((f) => f[key]));
+    if (files.indexOf("README.md") === -1) return ["README.md does not exist"];
+    const readme = readText(root, "README.md");
+    const section = supportSection(readme);
+    if (!section) {
+        problems.push('README.md has no "## Browser support" section');
+    } else {
+        const text = readme.slice(section.start, section.end);
+        const rows = text.split("\n").filter((line) => /^\|/.test(line) && !/^\|\s*-/.test(line));
+        for (const feature of used) {
+            const row = rows.find((line) => line.split("|")[1] && line.split("|")[1].trim() === feature.name);
+            const cells = BROWSERS.map(([key]) => formatVersion(feature[key]));
+            const expected = `| ${feature.name} | ${cells.join(" | ")} |`;
+            if (!row) {
+                problems.push(`README.md: the library uses ${feature.name} but "Browser support" has no row for it (add: ${expected})`);
+            } else if (row.replace(/\s+\|/g, " |").replace(/\|\s+/g, "| ").trim() !== expected) {
+                problems.push(`README.md: the "Browser support" row for ${feature.name} is not ${expected}`);
+            }
+        }
+        for (const row of rows.slice(1)) {
+            const name = (row.split("|")[1] || "").trim();
+            if (name && !used.some((f) => f.name === name)) {
+                problems.push(`README.md: "Browser support" lists ${name}, which the library does not use (remove the row)`);
+            }
+        }
+        const line = BROWSERS.map(([key, label]) => `${label} ${formatVersion(minimum[key])}`).join(", ");
+        if (text.indexOf(`Minimum versions: ${line}.`) === -1) {
+            problems.push(`README.md: "Browser support" must say "Minimum versions: ${line}." (the highest version any listed feature needs)`);
+        }
+    }
+    // No version claim anywhere else: one place says it, and the check keeps it true.
+    for (const rel of files) {
+        if (!/\.(?:md|html)$/.test(rel) || ARCHIVE_PATHS.some((dir) => rel.startsWith(dir))) continue;
+        const text = readText(root, rel);
+        const skip = rel === "README.md" ? supportSection(text) : null;
+        VERSION_CLAIM.lastIndex = 0;
+        let m;
+        while ((m = VERSION_CLAIM.exec(text)) !== null) {
+            if (skip && m.index >= skip.start && m.index < skip.end) continue;
+            problems.push(`${rel}:${lineOf(text, m.index)}: browser version claim "${m[0]}" outside README's "Browser support" section (state versions there only)`);
+        }
+    }
+    return problems;
+}
+
 function checkBundleRequire(root, files) {
     const bundles = GENERATED_BUNDLES.filter((rel) => files.indexOf(rel) !== -1 || fs.existsSync(path.join(root, rel)));
     return findAll(root, bundles, BARE_REQUIRE, "require() in the bundle (inline the module instead)");
@@ -478,6 +631,8 @@ const CHECKS = {
     "no-console": (root, files) => checkNoConsole(root, files),
     "no-random-ids": (root, files) => checkNoRandomIds(root, files),
     "bundle-require": (root, files) => checkBundleRequire(root, files),
+    "no-html-sinks": (root, files) => checkNoHtmlSinks(root, files),
+    "browser-support": (root, files) => checkBrowserSupport(root, files),
     "doc-snippets": (root, files) => docChecks.checkDocSnippets(root, files),
     "api-coverage": (root, files) => docChecks.checkApiCoverage(root, files),
     "error-coverage": (root, files) => docChecks.checkErrorCoverage(root, files),

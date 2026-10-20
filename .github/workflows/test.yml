@@ -25,8 +25,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium, Firefox and WebKit
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Rebuild generated files
         run: npm run build
@@ -34,7 +34,7 @@ jobs:
       - name: Generated files match the committed ones
         run: git diff --exit-code
 
-      - name: Test gate (static checks, both builds, gate self-tests)
+      - name: Test gate (static checks, three engines x both builds, gate self-tests)
         run: npm test
 
       - name: Upload test report

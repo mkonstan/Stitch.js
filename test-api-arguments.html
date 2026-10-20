@@ -422,13 +422,13 @@
                 const strictDelete = (o, k) => { 'use strict'; return delete o[k]; };
 
                 t.equal(sloppyDelete(m, 'flag'), false, 'sloppy: delete m.flag is refused (returns false)');
-                t.match(thrown(() => strictDelete(m, 'flag')), /Cannot delete|non-configurable/i, 'strict: delete m.flag throws a TypeError');
+                t.match(thrown(() => strictDelete(m, 'flag')), /Cannot delete|non-configurable|Unable to delete/i, 'strict: delete m.flag throws a TypeError');
                 m.flag = false;
                 await tick();
                 t.equal(host.querySelector('b').style.display, 'none', 'm.flag = false afterwards still hides the element');
 
                 t.equal(sloppyDelete(m.obj, 'inner'), false, 'sloppy: delete m.obj.inner is refused');
-                t.match(thrown(() => strictDelete(m.obj, 'inner')), /Cannot delete|non-configurable/i, 'strict: delete m.obj.inner throws');
+                t.match(thrown(() => strictDelete(m.obj, 'inner')), /Cannot delete|non-configurable|Unable to delete/i, 'strict: delete m.obj.inner throws');
                 m.obj.inner = { v: 2 };
                 await tick();
                 t.equal(host.querySelector('i').textContent, '2', 'a later m.obj.inner = {...} updates the screen');

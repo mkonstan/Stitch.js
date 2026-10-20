@@ -60,6 +60,9 @@ and a row appears.
   custom bindings, lifecycle.
 - [API reference](docs/API.md): every name, signature, return value and error.
 - [Error reference](docs/ERRORS.md): every error message, its cause and its fix.
+- [Accessibility](docs/ACCESSIBILITY.md): what Stitch does for assistive technology, and the
+  patterns for labels, ARIA states, live regions, loading, validation and focus.
+- [RELEASE.md](RELEASE.md): how a version is released.
 - [AGENTS.md](AGENTS.md): the rules in short form, for AI agents and quick reference.
 - [Migration guide](MIGRATION.md): upgrading from v2.
 - [Changelog](CHANGELOG.md).
@@ -76,7 +79,28 @@ attribute and class bindings. `example-basic-demo.html` shows the basics on one 
 
 ## Browser support
 
-Stitch needs `Proxy`, `WeakMap`, `Map`, `Set` and `Promise`. The test suite runs in Chromium.
+**Policy:** the current and the previous year's versions of Chrome, Edge, Firefox and Safari
+(desktop and mobile). Every push runs the whole test suite, on both `stitch.js` and
+`stitch.min.js`, in the three engines behind them: Chromium (Chrome, Edge), Firefox and WebKit
+(Safari), including a page served with a strict Content-Security-Policy.
+
+The newest language and DOM features the library uses, read from its code (the test suite checks
+this table against the code):
+
+| Feature | Chrome | Edge | Firefox | Safari |
+|---|---|---|---|---|
+| Optional chaining (`?.`) | 80 | 80 | 74 | 13.1 |
+| `Element.replaceChildren()` | 86 | 86 | 78 | 14 |
+
+Minimum versions: Chrome 86, Edge 86, Firefox 78, Safari 14.
+
+Older versions than the policy's are not tested and not supported, even where they meet these
+minimums. Internet Explorer is not supported.
+
+Under a strict Content-Security-Policy (no `'unsafe-inline'`, no `'unsafe-eval'`,
+`require-trusted-types-for 'script'`) Stitch needs nothing allowed: it never writes HTML strings,
+script strings or style strings. Chrome, Edge and Safari enforce Trusted Types; Firefox ignores
+that directive and enforces the rest.
 
 ## Development
 
@@ -84,9 +108,9 @@ The source is in `packages/`; `stitch.js` and `stitch.min.js` are generated from
 
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 npm run build    # regenerate stitch.js and stitch.min.js
-npm test         # static checks, every suite on both builds, gate self-tests
+npm test         # static checks, every suite on three engines and both builds, gate self-tests
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the module layout and the test harness, and

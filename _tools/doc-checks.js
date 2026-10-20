@@ -655,6 +655,7 @@ function checkDocHygiene(root, files) {
 }
 
 module.exports = {
+    tokenize,
     checkDocSnippets,
     checkApiCoverage,
     checkErrorCoverage,
