@@ -238,7 +238,7 @@ module.exports = { VERSION: ${JSON.stringify(pkg.version)} };
         moduleMap
     };
 
-    const licenseBanner = `/*! Stitch.js v${pkg.version} | MIT License | https://github.com/user/Stitch.js */`;
+    const licenseBanner = `/*! Stitch.js v${pkg.version} | MIT License | https://github.com/mkonstan/Stitch.js */`;
 
     const output = [
         licenseBanner,
