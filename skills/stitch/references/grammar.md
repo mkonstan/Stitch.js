@@ -37,11 +37,14 @@ allowed on `<script>`, `<style>`, `<base>`, `<meta>` (E326, bind).
 | `data-event` | path | an object `{ eventName: handlerName or function }` (names resolve like `data-click`; a function must not be an arrow, E707 at create) | no | not an object (E304); bad entry (E305); names not found (E401 ...) | same, update; replacing the object re-registers listeners |
 | `data-foreach` | path | an array, `null` or `undefined` (no rows); other bindings may sit on the list element (applied after the rows), except `data-text` | no | not an array (E521); keys of present rows (E501-E505); template (E511-E516) | non-array (E521), keys of new rows (E501, E502, E503); the DOM keeps its last good rows |
 
-A `<select data-foreach>` with `data-value`: when the chosen option leaves the list, the choice is
-cleared: the model gets the placeholder's value (`data-default-value`, default `""`), or `null` with
-nothing selected when there is no placeholder; a multiple select drops the value from its array. The
-write is an ordinary change (`$watch` / `$onChange` see it). A value no option has shown yet (options
-that arrive later) is left alone.
+A select bound with `data-value` shows exactly what the model holds: the matching option; the
+placeholder for `null`, `""` or the placeholder's value; and with no placeholder, no option at all
+(`selectedIndex` -1, re-applied after every options change) for `null` or a value no option has. On a
+`<select data-foreach>`, when the chosen option leaves the list the choice is cleared: the model gets
+the placeholder's value converted like a user pick (`""`, or `null` with `data-type="int"` / `"float"`),
+or `null` when there is no placeholder; a multiple select drops the value from its array. The write is
+an ordinary change (`$watch` / `$onChange` see it). A value no option has shown yet (options that
+arrive later) is left alone.
 
 ## List attributes (only beside data-foreach)
 

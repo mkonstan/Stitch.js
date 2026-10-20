@@ -738,6 +738,28 @@ const staticFixtures = {
         },
         expect: FAIL("G30: the Right half does not contain")
     },
+    "skill-gotcha-fix-trivialised": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            // The fix cell reduced to a fragment both halves share.
+            const file = path.join(dir, "skills/stitch/references/gotchas.md");
+            const text = fs.readFileSync(file, "utf8");
+            fs.writeFileSync(file, text.replace("| `return this.items.slice().sort((a, b) => a.id - b.id)` | `sort()` would", "| sort `this.items` in place | `sort()` would"));
+        },
+        expect: FAIL("G30: every \"Write instead\" span is in the Wrong half too")
+    },
+    "skill-gotcha-fix-in-comment": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            // The Right half keeps the advised code only in a comment; nothing executes it.
+            const file = path.join(dir, "tests/skill-proofs.md");
+            const text = fs.readFileSync(file, "utf8");
+            fs.writeFileSync(file, text.replace('<div id="p"><p id="a" data-visible="open">a</p></div>', '<div id="p"><!-- data-visible="open" --><p id="a">a</p></div>'));
+        },
+        expect: FAIL("G3: the Right half does not contain `data-visible=\"open\"`")
+    },
     "skill-gotcha-guidance-unlisted": {
         check: "skill",
         create: (dir, { copyTree }) => {

@@ -836,7 +836,7 @@ function checkSkill(root, files) {
 // Gotcha rows whose advice cannot be executed in the test page (it needs a server header, or
 // an engine without a date control). They are marked "Guidance only:" in tests/skill-proofs.md;
 // this list is the count, so a new unexecuted row cannot slip in.
-const SKILL_GUIDANCE_ONLY = ["G85", "G123"];
+const SKILL_GUIDANCE_ONLY = ["G87", "G125"];
 
 /** The code spans of a table cell, with escaped pipes restored. */
 function cellSpans(cell) {
@@ -848,6 +848,17 @@ function cellSpans(cell) {
 }
 
 const squash = (text) => text.replace(/\s+/g, " ").trim();
+
+/** Code without its comments: <!-- ... -->, /* ... *\/ and // to the end of the line (not in "://"). */
+function stripComments(code) {
+    return code
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .replace(/(^|[^:\\'"])\/\/[^\n]*/g, "$1");
+}
+
+// A check must compare something or call a helper: `true` or `1` alone tests nothing.
+const MEANINGFUL_CHECK = /[=!<>]=|[<>]|[A-Za-z_$][\w$]*\s*\(/;
 
 /**
  * Both halves of every gotcha, structurally (test-skill-proofs.html then runs them):
@@ -927,7 +938,8 @@ function checkGotchaProofs(gotchasText, proofsText) {
             if (!half) problems.push(`${SKILL_PROOFS}:${sn.line}: a ${id} block before any "Wrong:" / "Right:" line`);
             else halves[half].push(sn);
         }
-        const codeOf = (list) => squash(list.map((sn) => (sn.page || "") + "\n" + sn.code).join("\n"));
+        // Comments do not count: advice hidden in a comment is not executed.
+        const codeOf = (list) => squash(stripComments(list.map((sn) => (sn.page || "") + "\n" + sn.code).join("\n")));
         if (!halves.wrong.length) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} has no Wrong half (the "About to write" code, failing)`);
         if (!halves.right.length) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} has no Right half (the "Write instead" code, working)`);
         if (halves.wrong.length) {
@@ -951,6 +963,19 @@ function checkGotchaProofs(gotchasText, proofsText) {
             }
             if (halves.right.some((sn) => sn.mode !== "run")) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Right half must only run (no throws blocks)`);
             if (!halves.right.some((sn) => sn.checks.length)) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Right half has no check showing that it works`);
+            if (!halves.right.some((sn) => sn.checks.some((check) => MEANINGFUL_CHECK.test(check)))) {
+                problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: no Right half check tests anything (one must compare a value or call a helper)`);
+            }
+            // The fix must be told apart: at least one "Write instead" span (that the "About to
+            // write" cell does not also name) must be absent from the Wrong half. A fix cell
+            // reduced to a fragment both halves share (such as \`this.items\`) fails.
+            const ownRight = rightSpans.filter((span) => wrongSpans.indexOf(span) === -1);
+            if (halves.wrong.length && ownRight.length) {
+                const wrongCode = codeOf(halves.wrong);
+                if (ownRight.every((span) => wrongCode.indexOf(squash(span)) !== -1)) {
+                    problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: every "Write instead" span is in the Wrong half too, so none shows the fix`);
+                }
+            }
         }
     });
     for (const id of sections.keys()) {

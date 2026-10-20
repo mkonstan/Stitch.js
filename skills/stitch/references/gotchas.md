@@ -37,7 +37,7 @@ code in "Write instead" is shown working.
 | G24 | `model = Stitch.Observable.create(newData)` to re-render | assign the bound model's properties: `model.title = 'new'` | the page stays bound to the old object | silent |
 | G25 | `total: Stitch.computed(() => this.price * this.qty)` | `total: Stitch.computed(m => m.price * m.qty)` or `function () { return this.price * this.qty; }` | an arrow's `this` is never the model | silent: `NaN` (TypeError in a module script) |
 | G26 | `save: () => { this.saved = true; }` | `save() { this.saved = true; }` | arrow methods cannot see the model | E707 at create |
-| G27 | `model.total()` | `model.total` | a computed is a property | TypeError |
+| G27 | `model.total()` | read it as a property: `const total = model.total;` | a computed is a property | TypeError |
 | G28 | `model.total = 5` | change what it is computed from: `model.price = 5` | computeds are read-only | E713 |
 | G29 | `this.reads++` (any write) inside a computed | write in a handler or a `$watch` callback | a computed only reads | E724 where it is read |
 | G30 | `return this.items.sort((a, b) => a.id - b.id)` in a computed | `return this.items.slice().sort((a, b) => a.id - b.id)` | `sort()` would reorder the model itself | E725 where it is read |
@@ -93,87 +93,89 @@ code in "Write instead" is shown working.
 | G70 | `<span data-value="name">` | `<span data-text="name">` to show it; `<input data-value="name">` to edit it | nothing reads or writes a span's value | silent: empty |
 | G71 | `<select data-value="selectedId">` over numeric ids, then `=== 2` | `<select data-value="selectedId" data-type="int">` | a select writes strings | silent: `"2" !== 2` |
 | G72 | `this.cities = []` while reloading, then `this.cities = loaded` | assign the new list in one step: `this.cities = loaded` | a chosen option that leaves the list clears the choice (to the placeholder value, or `null`) | silent: choice cleared |
-| G73 | `<option value="">Pick</option>` next to the option template in a select list | `data-default-text="Pick"` on the select | everything inside the list element is the row template | E511 bind |
-| G74 | `data-class="state"` (a string) on an element with other classes | `data-class="classes"` with `{ active: this.on }` from a computed | a string replaces every class | silent: static classes lost |
-| G75 | `data-attr` with `{ 'aria-expanded': true }` | `{ 'aria-expanded': this.open ? 'true' : 'false' }` | `true` writes an empty attribute | silent: `aria-expanded=""` |
-| G76 | `data-attr` with `{ style: 'color: red' }` | `{ style: { color: 'red' } }`, or `data-class` | style strings are refused | E325 bind |
-| G77 | `data-attr` with `{ href: userInput }` | a computed: `'/u/' + encodeURIComponent(this.userId)` | `javascript:` and `vbscript:` URLs are refused | E323 bind or later |
-| G78 | `data-attr` with `{ href: 'data:text/html,hi' }` | a URL the server serves: `{ href: '/files/report.html' }` | `data:` URLs are refused, except `data:image/...` in an `<img>` `src` | E324 |
-| G79 | `data-attr` with `{ sandbox: null }` (or another security attribute) | write them in the markup: `sandbox=""` | data may not change security attributes (`sandbox`, `crossorigin`, `integrity`, `allow`, `nonce`, `referrerpolicy`, ...) | E327 bind |
-| G80 | `data-attr` with `{ rel: 'nofollow' }` on a link whose markup has `rel="noopener"` | `{ rel: 'noopener nofollow' }`, or leave `rel` out | data may not drop `noopener`/`noreferrer` | E329 bind |
-| G81 | `data-attr` with `{ rel: 'opener' }` | `{ rel: 'noopener noreferrer' }`, or leave `rel` out | `opener` lets the linked page control this window | E328 |
-| G82 | `data-attr` with `{ srcdoc: '<p>hi</p>' }` on an iframe | a page URL instead: a link with `{ href: '/files/report.html' }`, or the frame's src in the markup | `srcdoc` runs its own scripts | E322 |
-| G83 | `<style data-text="css">` (any binding on a script, style, base or meta element) | `<pre data-text="css">` | their content is code | E326 bind |
-| G84 | `data-attr` with names from data (`{ [field]: value }`) | fixed names in a computed: `{ placeholder: this.hint }` | names other than the refused ones are written as given (`type`, `method`, `id`) | silent: a password field became a text field |
-| G85 | inline `<script>` on a page with a strict Content-Security-Policy | the page script in its own `.js` file | the policy blocks inline scripts; Stitch itself needs nothing allowed | silent: nothing binds |
-| G86 | `<p hidden data-visible="open">` | `<p data-visible="open">` (start hidden through the model) | `data-visible` clears only the inline `display`; `hidden` keeps it hidden | silent: never shown |
-| G87 | `<p class="hid" data-visible="open">` with `.hid { display: none; }` | no hiding class: `<p data-visible="open">` | `data-visible` clears only the inline `display`; the stylesheet keeps it hidden | silent: never shown |
-| G88 | `this.price * this.qty` with a number input bound to `qty` | `this.price * (this.qty \|\| 0)` | an empty or invalid number input writes `null` | silent: `0`/`NaN` |
-| G89 | `data-text="due"` on a `Date` | `dueText: Stitch.computed(function () { return this.due ? this.due.toISOString().slice(0, 10) : ''; })` | `data-text` writes `String(value)` | silent: long date string |
-| G90 | `data-text="obj"` on an object or array | a computed returning a string: `JSON.stringify(this.obj)`, `this.tags.join(', ')` | objects print as `[object Object]`, arrays join with commas | silent |
-| G91 | `<a data-enabled="ok" data-click="go">` | `<button type="button" data-enabled="ok" data-click="go">` | `disabled` exists only on form controls | silent: still clickable |
+| G73 | a type-to-filter list for a select: `return this.cities.filter(c => c.name.toLowerCase().includes(this.q))` | keep the chosen option in the list: `return this.cities.filter(c => c.name.toLowerCase().includes(this.q) \|\| c.id === this.city)` | a chosen option that leaves the list clears the choice | silent: choice cleared |
+| G74 | `<select data-foreach="opts" data-value="v">` with no placeholder | `<select data-foreach="opts" data-value="v" data-default-text="Choose...">` | a cleared (or never-made) choice then shows a blank select instead of a prompt | silent: blank select |
+| G75 | `<option value="">Pick</option>` next to the option template in a select list | `data-default-text="Pick"` on the select | everything inside the list element is the row template | E511 bind |
+| G76 | `data-class="state"` (a string) on an element with other classes | `data-class="classes"` with `{ active: this.on }` from a computed | a string replaces every class | silent: static classes lost |
+| G77 | `data-attr` with `{ 'aria-expanded': true }` | `{ 'aria-expanded': this.open ? 'true' : 'false' }` | `true` writes an empty attribute | silent: `aria-expanded=""` |
+| G78 | `data-attr` with `{ style: 'color: red' }` | `{ style: { color: 'red' } }`, or `data-class` | style strings are refused | E325 bind |
+| G79 | `data-attr` with `{ href: userInput }` | a computed: `'/u/' + encodeURIComponent(this.userId)` | `javascript:` and `vbscript:` URLs are refused | E323 bind or later |
+| G80 | `data-attr` with `{ href: 'data:text/html,hi' }` | a URL the server serves: `{ href: '/files/report.html' }` | `data:` URLs are refused, except `data:image/...` in an `<img>` `src` | E324 |
+| G81 | `data-attr` with `{ sandbox: null }` (or another security attribute) | write them in the markup (`sandbox=""`) and give data only the other attributes: `{ title: 'Preview' }` | data may not change security attributes (`sandbox`, `crossorigin`, `integrity`, `allow`, `nonce`, `referrerpolicy`, ...) | E327 bind |
+| G82 | `data-attr` with `{ rel: 'nofollow' }` on a link whose markup has `rel="noopener"` | `{ rel: 'noopener nofollow' }`, or leave `rel` out | data may not drop `noopener`/`noreferrer` | E329 bind |
+| G83 | `data-attr` with `{ rel: 'opener' }` | `{ rel: 'noopener noreferrer' }`, or leave `rel` out | `opener` lets the linked page control this window | E328 |
+| G84 | `data-attr` with `{ srcdoc: '<p>hi</p>' }` on an iframe | a page URL instead: a link with `{ href: '/files/report.html' }`, or the frame's src in the markup | `srcdoc` runs its own scripts | E322 |
+| G85 | `<style data-text="css">` (any binding on a script, style, base or meta element) | `<pre data-text="css">` | their content is code | E326 bind |
+| G86 | `data-attr` with names from data (`{ [field]: value }`) | fixed names in a computed: `{ placeholder: this.hint }` | names other than the refused ones are written as given (`type`, `method`, `id`) | silent: a password field became a text field |
+| G87 | inline `<script>` on a page with a strict Content-Security-Policy | the page script in its own `.js` file | the policy blocks inline scripts; Stitch itself needs nothing allowed | silent: nothing binds |
+| G88 | `<p hidden data-visible="open">` | `<p data-visible="open">` (start hidden through the model) | `data-visible` clears only the inline `display`; `hidden` keeps it hidden | silent: never shown |
+| G89 | `<p class="hid" data-visible="open">` with `.hid { display: none; }` | no hiding class: `<p data-visible="open">` | `data-visible` clears only the inline `display`; the stylesheet keeps it hidden | silent: never shown |
+| G90 | `this.price * this.qty` with a number input bound to `qty` | `this.price * (this.qty \|\| 0)` | an empty or invalid number input writes `null` | silent: `0`/`NaN` |
+| G91 | `data-text="due"` on a `Date` | `dueText: Stitch.computed(function () { return this.due ? this.due.toISOString().slice(0, 10) : ''; })` | `data-text` writes `String(value)` | silent: long date string |
+| G92 | `data-text="obj"` on an object or array | a computed returning a string: `JSON.stringify(this.obj)`, `this.tags.join(', ')` | objects print as `[object Object]`, arrays join with commas | silent |
+| G93 | `<a data-enabled="ok" data-click="go">` | `<button type="button" data-enabled="ok" data-click="go">` | `disabled` exists only on form controls | silent: still clickable |
 
 ## Lists
 
 | ID | About to write | Write instead | Because | Error |
 |---|---|---|---|---|
-| G92 | two elements as the row (a dt and a dd) | wrap them in one element: `<div><dt data-text="term"></dt><dd data-text="meaning"></dd></div>` | a row is exactly one element | E511 bind |
-| G93 | `Loading...` text inside the list element | `<p data-visible="loading">Loading...</p>` outside the list | the list's content is the template | E513 bind |
-| G94 | `<table data-foreach="rows">` | `<tbody data-foreach="rows">` (or a template row) | the parser inserts a `<tbody>`, which becomes the row | silent: one `<tbody>` per row |
-| G95 | `data-foreach="byId"` on an object (or a Map, a Set) | `rows: Stitch.computed(function () { return Object.values(this.byId); })` | `data-foreach` needs an array | E521 bind or later |
-| G96 | `['a', 'a']`, or two rows with one `id` | objects with unique ids: `[{ id: 1, tag: 'a' }, { id: 2, tag: 'a' }]` | keys must be unique | E502 bind or later |
-| G97 | `null` entries in a list | filter them out: `rows.filter(r => r !== null)` | a row cannot be `null` | E503 |
-| G98 | `data-key="id"` on a list of strings | no data-key: `<ul data-foreach="tags">` | plain values are their own key | E504 bind |
-| G99 | `data-key=""` | `data-key="sku"` | the key field must be named | E505 bind |
-| G100 | `data-key="sku"` on an element without data-foreach | `data-foreach="rows" data-key="sku"` on the list element | it configures a list | E531 bind |
-| G101 | `data-template="row"` with inline children too | an empty list element: `<ul data-foreach="rows" data-template="row"></ul>` | the inline content would be discarded | E516 bind |
-| G102 | `data-template` naming a missing id, or a div | `<template id="row">` with one root element | the template must exist and be a `<template>` | E514, E515 bind |
-| G103 | `<ul data-foreach="rows"></ul>` (no row element) | `<ul data-foreach="rows"><li data-text="$data"></li></ul>` | there is no row template | E512 bind |
-| G104 | `data-default-text` on a list that is not a select; `data-default-value` alone | both on a select list, with `data-default-text` | placeholders are select options | E532, E533 bind |
-| G105 | `data-click="save"` inside a row for a model method | `data-click="$root.save"` | a bare name is looked up on the row | E401 row (with an empty list: later, on the first row) |
-| G106 | `data-click="$root.save"` where the model has no `save` | add `save()` to the root model | `$root.` handlers are checked at bind, even with no rows | E406 bind |
-| G107 | `data-click="$parent.save"` outside any list | `data-click="save"` | there is no level above the model | E403 bind |
-| G108 | `data-click="$parent.$parent.save"` | `data-click="$root.save"` | one prefix, once | E110 bind |
-| G109 | `data-click="$root"` | `data-click="$root.save"` | the prefix needs a method name | E109 bind |
-| G110 | `data-event="rowEvents"` inside a row for a model property | `data-event="$root.rowEvents"`, with names inside like `'$root.touch'` | a bare path in a row is a row field | E201 row |
-| G111 | `data-event="onInput"` naming a method | `data-event="inputEvents"` with `inputEvents: { input: 'onInput' }` | `data-event` names an object of event → handler | E304 bind |
-| G112 | `{ input: () => {} }` in an event map | `{ input: 'touch' }` | the map is model data; arrow functions are refused | E707 at create |
-| G113 | `{ input: 'tuoch' }` (a handler name typo) | `{ input: 'touch' }`, the exact method name | handler names are looked up at bind | E401 bind |
-| G114 | `rows.push({ id: 1, name: 'again' })` when id 1 exists | replace it: `rows[0] = { id: 1, name: 'again' }` | keys must stay unique; the model keeps both, the page keeps its last rows | E502 later |
-| G115 | `this.rows = fresh` on every refresh while users edit rows | update fields in place: `Object.assign(this.rows[0], fresh[0])` | a row is reused only for the same key AND the same object; a new object rebuilds the row (typed text, focus lost) | silent: rows rebuilt |
-| G116 | `data-text="$index + 1"` for row numbers | `<ol data-foreach="rows">` (the list numbers itself), or a CSS counter | a binding cannot compute | E102 bind |
+| G94 | two elements as the row (a dt and a dd) | wrap them in one element: `<div><dt data-text="term"></dt><dd data-text="meaning"></dd></div>` | a row is exactly one element | E511 bind |
+| G95 | `Loading...` text inside the list element | `<p data-visible="loading">Loading...</p>` outside the list | the list's content is the template | E513 bind |
+| G96 | `<table data-foreach="rows">` | `<tbody data-foreach="rows">` (or a template row) | the parser inserts a `<tbody>`, which becomes the row | silent: one `<tbody>` per row |
+| G97 | `data-foreach="byId"` on an object (or a Map, a Set) | `rows: Stitch.computed(function () { return Object.values(this.byId); })` | `data-foreach` needs an array | E521 bind or later |
+| G98 | `['a', 'a']`, or two rows with one `id` | objects with unique ids: `[{ id: 1, tag: 'a' }, { id: 2, tag: 'a' }]` | keys must be unique | E502 bind or later |
+| G99 | `null` entries in a list | filter them out: `rows.filter(r => r !== null)` | a row cannot be `null` | E503 |
+| G100 | `data-key="id"` on a list of strings | no data-key: `<ul data-foreach="tags">` | plain values are their own key | E504 bind |
+| G101 | `data-key=""` | `data-key="sku"` | the key field must be named | E505 bind |
+| G102 | `data-key="sku"` on an element without data-foreach | `data-foreach="rows" data-key="sku"` on the list element | it configures a list | E531 bind |
+| G103 | `data-template="row"` with inline children too | an empty list element: `<ul data-foreach="rows" data-template="row"></ul>` | the inline content would be discarded | E516 bind |
+| G104 | `data-template` naming a missing id, or a div | `<template id="row">` with one root element | the template must exist and be a `<template>` | E514, E515 bind |
+| G105 | `<ul data-foreach="rows"></ul>` (no row element) | `<ul data-foreach="rows"><li data-text="$data"></li></ul>` | there is no row template | E512 bind |
+| G106 | `data-default-text` on a list that is not a select; `data-default-value` alone | both on a select list, with `data-default-text` | placeholders are select options | E532, E533 bind |
+| G107 | `data-click="save"` inside a row for a model method | `data-click="$root.save"` | a bare name is looked up on the row | E401 row (with an empty list: later, on the first row) |
+| G108 | `data-click="$root.save"` where the model has no `save` | add `save()` to the root model | `$root.` handlers are checked at bind, even with no rows | E406 bind |
+| G109 | `data-click="$parent.save"` outside any list | `data-click="save"` | there is no level above the model | E403 bind |
+| G110 | `data-click="$parent.$parent.save"` | `data-click="$root.save"` | one prefix, once | E110 bind |
+| G111 | `data-click="$root"` | `data-click="$root.save"` | the prefix needs a method name | E109 bind |
+| G112 | `data-event="rowEvents"` inside a row for a model property | `data-event="$root.rowEvents"`, with names inside like `'$root.touch'` | a bare path in a row is a row field | E201 row |
+| G113 | `data-event="onInput"` naming a method | `data-event="inputEvents"` with `inputEvents: { input: 'onInput' }` | `data-event` names an object of event → handler | E304 bind |
+| G114 | `{ input: () => {} }` in an event map | `{ input: 'touch' }` | the map is model data; arrow functions are refused | E707 at create |
+| G115 | `{ input: 'tuoch' }` (a handler name typo) | `{ input: 'touch' }`, the exact method name | handler names are looked up at bind | E401 bind |
+| G116 | `rows.push({ id: 1, name: 'again' })` when id 1 exists | replace it: `rows[0] = { id: 1, name: 'again' }` | keys must stay unique; the model keeps both, the page keeps its last rows | E502 later |
+| G117 | `this.rows = fresh` on every refresh while users edit rows | update fields in place: `Object.assign(this.rows[0], fresh[0])` | a row is reused only for the same key AND the same object; a new object rebuilds the row (typed text, focus lost) | silent: rows rebuilt |
+| G118 | `data-text="$index + 1"` for row numbers | `<ol data-foreach="rows">` (the list numbers itself), or a CSS counter | a binding cannot compute | E102 bind |
 
 ## Forms
 
 | ID | About to write | Write instead | Because | Error |
 |---|---|---|---|---|
-| G117 | `<button data-click="go">` inside a form | `<button type="button" data-click="go">` | a button without `type` submits the form and reloads the page | silent: reload |
-| G118 | a form with no submit handler (Enter in a field submits it) | `data-event="formEvents"` with `formEvents: { submit: 'save' }` and `event.preventDefault()` | Enter in a field submits the form | silent: reload |
-| G119 | `required` / `type="email"` without novalidate when Stitch validates | `<form novalidate data-event="formEvents">` | the browser blocks the `submit` event while a field is invalid | silent: handler never runs |
-| G120 | `{ change: 'touch' }` (or blur) as the "touched" event | `{ input: 'touch' }` | `input` fires on every user edit; `change` waits for leaving a text field | silent: late errors |
-| G121 | `data-value="address.city"` while `address` is `null` | `address: { city: '' }`, or hide the input while `address` is null | Stitch does not create the missing object | E314 later (on typing) |
-| G122 | `async save() { await api(); }` with no catch, expecting the page to show the failure | `try { await api(); } catch (e) { this.error = e.message; }` | a rejected handler promise goes to `Stitch.onError` (an unhandled rejection without it), not into the page | later: `Stitch.onError` |
-| G123 | `<input type="date" data-value="due">` relying on the input type alone | `<input type="date" data-type="date" data-value="due">` | an engine without a date control treats it as a text field, which writes a string | silent: string, not `Date` |
+| G119 | `<button data-click="go">` inside a form | `<button type="button" data-click="go">` | a button without `type` submits the form and reloads the page | silent: reload |
+| G120 | a form with no submit handler (Enter in a field submits it) | `data-event="formEvents"` with `formEvents: { submit: 'save' }` and `event.preventDefault()` | Enter in a field submits the form | silent: reload |
+| G121 | `required` / `type="email"` without novalidate when Stitch validates | `<form novalidate data-event="formEvents">` | the browser blocks the `submit` event while a field is invalid | silent: handler never runs |
+| G122 | `{ change: 'touch' }` (or blur) as the "touched" event | `{ input: 'touch' }` | `input` fires on every user edit; `change` waits for leaving a text field | silent: late errors |
+| G123 | `data-value="address.city"` while `address` is `null` | `address: { city: '' }`, or hide the input while `address` is null | Stitch does not create the missing object | E314 later (on typing) |
+| G124 | `async save() { await api(); }` with no catch, expecting the page to show the failure | `try { await api(); } catch (e) { this.error = e.message; }` | a rejected handler promise goes to `Stitch.onError` (an unhandled rejection without it), not into the page | later: `Stitch.onError` |
+| G125 | `<input type="date" data-value="due">` relying on the input type alone | `<input type="date" data-type="date" data-value="due">` | an engine without a date control treats it as a text field, which writes a string | silent: string, not `Date` |
 
 ## Binding, timing, lifecycle
 
 | ID | About to write | Write instead | Because | Error |
 |---|---|---|---|---|
-| G124 | binding in a script that runs before the element | the script at the end of the body, or inside `DOMContentLoaded` | the element does not exist yet | E602 bind |
-| G125 | `binder.bind('.card', model)` expecting every match | bind each element: `document.querySelectorAll('.card').forEach(el => binder.bind(el, cardModel(el)))` | a selector binds its FIRST match | silent: the others stay empty |
-| G126 | `binder.bind('#p', model)` again with new data | `binder.unbind('#p')` first, or change the bound model's data | an element is bound once | E601 bind |
-| G127 | a root bound inside another bound root (a widget in a bound page) | sibling roots, one model each | the outer bind reads the inner bindings as its own | E601 or E201 bind |
-| G128 | `binder.unbind('#p')` "just in case" | unbind once, only what this binder bound | unbinding nothing is a mistake | E607 |
-| G129 | binding after `binder.dispose()` | `new Stitch.DataBinder()` | a disposed binder is finished | E605 |
-| G130 | `bind('#p', { t: 1 })` (plain data) | `bind('#p', Stitch.Observable.create({ t: 1 }))` | `bind()` needs a model | E604 |
-| G131 | reading the DOM right after `model.t = 'new'` | `await Promise.resolve()` first | the page updates in a microtask | silent: old text |
-| G132 | clicking a button in the same tick as the write that enables it | `await Promise.resolve()` between them | it is still disabled | silent: click ignored |
-| G133 | `registerBinding` in a widget script loaded after the page's first bind | register every custom binding before the first bind | elements bound earlier would miss it | E621 |
-| G134 | `data-tooltip="Save changes"` with a default (path) custom binding | `registerBinding('tooltip', { value: 'literal', bind(element, model, text) { element.title = text; } })` | a path binding reads its value as a property path | E102 or E201 bind, with a literal hint |
-| G135 | `registerBinding('myTooltip', { bind() {} })` | `registerBinding('my-tooltip', { bind() {} })` | HTML lowercases attribute names | E623 |
-| G136 | registering a name twice (a script included twice), or a built-in name | register once, under a new name | names are unique | E627 |
-| G137 | a custom binding effect without cleanup | `context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect))` | otherwise it runs forever; `Stitch.debug.stats()` keeps growing | silent: leak |
-| G138 | `element.innerHTML = value` in a custom binding | `element.textContent = value` | built-in safety checks do not cover custom bindings | silent: data becomes markup |
-| G139 | a second `Stitch.onError(fn)` (two widgets) | one page-wide handler; call the remover the first returned: `remove()` | one handler per page | E902 |
-| G140 | `try { binder.bind('#p', model); } catch (e) {}` | let it throw: `binder.bind('#p', model);` and fix what the message names | the message names the fix; a swallowed bind leaves the page empty | silent: blank page |
-| G141 | `if (/is not a property/.test(error.message))` | `error.message.startsWith('[Stitch E201]')` | codes are stable, wording is not | silent: breaks on rewording |
+| G126 | binding in a script that runs before the element | the script at the end of the body, or inside `DOMContentLoaded` | the element does not exist yet | E602 bind |
+| G127 | `binder.bind('.card', model)` expecting every match | bind each element: `document.querySelectorAll('.card').forEach(el => binder.bind(el, cardModel(el)))` | a selector binds its FIRST match | silent: the others stay empty |
+| G128 | `binder.bind('#p', model)` again with new data | `binder.unbind('#p')` first, or change the bound model's data | an element is bound once | E601 bind |
+| G129 | a root bound inside another bound root (a widget in a bound page) | sibling roots, one model each | the outer bind reads the inner bindings as its own | E601 or E201 bind |
+| G130 | `binder.unbind('#p')` "just in case" | unbind once, only what this binder bound | unbinding nothing is a mistake | E607 |
+| G131 | binding after `binder.dispose()` | a new binder: `new Stitch.DataBinder().bind('#p', model)` | a disposed binder is finished | E605 |
+| G132 | `bind('#p', { t: 1 })` (plain data) | `bind('#p', Stitch.Observable.create({ t: 1 }))` | `bind()` needs a model | E604 |
+| G133 | reading the DOM right after `model.t = 'new'` | `await Promise.resolve()` first | the page updates in a microtask | silent: old text |
+| G134 | clicking a button in the same tick as the write that enables it | `await Promise.resolve()` between them | it is still disabled | silent: click ignored |
+| G135 | `registerBinding` in a widget script loaded after the page's first bind | register every custom binding before the first bind | elements bound earlier would miss it | E621 |
+| G136 | `data-tooltip="Save changes"` with a default (path) custom binding | `registerBinding('tooltip', { value: 'literal', bind(element, model, text) { element.title = text; } })` | a path binding reads its value as a property path | E102 or E201 bind, with a literal hint |
+| G137 | `registerBinding('myTooltip', { bind() {} })` | `registerBinding('my-tooltip', { bind() {} })` | HTML lowercases attribute names | E623 |
+| G138 | registering a name twice (a script included twice), or a built-in name | register once, under a new name | names are unique | E627 |
+| G139 | a custom binding effect without cleanup | `context.binder._trackCleanup(element, () => context.reactiveSystem.cleanup(effect))` | otherwise it runs forever; `Stitch.debug.stats()` keeps growing | silent: leak |
+| G140 | `element.innerHTML = value` in a custom binding | `element.textContent = value` | built-in safety checks do not cover custom bindings | silent: data becomes markup |
+| G141 | a second `Stitch.onError(fn)` (two widgets) | one page-wide handler; call the remover the first returned: `remove()` | one handler per page | E902 |
+| G142 | `try { binder.bind('#p', model); } catch (e) {}` | let bind throw and fix what the message names: `data-text="name"` | the message names the fix; a swallowed bind leaves the page empty | silent: blank page |
+| G143 | `if (/is not a property/.test(error.message))` | `error.message.startsWith('[Stitch E201]')` | codes are stable, wording is not | silent: breaks on rewording |

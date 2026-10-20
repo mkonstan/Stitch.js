@@ -25,7 +25,7 @@ exactly.
 | 7 | Use only these bindings: `data-text`, `data-value`, `data-visible`, `data-enabled`, `data-class`, `data-attr`, `data-loading`, `data-click`, `data-event`, `data-foreach`; list attributes `data-key`, `data-template`, `data-default-text`, `data-default-value`; `data-type` beside `data-value`. For a `v-if`, use `data-visible`. | `data-if`, `data-show`, `data-html`, `data-bind`, `data-model`, `data-for`, `v-if`, `x-show`: never read, no error | none |
 | 8 | Methods: `name() { }`, also in rows you push later. Computeds: `Stitch.computed(function () { return this.a * this.b; })` or `Stitch.computed(m => m.a * m.b)` (use the ARGUMENT). A computed only reads: no assignment, no `sort`/`push`/`splice` on model lists. | Arrow methods; `this` inside an arrow computed (silently `NaN`); writes in a computed | E707 E724 E725 |
 | 9 | Every `<button>` in a `<form>` gets `type="button"`, or put `data-event="formEvents"` on the form with `{ submit: 'save' }` and call `event.preventDefault()`. Add `novalidate` when Stitch validates. | A bare `<button>` in a form: it submits and RELOADS the page | none |
-| 10 | Options from plain values: `<option data-text="$data"></option>` only. From objects: `<option data-value="code" data-text="name">`. A `<select>` writes STRINGS: add `data-type="int"` for numeric values. | `<option data-value="$data">`; comparing a select's value to a number id | E313 |
+| 10 | Options from plain values: `<option data-text="$data"></option>` only. From objects: `<option data-value="code" data-text="name">`. A `<select>` writes STRINGS: add `data-type="int"` for numeric values. Give every select bound with `data-value` a `data-default-text` (a cleared choice then shows the prompt, not a blank). A filtered option list must keep the chosen option, or the choice is cleared. | `<option data-value="$data">`; comparing a select's value to a number id | E313 |
 | 11 | `data-value` needs a writable property, on `input`, `textarea` or `select`. | `data-value` on a computed, `$data`, `$index`, `$parent`, `$root` | E311 E313 |
 | 12 | Put text in its own `<span data-text>`; keep `data-text` off any element that contains bound elements or carries `data-foreach`. | `<label data-text="x"><input data-value="y"></label>` | E535 E534 |
 | 13 | Filter and sort in a computed that returns a NEW array: `this.items.slice().sort(...)`. React to a change with `model.$watch('path', fn)`, writing only when the value must change. | `this.items.sort()` in a computed; a `$watch` that always writes its own path | E725 E912 |
@@ -118,8 +118,8 @@ Copy this. Replace the data, keep the structure: `onError` first, one model, one
 | later update (push, assignment, recompute, click, a handler's rejected promise) | keys of new rows, `data-foreach` gets a non-array, refused `data-attr` values, a computed or handler that throws or rejects, a `$watch` re-running itself (E912) | `Stitch.onError`; uncaught (or an unhandled rejection) without it; the DOM keeps its last good state |
 | user typing | writing through a `null` object (`address.city` while `address` is `null`) | `Stitch.onError`, E314 |
 
-A `<select data-value>` whose chosen option leaves its list clears the choice: the model gets the
-placeholder's value (or `null`). Not errors (silent): an unknown `data-*` attribute; `data-visible`
+A select shows exactly what the model holds. When the chosen option leaves its list, the choice is
+cleared: the placeholder's value (`null` with `data-type="int"`), or `null` and no option shown. Not errors (silent): an unknown `data-*` attribute; `data-visible`
 on an element also hidden by `hidden` or a stylesheet class (stays hidden); `data-value` on a
 non-form element.
 

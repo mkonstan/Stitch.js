@@ -582,7 +582,8 @@ Right:
 
 ```js run
 const model = Stitch.Observable.create({ a: 2, total: Stitch.computed(function () { return this.a; }) });
-window.result = model.total;
+const total = model.total;
+window.result = total;
 ```
 <!-- check: window.result === 2 -->
 
@@ -1593,6 +1594,69 @@ model.reload();
 
 Wrong:
 
+```html run
+<div id="p">
+    <input data-value="q">
+    <select data-foreach="shown" data-value="city" data-default-text="City"><option data-value="id" data-text="name"></option></select>
+</div>
+<script>
+const model = Stitch.Observable.create({
+    q: '',
+    city: 'par',
+    cities: [{ id: 'par', name: 'Paris' }, { id: 'lyo', name: 'Lyon' }],
+    shown: Stitch.computed(function () { return this.cities.filter(c => c.name.toLowerCase().includes(this.q)); })
+});
+new Stitch.DataBinder().bind('#p', model);
+</script>
+```
+<!-- check: type('#p input', 'ly') -->
+<!-- check: type('#p input', '') -->
+<!-- check: model.city === '' && document.querySelector('#p select').value === '' -->
+
+Right:
+
+```html run
+<div id="p">
+    <input data-value="q">
+    <select data-foreach="shown" data-value="city" data-default-text="City"><option data-value="id" data-text="name"></option></select>
+</div>
+<script>
+const model = Stitch.Observable.create({
+    q: '',
+    city: 'par',
+    cities: [{ id: 'par', name: 'Paris' }, { id: 'lyo', name: 'Lyon' }],
+    shown: Stitch.computed(function () { return this.cities.filter(c => c.name.toLowerCase().includes(this.q) || c.id === this.city); })
+});
+new Stitch.DataBinder().bind('#p', model);
+</script>
+```
+<!-- check: type('#p input', 'ly') -->
+<!-- check: model.city === 'par' && count('#p option') === 3 -->
+<!-- check: type('#p input', '') -->
+<!-- check: model.city === 'par' && document.querySelector('#p select').value === 'par' -->
+
+## G74
+
+Wrong:
+
+```html run
+<div id="p"><select data-foreach="opts" data-value="v"><option data-text="$data"></option></select></div>
+<script>const model = Stitch.Observable.create({ v: 'b', opts: ['a', 'b'] }); new Stitch.DataBinder().bind('#p', model); model.opts = ['a'];</script>
+```
+<!-- check: model.v === null && document.querySelector('#p select').selectedIndex === -1 -->
+
+Right:
+
+```html run
+<div id="p"><select data-foreach="opts" data-value="v" data-default-text="Choose..."><option data-text="$data"></option></select></div>
+<script>const model = Stitch.Observable.create({ v: 'b', opts: ['a', 'b'] }); new Stitch.DataBinder().bind('#p', model); model.opts = ['a'];</script>
+```
+<!-- check: model.v === '' && document.querySelector('#p select').selectedOptions[0].textContent === 'Choose...' -->
+
+## G75
+
+Wrong:
+
 ```html throws
 <select id="p" data-foreach="options" data-value="choice"><option value="">Pick</option><option data-text="$data"></option></select>
 <script>new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ choice: '', options: ['x'] }));</script>
@@ -1607,7 +1671,7 @@ Right:
 ```
 <!-- check: texts('#p option').join(',') === 'Pick,x' -->
 
-## G74
+## G76
 
 Wrong:
 
@@ -1630,7 +1694,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: document.getElementById('p').className === 'card active' -->
 
-## G75
+## G77
 
 Wrong:
 
@@ -1653,7 +1717,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: attr('#p', 'aria-expanded') === 'true' -->
 
-## G76
+## G78
 
 Wrong:
 
@@ -1671,7 +1735,7 @@ Right:
 ```
 <!-- check: document.getElementById('a').style.color === 'red' && document.getElementById('b').className === 'warn' -->
 
-## G77
+## G79
 
 Wrong:
 
@@ -1697,7 +1761,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: attr('#p', 'href').indexOf('/u/javascript%3A') === 0 -->
 
-## G78
+## G80
 
 Wrong:
 
@@ -1715,7 +1779,7 @@ Right:
 ```
 <!-- check: attr('#p', 'href') === '/files/report.html' -->
 
-## G79
+## G81
 
 Wrong:
 
@@ -1733,7 +1797,7 @@ Right:
 ```
 <!-- check: attr('#p', 'sandbox') === '' && attr('#p', 'title') === 'Preview' -->
 
-## G80
+## G82
 
 Wrong:
 
@@ -1751,7 +1815,7 @@ Right:
 ```
 <!-- check: attr('#p', 'rel') === 'noopener nofollow' -->
 
-## G81
+## G83
 
 Wrong:
 
@@ -1769,7 +1833,7 @@ Right:
 ```
 <!-- check: attr('#p', 'rel') === 'noopener noreferrer' -->
 
-## G82
+## G84
 
 Wrong:
 
@@ -1787,7 +1851,7 @@ Right:
 ```
 <!-- check: attr('#p', 'href') === '/files/report.html' -->
 
-## G83
+## G85
 
 Wrong:
 
@@ -1805,7 +1869,7 @@ Right:
 ```
 <!-- check: text('#p pre') === 'p {}' -->
 
-## G84
+## G86
 
 Wrong:
 
@@ -1832,11 +1896,11 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: document.getElementById('p').type === 'password' && attr('#p', 'placeholder') === 'type' -->
 
-## G85
+## G87
 
 Guidance only: a Content-Security-Policy comes from the page's HTTP header (or a meta element at load); the snippet frames cannot set one. The library's strict-CSP suite (test-strict-csp.html) shows that Stitch needs nothing allowed.
 
-## G86
+## G88
 
 Wrong:
 
@@ -1855,7 +1919,7 @@ Right:
 <!-- check: visible('#p p') === false && (model.open = true, true) -->
 <!-- check: visible('#p p') -->
 
-## G87
+## G89
 
 Wrong:
 
@@ -1875,7 +1939,7 @@ Right:
 <!-- check: visible('#p p') === false && (model.open = true, true) -->
 <!-- check: visible('#p p') -->
 
-## G88
+## G90
 
 Wrong:
 
@@ -1899,7 +1963,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: type('#p input', 'x') && model.total === 0 && type('#p input', '3') && model.total === 6 -->
 
-## G89
+## G91
 
 Wrong:
 
@@ -1922,7 +1986,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: text('#p') === '2024-05-06' -->
 
-## G90
+## G92
 
 Wrong:
 
@@ -1947,7 +2011,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: text('#a') === '{"a":1}' && text('#b') === 'x, y' -->
 
-## G91
+## G93
 
 Wrong:
 
@@ -1965,7 +2029,7 @@ Right:
 ```
 <!-- check: click('#p button') && model.went === false -->
 
-## G92
+## G94
 
 Wrong:
 
@@ -1983,7 +2047,7 @@ Right:
 ```
 <!-- check: text('#p dt') === 't' && text('#p dd') === 'm' -->
 
-## G93
+## G95
 
 Wrong:
 
@@ -2002,7 +2066,7 @@ Right:
 <!-- check: visible('#p p') && (model.rows = ['a'], model.loading = false, true) -->
 <!-- check: visible('#p p') === false && text('#p li') === 'a' -->
 
-## G94
+## G96
 
 Wrong:
 
@@ -2020,7 +2084,7 @@ Right:
 ```
 <!-- check: count('#p table > tbody') === 1 && count('#p tr') === 2 -->
 
-## G95
+## G97
 
 Wrong:
 
@@ -2043,7 +2107,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G96
+## G98
 
 Wrong:
 
@@ -2067,7 +2131,7 @@ Right:
 ```
 <!-- check: texts('#p li').join(',') === 'a,a' -->
 
-## G97
+## G99
 
 Wrong:
 
@@ -2088,7 +2152,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ rows: rows.filter(
 ```
 <!-- check: count('#p li') === 1 -->
 
-## G98
+## G100
 
 Wrong:
 
@@ -2106,7 +2170,7 @@ Right:
 ```
 <!-- check: texts('#p li').join(',') === 'a,b' -->
 
-## G99
+## G101
 
 Wrong:
 
@@ -2124,7 +2188,7 @@ Right:
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G100
+## G102
 
 Wrong:
 
@@ -2142,7 +2206,7 @@ Right:
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G101
+## G103
 
 Wrong:
 
@@ -2162,7 +2226,7 @@ Right:
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G102
+## G104
 
 Wrong:
 
@@ -2188,7 +2252,7 @@ Right:
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G103
+## G105
 
 Wrong:
 
@@ -2206,7 +2270,7 @@ Right:
 ```
 <!-- check: text('#p li') === 'a' -->
 
-## G104
+## G106
 
 Wrong:
 
@@ -2230,7 +2294,7 @@ Right:
 ```
 <!-- check: texts('#p option').join(',') === 'Choose,a' && document.querySelector('#p option').value === '0' -->
 
-## G105
+## G107
 
 Wrong:
 
@@ -2258,7 +2322,7 @@ Right:
 ```
 <!-- check: click('#p button') && model.saved === 1 -->
 
-## G106
+## G108
 
 Wrong:
 
@@ -2276,7 +2340,7 @@ Right:
 ```
 <!-- check: click('#p button') && model.saved === true -->
 
-## G107
+## G109
 
 Wrong:
 
@@ -2294,7 +2358,7 @@ Right:
 ```
 <!-- check: click('#p') && model.saved === true -->
 
-## G108
+## G110
 
 Wrong:
 
@@ -2312,7 +2376,7 @@ Right:
 ```
 <!-- check: click('#p button') && model.saved === 2 -->
 
-## G109
+## G111
 
 Wrong:
 
@@ -2330,7 +2394,7 @@ Right:
 ```
 <!-- check: click('#p button') && model.saved === true -->
 
-## G110
+## G112
 
 Wrong:
 
@@ -2351,7 +2415,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: (document.querySelector('#p input').dispatchEvent(new Event('input', { bubbles: true })), model.touched === 1) -->
 
-## G111
+## G113
 
 Wrong:
 
@@ -2372,7 +2436,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: type('#p', 'x') && model.typed === true -->
 
-## G112
+## G114
 
 Wrong:
 
@@ -2392,7 +2456,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: type('#p', 'x') && model.touched === true -->
 
-## G113
+## G115
 
 Wrong:
 
@@ -2413,7 +2477,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: type('#p', 'x') && model.touched === true -->
 
-## G114
+## G116
 
 Wrong:
 
@@ -2441,7 +2505,7 @@ rows[0] = { id: 1, name: 'again' };
 ```
 <!-- check: texts('#p li').join(',') === 'again' -->
 
-## G115
+## G117
 
 Wrong:
 
@@ -2475,7 +2539,7 @@ model.refresh([{ id: 1, name: 'b' }]);
 ```
 <!-- check: document.querySelector('#p input') === window.before && window.before.value === 'b' -->
 
-## G116
+## G118
 
 Wrong:
 
@@ -2493,7 +2557,7 @@ Right:
 ```
 <!-- check: count('#p li') === 2 -->
 
-## G117
+## G119
 
 Wrong:
 
@@ -2519,7 +2583,7 @@ new Stitch.DataBinder().bind('#f', model);
 ```
 <!-- check: click('#f button') && window.submitted === false && model.went === true -->
 
-## G118
+## G120
 
 Wrong:
 
@@ -2551,7 +2615,7 @@ document.getElementById('f').requestSubmit();
 ```
 <!-- check: window.prevented === true && model.saved === true -->
 
-## G119
+## G121
 
 Wrong:
 
@@ -2575,7 +2639,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: click('#p button') && model.ran === true -->
 
-## G120
+## G122
 
 Wrong:
 
@@ -2605,7 +2669,7 @@ el.dispatchEvent(new Event('input', { bubbles: true }));
 ```
 <!-- check: model.touched === true -->
 
-## G121
+## G123
 
 Wrong:
 
@@ -2631,7 +2695,7 @@ new Stitch.DataBinder().bind('#p', model);
 ```
 <!-- check: type('#p', 'Paris') && model.address.city === 'Paris' -->
 
-## G122
+## G124
 
 Wrong:
 
@@ -2665,11 +2729,11 @@ new Stitch.DataBinder().bind('#p', model);
 <!-- check: click('#p button') -->
 <!-- check: tick().then(() => text('#e') === 'server said no') -->
 
-## G123
+## G125
 
 Guidance only: whether `type="date"` is a date control depends on the browser engine; the engines the tests run (current Chromium, Firefox and WebKit builds) differ, so the failing half cannot be shown everywhere. The fix itself, `data-type="date"`, is executed by recipe 10 in `skills/stitch/references/recipes.md`.
 
-## G124
+## G126
 
 Wrong:
 
@@ -2691,7 +2755,7 @@ document.addEventListener('DOMContentLoaded', function () {
 ```
 <!-- check: text('#later') === '1' -->
 
-## G125
+## G127
 
 Wrong:
 
@@ -2717,7 +2781,7 @@ document.querySelectorAll('.card').forEach(el => binder.bind(el, cardModel(el)))
 ```
 <!-- check: texts('.card').join(',') === 'A,B' -->
 
-## G126
+## G128
 
 Wrong:
 
@@ -2746,7 +2810,7 @@ binder.bind('#p', Stitch.Observable.create({ title: 'b' }));
 ```
 <!-- check: text('#p') === 'b' -->
 
-## G127
+## G129
 
 Wrong:
 
@@ -2776,7 +2840,7 @@ new Stitch.DataBinder().bind('#widget', Stitch.Observable.create({ name: 'N' }))
 ```
 <!-- check: text('#t') === 'T' && text('#n') === 'N' -->
 
-## G128
+## G130
 
 Wrong:
 
@@ -2805,7 +2869,7 @@ model.t = 2;
 ```
 <!-- check: text('#p') === '1' -->
 
-## G129
+## G131
 
 Wrong:
 
@@ -2826,12 +2890,13 @@ Right:
 <script>
 const old = new Stitch.DataBinder();
 old.dispose();
-new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ t: 1 }));
+const model = Stitch.Observable.create({ t: 1 });
+new Stitch.DataBinder().bind('#p', model);
 </script>
 ```
 <!-- check: text('#p') === '1' -->
 
-## G130
+## G132
 
 Wrong:
 
@@ -2849,7 +2914,7 @@ Right:
 ```
 <!-- check: text('#p') === '1' -->
 
-## G131
+## G133
 
 Wrong:
 
@@ -2880,7 +2945,7 @@ Right:
 ```
 <!-- check: window.after === 'new' -->
 
-## G132
+## G134
 
 Wrong:
 
@@ -2911,7 +2976,7 @@ Right:
 ```
 <!-- check: window.model.went === true -->
 
-## G133
+## G135
 
 Wrong:
 
@@ -2935,7 +3000,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ t: 1 }));
 ```
 <!-- check: attr('#p', 'title') === '1' -->
 
-## G134
+## G136
 
 Wrong:
 
@@ -2968,7 +3033,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({}));
 ```
 <!-- check: attr('#p', 'title') === 'Save changes' -->
 
-## G135
+## G137
 
 Wrong:
 
@@ -2985,7 +3050,7 @@ window.result = 'registered';
 ```
 <!-- check: window.result === 'registered' -->
 
-## G136
+## G138
 
 Wrong:
 
@@ -3004,7 +3069,7 @@ window.result = 'two names';
 ```
 <!-- check: window.result === 'two names' -->
 
-## G137
+## G139
 
 Wrong:
 
@@ -3046,7 +3111,7 @@ window.left = Stitch.debug.stats().effects - before;
 ```
 <!-- check: window.shown === 'ADA' && window.left === 0 -->
 
-## G138
+## G140
 
 Wrong:
 
@@ -3074,7 +3139,7 @@ new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ value: '<b>from da
 ```
 <!-- check: count('#p b') === 0 && text('#p') === '<b>from data</b>' -->
 
-## G139
+## G141
 
 Wrong:
 
@@ -3096,7 +3161,7 @@ window.result = typeof removeSecond;
 ```
 <!-- check: window.result === 'function' -->
 
-## G140
+## G142
 
 Wrong:
 
@@ -3122,7 +3187,7 @@ binder.bind('#p', model);
 ```
 <!-- check: text('#p') === 'Ada' -->
 
-## G141
+## G143
 
 Wrong:
 
@@ -3151,4 +3216,3 @@ try { new Stitch.DataBinder().bind('#p', Stitch.Observable.create({ name: 'Ada' 
 </script>
 ```
 <!-- check: matched === true -->
-

@@ -7,26 +7,27 @@ it starts at the line given below (its heading is `## N. Title`).
 
 | Task | Recipe | Line |
 |---|---|---|
-| List of objects: add, edit in place, remove | [1](#1-keyed-list-add-edit-remove) | 31 |
-| Rows keyed by another field | [2](#2-rows-keyed-by-another-field-data-key) | 68 |
-| Table body, row computeds, totals | [3](#3-table-body-from-a-template-with-totals) | 87 |
-| Recursive tree with expand/collapse | [4](#4-recursive-tree-with-expand-and-collapse) | 131 |
-| Search, filter and sort | [5](#5-search-filter-and-sort) | 177 |
-| Master-detail selection | [6](#6-master-detail-selection) | 217 |
-| Form with validation | [7](#7-form-with-validation-inside-a-form) | 262 |
-| Selects: objects, plain values, numbers, multiple | [8](#8-selects-over-objects-plain-values-and-numbers) | 331 |
-| Cascading selects | [9](#9-cascading-selects) | 377 |
-| Every input type, two-way | [10](#10-two-way-inputs-by-type) | 416 |
-| Handlers in nested lists ($parent / $root), keyboard events | [11](#11-handlers-in-nested-lists-and-keyboard-events) | 459 |
-| Events between parts of the page | [12](#12-events-root-only-emit-and-on) | 505 |
-| Error reporting | [13](#13-error-reporting-with-onerror) | 535 |
-| Custom bindings (path and literal) | [14](#14-custom-bindings-path-and-literal) | 573 |
-| Links, images, ARIA, styles from data | [15](#15-attributes-from-data-links-images-aria-style) | 635 |
-| Loading data from a server | [16](#16-loading-data-from-a-server) | 681 |
-| An element only for some rows | [17](#17-an-element-only-for-some-rows) | 726 |
-| Tabs and wizard steps | [18](#18-tabs-and-wizard-steps) | 762 |
-| Teardown, rebind, removers | [19](#19-lifecycle-rebind-teardown-removers) | 798 |
-| Nested lists, group subtotals and a grand total | [20](#20-nested-lists-with-group-subtotals) | 840 |
+| List of objects: add, edit in place, remove | [1](#1-keyed-list-add-edit-remove) | 32 |
+| Rows keyed by another field | [2](#2-rows-keyed-by-another-field-data-key) | 69 |
+| Table body, row computeds, totals | [3](#3-table-body-from-a-template-with-totals) | 88 |
+| Recursive tree with expand/collapse | [4](#4-recursive-tree-with-expand-and-collapse) | 132 |
+| Search, filter and sort | [5](#5-search-filter-and-sort) | 178 |
+| Master-detail selection | [6](#6-master-detail-selection) | 218 |
+| Form with validation | [7](#7-form-with-validation-inside-a-form) | 263 |
+| Selects: objects, plain values, numbers, multiple | [8](#8-selects-over-objects-plain-values-and-numbers) | 332 |
+| Cascading selects | [9](#9-cascading-selects) | 381 |
+| Every input type, two-way | [10](#10-two-way-inputs-by-type) | 420 |
+| Handlers in nested lists ($parent / $root), keyboard events | [11](#11-handlers-in-nested-lists-and-keyboard-events) | 463 |
+| Events between parts of the page | [12](#12-events-root-only-emit-and-on) | 509 |
+| Error reporting | [13](#13-error-reporting-with-onerror) | 539 |
+| Custom bindings (path and literal) | [14](#14-custom-bindings-path-and-literal) | 577 |
+| Links, images, ARIA, styles from data | [15](#15-attributes-from-data-links-images-aria-style) | 639 |
+| Loading data from a server | [16](#16-loading-data-from-a-server) | 685 |
+| An element only for some rows | [17](#17-an-element-only-for-some-rows) | 730 |
+| Tabs and wizard steps | [18](#18-tabs-and-wizard-steps) | 766 |
+| Teardown, rebind, removers | [19](#19-lifecycle-rebind-teardown-removers) | 802 |
+| Nested lists, group subtotals and a grand total | [20](#20-nested-lists-with-group-subtotals) | 844 |
+| Select filtered by a search box | [21](#21-filtered-select-type-to-filter) | 904 |
 
 ## 1. Keyed list: add, edit, remove
 
@@ -371,8 +372,11 @@ placeholder whose value is `data-default-value` (default `""`).
 - A select writes strings. Numbers need `data-type="int"` (or `float`).
 - A select WITHOUT `data-value` keeps the user's choice while its list changes.
 - With `data-value`, when the chosen option leaves the list the choice is cleared: the model gets
-  the placeholder's value (or `null` without a placeholder), and `$watch` / `$onChange` see it. To
-  keep a choice across a reload, assign the new list in one step (never `[]` first).
+  the placeholder's value (`null` with `data-type="int"`), or `null` without a placeholder, and
+  `$watch` / `$onChange` see it. To keep a choice across a reload, assign the new list in one step
+  (never `[]` first); a filtered list must keep the chosen option (recipe 21).
+- Give every select bound with `data-value` a `data-default-text`: without one, a cleared choice shows
+  a blank select.
 
 ## 9. Cascading selects
 
@@ -896,3 +900,37 @@ Inside the inner list `$parent` is the group, `$root` the model.
 
 `$root.addLine` receives the group (the item of the row the button is in), so one model method
 serves every group. `$parent.removeLine` is the group's own method, called with the line.
+
+## 21. Filtered select (type to filter)
+
+A search box filters a select's options. A chosen option that leaves the list clears the choice,
+so keep the chosen option in the filtered list (`|| c.id === this.city`).
+
+```html run
+<div id="pick-city">
+    <input id="city-q" data-value="q" placeholder="Filter">
+    <select id="city-s" data-foreach="shownCities" data-value="city" data-default-text="City">
+        <option data-value="id" data-text="name"></option>
+    </select>
+</div>
+<script>
+    const model = Stitch.Observable.create({
+        q: '',
+        city: '',
+        cities: [{ id: 'par', name: 'Paris' }, { id: 'lyo', name: 'Lyon' }, { id: 'nic', name: 'Nice' }],
+        shownCities: Stitch.computed(function () {
+            const q = this.q.trim().toLowerCase();
+            return this.cities.filter(c => c.name.toLowerCase().includes(q) || c.id === this.city);
+        })
+    });
+    new Stitch.DataBinder().bind('#pick-city', model);
+</script>
+```
+<!-- check: type('#city-s', 'par') -->
+<!-- check: type('#city-q', 'ly') -->
+<!-- check: texts('#city-s option').join(',') === 'City,Paris,Lyon' && model.city === 'par' -->
+<!-- check: type('#city-q', '') -->
+<!-- check: document.getElementById('city-s').value === 'par' && count('#city-s option') === 4 -->
+
+Without `|| c.id === this.city`, typing `ly` would clear `city` to the placeholder's value, and
+clearing the filter would not bring the choice back.
