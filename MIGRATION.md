@@ -364,6 +364,44 @@ model.rows.splice(0, 1);
 model.selected = null;
 ```
 
+### data-attr refuses values that could run script
+
+In v2, `data-attr` wrote whatever the data said: an `onclick` attribute, a `javascript:` link, a
+`srcdoc` document, a `data:` URL, a style string. In v3 each of those throws (E321-E325) and the
+object writes nothing; built-in bindings on `<script>`, `<style>`, `<base>` and `<meta>` throw
+(E326). The change most pages notice is `style`: a style string is refused (a strict
+Content-Security-Policy would block it); give `style` an object, which is written through the
+CSSOM, property by property. Behaviour belongs in `data-click` / `data-event`.
+
+Before:
+
+```html page
+<div id="app" data-attr="box">Box</div>
+```
+
+```js throws
+const model = Stitch.Observable.create({ box: { style: 'color: red; font-weight: bold', onclick: 'save()' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E325]`
+
+After:
+
+```html page
+<div id="app" data-attr="box" data-click="save">Box</div>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    saved: false,
+    box: { style: { color: 'red', fontWeight: 'bold' } },
+    save() { this.saved = true; }
+});
+new Stitch.DataBinder().bind('#app', model);
+```
+<!-- check: document.getElementById('app').style.fontWeight === 'bold' && click('#app') -->
+<!-- check: document.getElementById('app').getAttribute('onclick') === null -->
+
 ### Binding and unbinding are checked
 
 v2 ignored a second `bind()` of the same element, or bound it twice, and a needless `unbind()` did

@@ -28,6 +28,11 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
   `registerBinding` after the first `bind()` throws; names must be lowercase; built-in names cannot
   be replaced.
 - A model cannot be put inside another model, and two models cannot share an array, Map or Set.
+- `data-attr` refuses, with a coded error and without writing anything, every value that could run
+  script: an attribute name starting with `on`, `srcdoc`, a `javascript:` / `vbscript:` URL (in its
+  filter-evasion forms too), a `data:` URL other than `data:image/...` in an `<img>` `src`, and a
+  `style` string (give `style` an object; it is written through the CSSOM). Built-in bindings on
+  `<script>`, `<style>`, `<base>` and `<meta>` throw.
 - Model properties cannot be deleted (set them to `null`); `delete` on a list, Map or Set throws.
 - Data fields named `toJSON` or like a `$` helper throw.
 - `bind()` of an already-bound element, `unbind()` of an element with nothing bound, and `bind()` /
@@ -49,6 +54,11 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
   `this`, so `Stitch.computed(m => m.price * m.qty)` works.
 - Documentation: Guide, API reference, error reference and AGENTS.md, with every code example
   executed by the test suite.
+- docs/ACCESSIBILITY.md: what Stitch does and does not do for assistive technology, with runnable
+  patterns (labels, ARIA states, live regions, loading, validation, focus after list changes).
+- Tested on Chromium, Firefox and WebKit, both builds, including a page served with a strict
+  Content-Security-Policy with Trusted Types. The supported browsers and the minimum versions are
+  in the README.
 
 ### Fixed
 
@@ -66,6 +76,10 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
 - `Stitch.onBindReport` listed `data-type` as ignored although `data-value` reads it.
 - A path-type custom binding given text (`data-tooltip="Save changes"`) now says how to register
   it as literal.
+- `data-attr` with a `style` object replaced the whole `style` attribute, which also cleared the
+  `display: none` of `data-visible` on the same element; it now sets and removes only its own
+  properties.
+- The license banner names the real repository.
 
 Earlier versions: see the [v1 to v2 section of MIGRATION.md](MIGRATION.md#history-stitchjs-v10-to-v20)
 and the archived v2 documents in `docs/history/`.

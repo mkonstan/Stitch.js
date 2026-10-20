@@ -52,7 +52,8 @@
         "MIGRATION.md",
         "docs/GUIDE.md",
         "docs/API.md",
-        "docs/ERRORS.md"
+        "docs/ERRORS.md",
+        "docs/ACCESSIBILITY.md"
     ];
     // Files that may end with a history section (old-version code, not run).
     var HISTORY_SECTIONS = ["MIGRATION.md"];
