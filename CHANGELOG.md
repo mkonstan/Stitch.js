@@ -31,9 +31,13 @@
   list at create, `push`, `unshift`, `splice` and `fill`, at any depth, before anything is added.
   Before, such a row was accepted and threw only when first read, which stopped the list rendering.
 - `<select data-foreach data-value>`: when the chosen option leaves the list, the model is cleared
-  to the placeholder's value (or `null`, with nothing selected, without a placeholder; a multiple
-  select drops the value). Before, the select showed another option while the model kept the old
-  value.
+  to the placeholder's value, converted like a user pick (`null` with `data-type="int"` / `"float"`),
+  or to `null` with nothing selected without a placeholder; a multiple select drops the value.
+  Before, the select showed another option while the model kept the old value.
+- A select bound with `data-value` shows exactly what the model holds: without a placeholder, `null`
+  or a value no option has shows no option, after every options change (before: the browser showed
+  the first option). Picking the placeholder of a `data-type="int"` / `"float"` select writes `null`
+  (before: `""`).
 
 ### Fixed
 

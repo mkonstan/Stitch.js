@@ -382,8 +382,11 @@ function bindForeach(element, viewModel, path, context, deps) {
             return true;
         }
         if (placeholder) {
+            // The placeholder's value as the model type: null for data-type="int" / "float",
+            // the same value a user gets by picking the placeholder.
+            const converter = deps.getTypeConverter(element, placeholder.value);
             element.value = placeholder.value;
-            deps.setProperty(viewModel, valuePath, placeholder.value);
+            deps.setProperty(viewModel, valuePath, converter.toModel ? converter.toModel(placeholder.value) : placeholder.value);
         } else {
             element.selectedIndex = -1;
             deps.setProperty(viewModel, valuePath, null);
@@ -405,6 +408,10 @@ function bindForeach(element, viewModel, path, context, deps) {
                 }
             } else if (placeholder) {
                 element.value = placeholder.value;
+            } else {
+                // No choice and no placeholder: show no option. Re-applied on every render,
+                // because a browser selects the first option again when options change.
+                element.selectedIndex = -1;
             }
             return;
         }

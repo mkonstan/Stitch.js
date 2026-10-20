@@ -4046,8 +4046,11 @@ function bindForeach(element, viewModel, path, context, deps) {
             return true;
         }
         if (placeholder) {
+            // The placeholder's value as the model type: null for data-type="int" / "float",
+            // the same value a user gets by picking the placeholder.
+            const converter = deps.getTypeConverter(element, placeholder.value);
             element.value = placeholder.value;
-            deps.setProperty(viewModel, valuePath, placeholder.value);
+            deps.setProperty(viewModel, valuePath, converter.toModel ? converter.toModel(placeholder.value) : placeholder.value);
         } else {
             element.selectedIndex = -1;
             deps.setProperty(viewModel, valuePath, null);
@@ -4069,6 +4072,10 @@ function bindForeach(element, viewModel, path, context, deps) {
                 }
             } else if (placeholder) {
                 element.value = placeholder.value;
+            } else {
+                // No choice and no placeholder: show no option. Re-applied on every render,
+                // because a browser selects the first option again when options change.
+                element.selectedIndex = -1;
             }
             return;
         }
@@ -6026,8 +6033,18 @@ function createValueValidators(deps) {
                 if (hasPlaceholder && value === placeholderValue) {
                     return placeholderValue;
                 }
-                if (!value || value === "") {
-                    return hasPlaceholder ? placeholderValue : "";
+                if (value === null || value === undefined || value === "") {
+                    // No choice. The user picked the placeholder: the model gets the converted
+                    // value (null for data-type="int" / "float"), as given. On render: the
+                    // placeholder, or no option at all (never an option the model does not hold).
+                    if (source === "user-input") {
+                        return value;
+                    }
+                    if (hasPlaceholder) {
+                        return placeholderValue;
+                    }
+                    element.selectedIndex = -1;
+                    return element.value;
                 }
                 const converter = getTypeConverter(element, value);
                 const valueExists = Array.from(element.options).some(opt => converter.equals(opt.value, value));
@@ -6039,12 +6056,10 @@ function createValueValidators(deps) {
                         }
                         return placeholderValue;
                     }
-                    element.selectedIndex = 0;
-                    const firstValue = element.options[0]?.value || "";
-                    if (source === "user-input" && viewModel && path) {
-                        setProperty(viewModel, path, firstValue);
-                    }
-                    return firstValue;
+                    // The model holds a value no option has (for example options that arrive
+                    // later): show no option rather than one the model does not hold.
+                    element.selectedIndex = -1;
+                    return element.value;
                 }
                 return value;
             }

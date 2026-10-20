@@ -24,6 +24,7 @@
     <script>
         StitchTest.plan([
             'select-choice-that-leaves-the-list-is-cleared',
+            'select-shows-exactly-what-the-model-holds',
             'computed-that-changes-a-list-throws-e725',
             'computed-that-writes-throws-e724',
             'watch-that-writes-its-own-path-stops-with-e912',
@@ -116,6 +117,63 @@
             md.tags = ['a', 'c'];
             await tick();
             t.deepEqual(Stitch.Observable.toRaw(md.picked), ['a'], 'a multiple select drops the value whose option left');
+        });
+
+        test('select-shows-exactly-what-the-model-holds', async (t) => {
+            const shown = (select) => select.selectedIndex === -1 ? '(none)' : select.value;
+            // No placeholder: after the clear, no options change may show an option the model does not hold.
+            const a = mount('<select data-foreach="opts" data-value="v"><option data-text="$data"></option></select>');
+            const ma = Stitch.Observable.create({ v: 'b', opts: ['a', 'b'] });
+            new Stitch.DataBinder().bind(a, ma);
+            const sa = a.querySelector('select');
+            ma.opts = ['a'];
+            await tick();
+            t.equal(ma.v, null, 'cleared to null');
+            const seen = [shown(sa)];
+            ma.opts.push('c');
+            await tick();
+            seen.push(shown(sa));
+            ma.opts.reverse();
+            await tick();
+            seen.push(shown(sa));
+            ma.opts = ['x', 'y', 'z'];
+            await tick();
+            seen.push(shown(sa));
+            ma.opts.splice(1, 1);
+            await tick();
+            seen.push(shown(sa));
+            t.deepEqual(seen, ['(none)', '(none)', '(none)', '(none)', '(none)'], 'with the model null, the select shows no option after every options change');
+            t.equal(ma.v, null, 'and the model stays null');
+            ma.v = 'z';
+            await tick();
+            t.equal(shown(sa), 'z', 'a model value with an option shows it');
+            ma.v = null;
+            await tick();
+            t.equal(shown(sa), '(none)', 'setting null shows no option');
+
+            // A static select whose model value has no option and no placeholder shows no option.
+            const c = mount('<select data-value="w"><option value="x">x</option><option value="y">y</option></select>');
+            const mc = Stitch.Observable.create({ w: 'zz' });
+            new Stitch.DataBinder().bind(c, mc);
+            t.equal(c.querySelector('select').selectedIndex, -1, 'a value no option has: no option shown (not the first one)');
+            t.equal(mc.w, 'zz', 'and the model is left alone');
+
+            // Typed selects: a cleared choice and a picked placeholder are both null.
+            const b = mount('<select data-foreach="ids" data-value="n" data-type="int" data-default-text="Pick"><option data-value="id" data-text="id"></option></select>');
+            const mb = Stitch.Observable.create({ n: 2, ids: [{ id: 1 }, { id: 2 }] });
+            new Stitch.DataBinder().bind(b, mb);
+            mb.ids = [{ id: 1 }];
+            await tick();
+            t.equal(mb.n, null, 'data-type="int": the cleared choice is null, not ""');
+            const sb = b.querySelector('select');
+            sb.value = '1';
+            sb.dispatchEvent(new Event('change'));
+            t.equal(mb.n, 1, 'a user pick writes the number');
+            sb.value = '';
+            sb.dispatchEvent(new Event('change'));
+            t.equal(mb.n, null, 'picking the placeholder writes null too');
+            await tick();
+            t.equal(sb.value, '', 'and the placeholder shows');
         });
 
         test('computed-that-changes-a-list-throws-e725', async (t) => {

@@ -400,11 +400,13 @@ the user (on `input` and `change` events).
 | `select` | the selected option's value, always a string (even if the model held a number); use `data-type="int"` for numbers |
 | `select multiple` | array of selected values |
 
-If the model holds a value no option of a `select` has, the select shows its placeholder (or its
-first option) and the model is left alone until the user picks. On a `<select data-foreach>`, when
-the chosen option leaves the list, the choice is cleared instead: the model is set to the
-placeholder's value (or `null`, with nothing selected, when there is no placeholder; a multiple
-select drops the value). The write is an ordinary change.
+A `select` shows exactly what the model holds. If the model holds `null`, `""` or a value no option
+has, the select shows its placeholder, or, without one, no option at all (`selectedIndex` -1,
+re-applied after every options change); the model is left alone until the user picks. Picking the
+placeholder writes its value converted by `data-type` (`null` for `int` / `float`). On a
+`<select data-foreach>`, when the chosen option leaves the list, the choice is cleared instead: the
+model is set to the placeholder's value, converted the same way (or `null`, with nothing selected,
+when there is no placeholder; a multiple select drops the value). The write is an ordinary change.
 
 On an `<option>` inside a `<select data-foreach>`, `data-value` sets the option's value. For options
 from a list of plain values, leave it out and write `<option data-text="$data">`: an option without

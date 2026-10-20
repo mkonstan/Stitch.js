@@ -665,13 +665,20 @@ template. `data-default-text` adds a first placeholder option (`data-default-val
 default `""`). With `data-value` on the select, the selection is two-way. Without it, the user's
 choice stays selected while the list changes, as long as its option is still in the list.
 
-With `data-value`, when the chosen option leaves the list (the list is filtered, or replaced by one
-without it), the choice is cleared, so the select and the model never disagree: the model gets the
-placeholder's value (`data-default-value`, default `""`), or `null` with nothing selected when there
-is no placeholder (a multiple select drops the value from its array). It is an ordinary write, so
-`$watch` and `$onChange` see it; cascading selects need no reset code. A value that no option has
-shown yet (options that arrive later) is left alone. To keep a choice across a reload, assign the new
-list in one step, not `[]` first.
+A select bound with `data-value` shows exactly what the model holds: the matching option; the
+placeholder for `null`, `""` or the placeholder's value; and, with no placeholder, no option at all
+for `null` or for a value no option has (re-applied after every change of the options, so the browser
+never falls back to the first option). Give every such select a `data-default-text`, so an empty
+choice shows a prompt rather than a blank.
+
+When the chosen option leaves the list (the list is filtered, or replaced by one without it), the
+choice is cleared, so the select and the model never disagree: the model gets the placeholder's value
+converted like a user pick (`""`, or `null` with `data-type="int"` or `"float"`), or `null` with
+nothing selected when there is no placeholder (a multiple select drops the value from its array). It
+is an ordinary write, so `$watch` and `$onChange` see it; cascading selects need no reset code. A
+value that no option has shown yet (options that arrive later) is left alone. To keep a choice across
+a reload, assign the new list in one step, not `[]` first; a list filtered by a search box must keep
+the chosen option (`.filter(c => matches(c) || c.id === this.city)`).
 
 ```html page
 <select id="city" data-foreach="cities" data-value="city" data-default-text="City">

@@ -623,8 +623,13 @@ affected; check for these patterns:
 - An arrow-function method in a row given to a list (at create, `push`, `splice`, ...) throws E707
   at once; it used to be thrown later, when the row was first read, and the list stopped rendering.
 - `<select data-foreach data-value>`: when the chosen option leaves the list, the model is cleared
-  (the placeholder's value, or `null`); the select used to show another option while the model kept the old
-  value. Code that reset the value itself (a `$watch` on the first select of a cascade) still works.
+  (the placeholder's value, `null` with `data-type="int"` / `"float"`, or `null` without a
+  placeholder); the select used to show another option while the model kept the old value. Code that
+  reset the value itself (a `$watch` on the first select of a cascade) still works.
+- A select bound with `data-value` never shows an option the model does not hold: without a
+  placeholder, a `null` value or a value no option has shows no option (it used to show the first
+  one). Picking the placeholder of a `data-type="int"` select writes `null` (it used to write `""`).
+  Add `data-default-text` to such selects.
 
 Also fixed: a list row that holds the focus keeps it when the list reorders.
 

@@ -31,8 +31,18 @@ function createValueValidators(deps) {
                 if (hasPlaceholder && value === placeholderValue) {
                     return placeholderValue;
                 }
-                if (!value || value === "") {
-                    return hasPlaceholder ? placeholderValue : "";
+                if (value === null || value === undefined || value === "") {
+                    // No choice. The user picked the placeholder: the model gets the converted
+                    // value (null for data-type="int" / "float"), as given. On render: the
+                    // placeholder, or no option at all (never an option the model does not hold).
+                    if (source === "user-input") {
+                        return value;
+                    }
+                    if (hasPlaceholder) {
+                        return placeholderValue;
+                    }
+                    element.selectedIndex = -1;
+                    return element.value;
                 }
                 const converter = getTypeConverter(element, value);
                 const valueExists = Array.from(element.options).some(opt => converter.equals(opt.value, value));
@@ -44,12 +54,10 @@ function createValueValidators(deps) {
                         }
                         return placeholderValue;
                     }
-                    element.selectedIndex = 0;
-                    const firstValue = element.options[0]?.value || "";
-                    if (source === "user-input" && viewModel && path) {
-                        setProperty(viewModel, path, firstValue);
-                    }
-                    return firstValue;
+                    // The model holds a value no option has (for example options that arrive
+                    // later): show no option rather than one the model does not hold.
+                    element.selectedIndex = -1;
+                    return element.value;
                 }
                 return value;
             }
