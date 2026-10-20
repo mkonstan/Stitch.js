@@ -44,7 +44,26 @@ const SCRIPT_SCHEMES = ["javascript", "vbscript"];
 //   integrity, crossorigin, nonce (whether a resource is trusted and with which credentials),
 //   referrerpolicy (what is leaked to the target), is (which custom element class runs).
 // rel is not on the list: rel="noopener noreferrer" (or none) from data is the common, safe
-// pattern; only the "opener" token, which hands the target page this window, is refused.
+// pattern; only the "opener" token, which hands the target page this window, is refused, and
+// a noopener / noreferrer written in the element's markup cannot be dropped (data may only add
+// tokens next to them).
+const PROTECTIVE_REL = ["noopener", "noreferrer"];
+// The protective rel tokens each element had in its markup, read the first time data-attr
+// checks a write for it (before data-attr has written anything).
+const STATIC_REL = new WeakMap();
+
+function relTokens(text) {
+    return String(text).toLowerCase().split(/[\t\n\f\r ]+/).filter(Boolean);
+}
+
+function protectiveStaticRel(element) {
+    if (!STATIC_REL.has(element)) {
+        const markup = element && typeof element.getAttribute === "function" ? element.getAttribute("rel") : null;
+        const tokens = markup === null ? [] : relTokens(markup);
+        STATIC_REL.set(element, PROTECTIVE_REL.filter(token => tokens.indexOf(token) !== -1));
+    }
+    return STATIC_REL.get(element);
+}
 const SENSITIVE_ATTRIBUTES = [
     "sandbox", "allow", "allowfullscreen", "allowpaymentrequest", "allowusermedia", "csp", "credentialless",
     "http-equiv", "integrity", "crossorigin", "nonce", "referrerpolicy", "is"
@@ -174,6 +193,7 @@ function planAttrWrite(name, value) {
  */
 function attrRefusal(element, write) {
     const name = write.name.toLowerCase();
+    const keptRel = protectiveStaticRel(element);
     if (name.slice(0, 2) === "on") {
         return { kind: "event-handler" };
     }
@@ -183,14 +203,21 @@ function attrRefusal(element, write) {
     if (SENSITIVE_ATTRIBUTES.indexOf(name) !== -1) {
         return { kind: "sensitive" };
     }
+    if (name === "rel") {
+        const tokens = write.remove ? [] : relTokens(write.text);
+        if (tokens.indexOf("opener") !== -1) {
+            return { kind: "opener" };
+        }
+        const missing = keptRel.filter(token => tokens.indexOf(token) === -1);
+        if (missing.length) {
+            return { kind: "rel-protection", missing };
+        }
+    }
     if (write.remove) {
         return null;
     }
     if (name === "style") {
         return write.style ? null : { kind: "style-string" };
-    }
-    if (name === "rel" && write.text.toLowerCase().split(/[\s]+/).indexOf("opener") !== -1) {
-        return { kind: "opener" };
     }
     if (!isUrlAttribute(element, name)) {
         return null;

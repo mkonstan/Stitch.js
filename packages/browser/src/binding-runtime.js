@@ -51,6 +51,10 @@ function attrRefusalError(element, path, attrName, refusal) {
             return bindingError("E328", element, "attr", path,
                 "rel \"opener\" gives the linked page a reference back to this window, so data may not set it. " +
                 "Leave it out (a link opened in a new tab gets noopener by default) or use \"noopener noreferrer\".");
+        case "rel-protection":
+            return bindingError("E329", element, "attr", path,
+                `the markup's rel has ${refusal.missing.join(" and ")}, which data may not drop: a bound rel may only add ` +
+                "tokens. Keep them in the value (e.g. \"noopener noreferrer nofollow\"), or leave rel out of the object.");
         case "srcdoc":
             return bindingError("E322", element, "attr", path,
                 "srcdoc holds a whole HTML document, scripts included, so data may not set it. " +

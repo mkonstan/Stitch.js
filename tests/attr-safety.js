@@ -22,6 +22,7 @@
         "style-updates-remove-only-their-own-properties",
         "code-elements-cannot-be-bound",
         "a-static-sandbox-cannot-be-removed-by-data",
+        "a-static-rel-protection-cannot-be-dropped-by-data",
         "a-radio-group-name-with-quotes-still-binds",
         "no-payload-ever-ran"
     ]);
@@ -210,6 +211,35 @@
         t.ok(error && String(error.message).indexOf("[Stitch E327]") === 0, "sandbox: null is refused with E327 (got " + (error ? String(error.message).slice(0, 60) : "no error") + ")");
         t.equal(frame.getAttribute("sandbox"), "", "the static sandbox stays");
         t.equal(frame.hasAttribute("title"), false, "and nothing else in the object is written");
+    });
+
+    StitchTest.test("a-static-rel-protection-cannot-be-dropped-by-data", function (t) {
+        function link(staticRel, rel) {
+            var a = make("a");
+            if (staticRel !== null) a.setAttribute("rel", staticRel);
+            a.setAttribute("data-attr", "attrs");
+            var error = thrown(function () { new Stitch.DataBinder().bind(a, Stitch.Observable.create({ attrs: { href: "/x", rel: rel } })); });
+            return { a: a, error: error };
+        }
+        // The markup says noopener noreferrer: data may add tokens, never drop those two.
+        [null, false, "", "nofollow", "noopener", "NOREFERRER", "opener"].forEach(function (rel) {
+            var run = link("noopener noreferrer", rel);
+            var code = rel === "opener" ? "E328" : "E329";
+            t.ok(run.error && String(run.error.message).indexOf("[Stitch " + code + "]") === 0,
+                "static noopener noreferrer, rel " + JSON.stringify(rel) + " throws " + code + " (got " + (run.error ? String(run.error.message).slice(0, 50) : "no error") + ")");
+            t.equal(run.a.getAttribute("rel"), "noopener noreferrer", "and the static rel stays (" + JSON.stringify(rel) + ")");
+            t.equal(run.a.hasAttribute("href"), false, "and nothing else is written (" + JSON.stringify(rel) + ")");
+        });
+        var single = link("noreferrer", "nofollow");
+        t.ok(single.error && String(single.error.message).indexOf("[Stitch E329]") === 0, "static noreferrer alone is kept too");
+        var added = link("noopener noreferrer", "NoReferrer external noopener");
+        t.equal(added.error, null, "adding tokens while keeping both binds");
+        t.equal(added.a.getAttribute("rel"), "NoReferrer external noopener", "and is written");
+        var other = link("nofollow", null);
+        t.equal(other.error, null, "a static rel without noopener/noreferrer may be removed");
+        t.equal(other.a.hasAttribute("rel"), false, "and is removed");
+        var none = link(null, "noopener noreferrer");
+        t.equal(none.error, null, "with no static rel, data may set one");
     });
 
     StitchTest.test("a-radio-group-name-with-quotes-still-binds", async function (t) {

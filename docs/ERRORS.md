@@ -194,7 +194,7 @@ Throws: `[Stitch E201]`
 
 Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state). `data-value` writes the user's input back, so its path must be writable. E321-E327 are the values that could make the page run script or lift a restriction: `data-attr` checks every entry of its object first and writes none of them if one is refused.
 
-[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object) · [E321](#e321-event-handler-attribute-from-data) · [E322](#e322-srcdoc-from-data) · [E323](#e323-javascript-or-vbscript-url-from-data) · [E324](#e324-data-url-from-data) · [E325](#e325-style-string-from-data) · [E326](#e326-binding-on-a-script-style-base-or-meta-element) · [E327](#e327-security-sensitive-attribute-from-data) · [E328](#e328-relopener-from-data)
+[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object) · [E321](#e321-event-handler-attribute-from-data) · [E322](#e322-srcdoc-from-data) · [E323](#e323-javascript-or-vbscript-url-from-data) · [E324](#e324-data-url-from-data) · [E325](#e325-style-string-from-data) · [E326](#e326-binding-on-a-script-style-base-or-meta-element) · [E327](#e327-security-sensitive-attribute-from-data) · [E328](#e328-relopener-from-data) · [E329](#e329-rel-protection-from-the-markup-dropped-by-data)
 
 ### E301: data-text bound to a function
 
@@ -371,6 +371,24 @@ Throws: `[Stitch E327]`
 **Cause:** A `data-attr` object gives `rel` a value with the token `opener`, which would let the linked page reach this window (`window.opener`) and navigate it. Other `rel` values, `noopener noreferrer` included, are written as given.
 
 **Fix:** Leave `rel` out, or use `rel: 'noopener noreferrer'`.
+
+### E329: rel protection from the markup dropped by data
+
+**Message:** `the markup's rel has …, which data may not drop: a bound rel may only add tokens. Keep them in the value (e.g. "noopener noreferrer nofollow"), or leave rel out of the object.`
+
+**Cause:** The element's markup has `rel` with `noopener` and/or `noreferrer`, and a `data-attr` value for `rel` would remove it (`null`, `false`) or replace it with a value that lacks one of them (`"nofollow"`). Those tokens keep the linked page from reaching this window or seeing this page's address, so data may add tokens next to them but never drop them.
+
+**Fix:** Keep the markup's tokens in the value (`rel: 'noopener noreferrer nofollow'`), or leave `rel` out of the object.
+
+```html page
+<a id="app" href="/report" rel="noopener noreferrer" data-attr="link">Report</a>
+```
+
+```js throws
+const model = Stitch.Observable.create({ link: { rel: 'nofollow' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E329]`
 
 ## E4xx: Handlers
 
