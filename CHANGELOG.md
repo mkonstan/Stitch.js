@@ -33,7 +33,8 @@ v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
   filter-evasion forms too), a `data:` URL other than `data:image/...` in an `<img>` `src`, and a
   `style` string (give `style` an object; it is written through the CSSOM), and security-sensitive
   names (`sandbox`, `allow`, `csp`, `integrity`, `crossorigin`, `nonce`, `referrerpolicy`,
-  `is`, ...) whatever the value, and `rel="opener"`. Built-in bindings on
+  `is`, ...) whatever the value, `rel="opener"`, and a `rel` value that drops a
+  `noopener` / `noreferrer` written in the markup. Built-in bindings on
   `<script>`, `<style>`, `<base>` and `<meta>` throw.
 - Model properties cannot be deleted (set them to `null`); `delete` on a list, Map or Set throws.
 - Data fields named `toJSON` or like a `$` helper throw.

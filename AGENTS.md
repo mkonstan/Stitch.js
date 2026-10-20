@@ -121,8 +121,8 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
     `javascript:`/`vbscript:` URL, a `data:` URL (except `data:image/...` in an `<img>` `src`), and
     `style` as a string (give `style` an object: `{ color: 'red' }`), and a security-sensitive name
     (`sandbox`, `allow`, `csp`, `http-equiv`, `integrity`, `crossorigin`, `nonce`,
-    `referrerpolicy`, `is`, ...) whatever the value: write those in the markup; and `rel` with
-    `opener`. Never put a binding on
+    `referrerpolicy`, `is`, ...) whatever the value: write those in the markup; `rel` with
+    `opener`; and a `rel` value that drops a `noopener`/`noreferrer` written in the markup. Never put a binding on
     `<script>`, `<style>`, `<base>` or `<meta>` (it throws). Behaviour goes in `data-click` /
     `data-event`, never in an attribute.
 19. Number inputs give numbers (`null` when empty or invalid); range inputs give numbers. A

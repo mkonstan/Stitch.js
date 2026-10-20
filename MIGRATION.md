@@ -368,11 +368,17 @@ model.selected = null;
 
 In v2, `data-attr` wrote whatever the data said: an `onclick` attribute, a `javascript:` link, a
 `srcdoc` document, a `data:` URL, a style string, or removed a static `sandbox`. In v3 each of those
-throws (E321-E325, E327, E328) and the
+throws (E321-E325, E327-E329) and the
 object writes nothing; built-in bindings on `<script>`, `<style>`, `<base>` and `<meta>` throw
 (E326). The change most pages notice is `style`: a style string is refused (a strict
 Content-Security-Policy would block it); give `style` an object, which is written through the
 CSSOM, property by property. Behaviour belongs in `data-click` / `data-event`.
+
+Security-sensitive names are refused whatever the value, which also catches legitimate v2 uses:
+`crossorigin` on an `<img>` or `<video>` (for canvas or CORS media) and `allowfullscreen` on an
+embedded video, set from data, now throw E327. Write them in the markup
+(`<img crossorigin="anonymous" data-attr="imageAttrs">`). A `rel` from data may no longer drop a
+`noopener` / `noreferrer` written in the markup (E329).
 
 Before:
 

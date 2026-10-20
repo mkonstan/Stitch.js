@@ -452,6 +452,7 @@ state:
 | `style` as a string or an array (use an object) | E325 |
 | a security-sensitive name, whatever the value (`null` too): `sandbox`, `allow`, `allowfullscreen`, `allowpaymentrequest`, `allowusermedia`, `csp`, `credentialless`, `http-equiv`, `integrity`, `crossorigin`, `nonce`, `referrerpolicy`, `is` | E327 |
 | `rel` with the token `opener` (other `rel` values, such as `noopener noreferrer`, are written) | E328 |
+| a `rel` value (`null`, `false` or text) that drops a `noopener` / `noreferrer` the element's markup has; adding tokens next to them is fine | E329 |
 
 The URL-bearing attributes are `href`, `src`, `action`, `formaction`, `xlink:href`, `xml:base`,
 `poster`, `cite`, `background`, `data`, `codebase`, `classid`, `longdesc`, `lowsrc`, `dynsrc`,
@@ -468,8 +469,13 @@ URLs (`title`, `aria-*`, `data-*`, ...) take any text. Built-in bindings are not
 The checks read URL **schemes** only: an `https:` URL to any host is written (a link, an image, a
 stylesheet `href`, a form `action`). Which origins a page may load from, frame or submit to is the
 page's Content-Security-Policy's job (see the README's browser support section). Attribute **names**
-other than the refused ones are written as given (`id`, `name`, `target`, ...): keep the names in
-your code (a computed), and let only the values come from data.
+other than the refused ones are written as given (`id`, `name`, `target`, `type`, `method`, ...):
+keep the names in your code (a computed), and let only the values come from data. Names such as
+`type` (a password field turned into a text field) and `method` / `formmethod` (a POST turned into
+a GET) are not refused because pages set them legitimately, so their values must never come from
+untrusted input either. A name the browser cannot use as an attribute name fails with the
+browser's own `InvalidCharacterError` from `setAttribute` (Firefox and Safari; Chrome is more
+lenient), not with a Stitch code.
 
 ### `data-loading="path"`
 
