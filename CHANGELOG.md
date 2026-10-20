@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0 (unreleased)
+## 3.0.0 (2026-10-20)
 
 v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
 [MIGRATION.md](MIGRATION.md), which lists every breaking change with before and after code.

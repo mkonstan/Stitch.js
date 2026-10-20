@@ -59,5 +59,5 @@ stamped from it by the build or checked against it by `npm test`.
 - [ ] Open a new `## Unreleased` section in `CHANGELOG.md` for the next changes (no version number
       until the next release).
 
-If any step fails, stop: fix it on the branch and start again from step 3. Nothing is published
-before step 7.
+If any step fails, stop: fix it on the branch and start again from step 3. Steps 1-4 are local.
+Step 5 publishes the branch, step 6 publishes the release on `main`, and step 7 marks it with a tag.
