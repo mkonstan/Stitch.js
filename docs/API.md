@@ -427,11 +427,36 @@ The value is an object `{ attributeName: value }`. Only the listed attributes ar
 | `null`, `undefined`, `false` | the attribute is removed |
 | `true` | the attribute is set to `""` |
 | an array | joined with spaces for `class`, commas otherwise |
-| an object for `style` | written as CSS (`{ fontSize: '12px' }` becomes `font-size: 12px`) |
+| an object for `style` | each property set through the CSSOM (`{ fontSize: '12px' }` sets `font-size: 12px`; `--name` custom properties and `!important` are kept); a property the next object no longer lists is removed, and `style: null` removes the ones `data-attr` wrote (others, such as `data-visible`'s `display`, are left alone) |
 | any other object | written as JSON |
 | anything else | `String(value)` |
 
 A `null` / `undefined` value for the whole binding changes nothing; any other non-object throws.
+
+**Values that could run script are refused.** The values come from data, so `data-attr` checks
+every entry of its object before it writes any; if one is refused, it throws (from `bind()`, or to
+`Stitch.onError` on a later change) and writes none of them, so the element keeps its last good
+state:
+
+| Refused | Code |
+|---|---|
+| an attribute name starting with `on`, in any case (`onclick`, `ONLOAD`, `onbegin`), whatever the value | E321 |
+| `srcdoc` | E322 |
+| a `javascript:` or `vbscript:` URL in a URL-bearing attribute | E323 |
+| a `data:` URL in a URL-bearing attribute, except `data:image/...` in an `<img>` `src` | E324 |
+| `style` as a string or an array (use an object) | E325 |
+
+The URL-bearing attributes are `href`, `src`, `action`, `formaction`, `xlink:href`, `xml:base`,
+`poster`, `cite`, `background`, `data`, `codebase`, `classid`, `longdesc`, `lowsrc`, `dynsrc`,
+`manifest`, `icon`, `profile`, `usemap`, `srcset`, `imagesrcset`, `ping` and `archive` on any element
+(each URL of a `srcset` or `ping` list is checked), and `to`, `from`, `by` and `values` on an SVG
+`<animate>` or `<set>`. A URL's scheme is read the way a browser reads it (any case; tabs, newlines
+and control characters before or inside it), and also after decoding character references
+(`&#106;`, `&#x6A`, `&colon;`) and percent-escapes and removing every invisible character, so the
+known evasion forms are refused. Allowed: relative URLs, `#anchor`, `?query`, `http(s):`,
+`mailto:`, `tel:`, and any URL whose scheme is not one of the three above. Attributes that are not
+URLs (`title`, `aria-*`, `data-*`, ...) take any text. Built-in bindings are not allowed on
+`<script>`, `<style>`, `<base>` or `<meta>` at all (E326).
 
 ### `data-loading="path"`
 

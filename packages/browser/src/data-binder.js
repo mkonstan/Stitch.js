@@ -38,6 +38,11 @@ const ROW_NAMES = ["$data", "$index", "$parent", "$root"];
 
 const KNOWN_HOOKS = ["onBind", "onChange", "properties"];
 
+// Elements whose text or attributes are code, or change where the page loads code from: a
+// built-in binding on one would let data run script (a <script>'s text, a <style>'s rules,
+// a <base> href, a <meta http-equiv>), so it throws. Matched by local name, in any namespace.
+const CODE_ELEMENTS = ["script", "style", "base", "meta"];
+
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
     const getBindingHandler = deps.getBindingHandler;
@@ -150,6 +155,17 @@ function createDataBinderClass(deps = {}) {
      */
     function checkStatically(element, bindings) {
         checkInternalAttributes(element);
+        const localName = String(element.localName || element.tagName).toLowerCase();
+        if (CODE_ELEMENTS.indexOf(localName) !== -1) {
+            const builtIn = bindings.find(binding => BUILT_IN_NAMES.has(binding.type));
+            if (builtIn) {
+                throw new Error(
+                    `[Stitch E326] ${paths.describeBinding(element, builtIn.attributeName, builtIn.path)}: a <${localName}> element ` +
+                    "holds code or decides where the page loads code from, so Stitch does not bind it (data could run script). " +
+                    "Bind an ordinary element (e.g. a <span>) instead."
+                );
+            }
+        }
         const types = bindings.map(binding => binding.type);
         if (types.indexOf("foreach") !== -1 && types.indexOf("text") !== -1) {
             throw new Error(

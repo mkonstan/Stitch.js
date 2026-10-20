@@ -180,7 +180,7 @@ function bindForeach(element, viewModel, path, context, deps) {
     // bound (foreach is a binding boundary), so they are simply taken out; if the first
     // render throws they are put back, so the element can be bound again once fixed.
     const originalChildren = Array.from(element.childNodes);
-    originalChildren.forEach(node => element.removeChild(node));
+    element.replaceChildren();
 
     const isSelect = element.tagName === "SELECT";
     const valuePath = isSelect && element.hasAttribute("data-value") ? element.getAttribute("data-value").trim() : null;
@@ -342,10 +342,7 @@ function bindForeach(element, viewModel, path, context, deps) {
     } catch (error) {
         // The first render threw (effect() has released the effect, and reconcile has
         // released any rows it built): restore the element as it was before bind().
-        while (element.firstChild) {
-            element.removeChild(element.firstChild);
-        }
-        originalChildren.forEach(node => element.appendChild(node));
+        element.replaceChildren(...originalChildren);
         throw error;
     }
 

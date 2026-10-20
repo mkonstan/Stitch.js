@@ -315,6 +315,46 @@ new Stitch.DataBinder().bind('#app', model);
 that inserts an HTML string. If you need structure, build it with a list (`data-foreach`) or write
 a [custom binding](#custom-bindings) that creates elements with the DOM API.
 
+### Attributes from data
+
+`data-attr` writes the attributes your data names, so it refuses every value that could make the
+page run script, and writes nothing from that object (the element keeps its last good state): an
+attribute name starting with `on` (E321), `srcdoc` (E322), a `javascript:` or `vbscript:` URL in a
+URL attribute such as `href` or `src` (E323), a `data:` URL there, except `data:image/...` in an
+`<img>` `src` (E324), and `style` as a string (E325). Ordinary links (relative, `#anchor`,
+`https:`, `mailto:`, `tel:`) and ordinary attributes (`title`, `aria-*`, `data-*`) work. Give `style`
+an object; each property is set through the CSSOM, so it works under a strict
+Content-Security-Policy. Built-in bindings are refused on `<script>`, `<style>`, `<base>` and
+`<meta>` (E326). The full rules are in the [API reference](API.md#data-attrpath).
+
+```html page
+<div id="app">
+    <a id="profile" data-attr="link">Profile</a>
+    <p id="note" data-attr="note">Note</p>
+</div>
+```
+
+```js run
+const model = Stitch.Observable.create({
+    link: { href: '/people/42', title: 'Open the profile' },
+    note: { style: { color: 'darkred', fontWeight: 'bold' }, 'aria-live': 'polite' }
+});
+new Stitch.DataBinder().bind('#app', model);
+```
+<!-- check: attr('#profile', 'href') === '/people/42' && document.getElementById('note').style.fontWeight === 'bold' -->
+
+A link that came from somewhere else with a `javascript:` URL, in any of its disguises, is refused:
+
+```html page
+<a id="app" data-attr="link">Open</a>
+```
+
+```js throws
+const model = Stitch.Observable.create({ link: { href: 'java\tscript:alert(1)' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E323]`
+
 ### Form controls
 
 `data-value` works on `input`, `textarea` and `select`. The model gets a value of the right type:

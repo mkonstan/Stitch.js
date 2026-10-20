@@ -191,9 +191,9 @@ Throws: `[Stitch E201]`
 
 ## E3xx: Binding values and two-way bindings
 
-Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state). `data-value` writes the user's input back, so its path must be writable.
+Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError` when a later value is wrong (the page keeps its last good state). `data-value` writes the user's input back, so its path must be writable. E321-E326 are the values that could make the page run script: `data-attr` checks every entry of its object first and writes none of them if one is refused.
 
-[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object)
+[E301](#e301-data-text-bound-to-a-function) · [E302](#e302-data-class-value-of-the-wrong-kind) · [E303](#e303-data-attr-value-of-the-wrong-kind) · [E304](#e304-data-event-value-of-the-wrong-kind) · [E305](#e305-data-event-entry-of-the-wrong-kind) · [E311](#e311-data-value-on-a-computed) · [E312](#e312-data-value-on-a-read-only-getter) · [E313](#e313-data-value-on-a-row-context-value) · [E314](#e314-writing-through-a-null-object) · [E321](#e321-event-handler-attribute-from-data) · [E322](#e322-srcdoc-from-data) · [E323](#e323-javascript-or-vbscript-url-from-data) · [E324](#e324-data-url-from-data) · [E325](#e325-style-string-from-data) · [E326](#e326-binding-on-a-script-style-base-or-meta-element)
 
 ### E301: data-text bound to a function
 
@@ -266,6 +266,84 @@ Thrown by `bind()` when the first value is wrong, and passed to `Stitch.onError`
 **Cause:** The user typed into an input bound to `a.b` while `a` is `null` or not an object. Stitch does not create the missing object (it would not be reactive). Reported to `Stitch.onError` (or uncaught). The input listens to both `input` and `change`, so one edit can report it twice.
 
 **Fix:** Give the object a value first (`address: { city: "" }`), or hide the input while it is `null` (`data-visible="address"`).
+
+### E321: Event-handler attribute from data
+
+**Message:** `"…" is an event-handler attribute, whose value runs as script, so data may not set it. Attach behaviour with data-click or data-event instead.`
+
+**Cause:** A `data-attr` object lists an attribute whose name starts with `on` (any case: `onclick`, `ONLOAD`, `onbegin`, even plain `on`). Its value would run as script, so data may never name one, whatever the value (`null` included). Nothing in the object is written.
+
+**Fix:** Attach behaviour with `data-click` or `data-event`, which call a handler on the model.
+
+```html page
+<a id="app" data-attr="link">Open</a>
+```
+
+```js throws
+const model = Stitch.Observable.create({ link: { href: '/report', onclick: 'track()' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E321]`
+
+### E322: srcdoc from data
+
+**Message:** `srcdoc holds a whole HTML document, scripts included, so data may not set it. Point src at a page instead, or show the text with data-text.`
+
+**Cause:** A `data-attr` object lists `srcdoc`. Its value is a whole HTML document that runs its own scripts.
+
+**Fix:** Point the frame's `src` at a page, or show the text with `data-text` (which is always text).
+
+### E323: javascript: or vbscript: URL from data
+
+**Message:** `"…" would get a …: URL, which runs script when it is followed, so it is refused. Use an http(s), mailto, tel, #anchor or relative URL.`
+
+**Cause:** A URL-bearing attribute (`href`, `src`, `action`, `formaction`, `xlink:href`, `poster`, `cite`, `background`, `ping`, `srcset`, `data`, an SVG animation's `to`/`from`/`by`/`values`, and the other URL attributes listed under [data-attr](API.md#data-attrpath)) would get a `javascript:` or `vbscript:` URL. The check reads the value the way a browser does (any case; tabs, newlines and control characters inside or before the scheme) and also after decoding character references (`&#106;`, `&colon;`, ...) and percent-escapes, and after removing every invisible character, so the evasion forms are refused too. Nothing in the object is written.
+
+**Fix:** Use an `http(s):`, `mailto:`, `tel:`, `#anchor` or relative URL. A URL that only contains `javascript:` later on (`/go?next=javascript:x`) is allowed.
+
+```html page
+<a id="app" data-attr="link">Open</a>
+```
+
+```js throws
+const model = Stitch.Observable.create({ link: { href: ' JaVaScRiPt:alert(1)' } });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E323]`
+
+### E324: data: URL from data
+
+**Message:** `"…" would get a data: URL, which can carry a document with scripts. Only data:image/... in an <img> src is allowed; serve anything else from a URL.`
+
+**Cause:** A URL-bearing attribute would get a `data:` URL. A `data:` URL can carry a whole document (HTML, SVG) with scripts. The one exception is `data:image/...` in the `src` of an `<img>`, where an image cannot run script.
+
+**Fix:** Serve the content from a URL, or show an inline image with `<img data-attr="...">` and `{ src: 'data:image/png;base64,...' }`.
+
+### E325: style string from data
+
+**Message:** `style must be an object of { property: value }, written through the CSSOM, e.g. { style: { color: "red" } }; a style string is refused (a strict Content-Security-Policy blocks it).`
+
+**Cause:** A `data-attr` object gives `style` a string (or an array). A page with a strict Content-Security-Policy (`style-src` without `'unsafe-inline'`) blocks style strings, so Stitch never writes one.
+
+**Fix:** Give `style` an object such as `{ color: 'red', fontSize: '12px' }`. Each property is set through the CSSOM (`element.style.setProperty`), which the policy allows; prefer classes (`data-class`) where you can.
+
+### E326: Binding on a script, style, base or meta element
+
+**Message:** `…: a <…> element holds code or decides where the page loads code from, so Stitch does not bind it (data could run script). Bind an ordinary element (e.g. a <span>) instead.`
+
+**Cause:** A built-in binding (`data-text`, `data-attr`, ...) is on a `<script>`, `<style>`, `<base>` or `<meta>` element (in any namespace, SVG included). Their text or attributes are code, or decide where the page loads code from, so data written there could run script.
+
+**Fix:** Bind an ordinary element. To show code as text, put it in a `<pre>` or `<code>` with `data-text`.
+
+```html page
+<div id="app"><script data-text="code"></script></div>
+```
+
+```js throws
+const model = Stitch.Observable.create({ code: 'alert(1)' });
+new Stitch.DataBinder().bind('#app', model);
+```
+Throws: `[Stitch E326]`
 
 ## E4xx: Handlers
 

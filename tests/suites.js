@@ -45,6 +45,7 @@
         { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
         { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" },
         { page: "test-api-contracts.html", title: "API contracts", about: "Removers from $watch/$onChange, boolean isReactive, computed argument, frozen data refused, bind report covers data-type, custom-binding literal hint, error codes" },
+        { page: "test-attr-safety.html", title: "Attribute safety", about: "data-attr refuses every value that could run script (the XSS corpus), with its code, writing nothing; legitimate values work; style through the CSSOM; code elements are not bound" },
         { page: "test-doc-snippets.html", title: "Executable docs", about: "Every html/js code block in the docs runs; mistakes throw their documented message" }
     ];
     // Every public example page (example*.html at the root). The runner fails if one is missing.

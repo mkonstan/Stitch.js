@@ -1789,7 +1789,7 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
     setProperty: runtimeHelpers.setProperty,
     getValueHandler,
     getValueValidator,
-    getAttrHandler: attrValueHandlers.getAttrHandler,
+    attrWrites: attrValueHandlers,
     bindForeach(element, viewModel, path, context) {
         return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
             pathReader: bindingPaths.pathReader,
@@ -2299,7 +2299,7 @@ function createBindingRuntime(deps = {}) {
     const setProperty = deps.setProperty;
     const getValueHandler = deps.getValueHandler;
     const getValueValidator = deps.getValueValidator;
-    const getAttrHandler = deps.getAttrHandler;
+    const attrWrites = deps.attrWrites;
     const bindForeach = deps.bindForeach;
 
 /**
@@ -2326,6 +2326,33 @@ function bindingErrorContext(element, type, path) {
 /** An error about one binding, with its stable code: `[Stitch E###] <span data-text="x">: message`. */
 function bindingError(code, element, type, path, message) {
     return new Error(`[Stitch ${code}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
+}
+
+/** The coded error for a data-attr entry that could run script (see attrRefusal). */
+function attrRefusalError(element, path, attrName, refusal) {
+    switch (refusal.kind) {
+        case "event-handler":
+            return bindingError("E321", element, "attr", path,
+                `"${attrName}" is an event-handler attribute, whose value runs as script, so data may not set it. ` +
+                "Attach behaviour with data-click or data-event instead.");
+        case "srcdoc":
+            return bindingError("E322", element, "attr", path,
+                "srcdoc holds a whole HTML document, scripts included, so data may not set it. " +
+                "Point src at a page instead, or show the text with data-text.");
+        case "script-url":
+            return bindingError("E323", element, "attr", path,
+                `"${attrName}" would get a ${refusal.scheme}: URL, which runs script when it is followed, so it is refused. ` +
+                "Use an http(s), mailto, tel, #anchor or relative URL.");
+        case "data-url":
+            return bindingError("E324", element, "attr", path,
+                `"${attrName}" would get a data: URL, which can carry a document with scripts. Only data:image/... in an <img> src ` +
+                "is allowed; serve anything else from a URL.");
+        case "style-string":
+        default:
+            return bindingError("E325", element, "attr", path,
+                "style must be an object of { property: value }, written through the CSSOM, e.g. { style: { color: \"red\" } }; " +
+                "a style string is refused (a strict Content-Security-Policy blocks it).");
+    }
 }
 
 function describeValue(value) {
@@ -2559,8 +2586,14 @@ const BINDING_HANDLERS = {
      *
      * The value names a property holding an object of { attributeName: value }; only the
      * attributes it lists are managed (static attributes stay; a listed one is overwritten).
-     * Supports strings, numbers, booleans, objects (style), arrays (class), null/undefined
-     * (removes the attribute). A null / undefined object: no change. Any other value throws.
+     * Supports strings, numbers, booleans, objects (style, written through the CSSOM),
+     * arrays (class), null/undefined/false (removes the attribute). A null / undefined
+     * object: no change. Any other value throws.
+     *
+     * The values come from data, so a write that could run script is refused, with a coded
+     * error, before anything is written (attr-value-handlers.js): event-handler names, srcdoc,
+     * javascript:/vbscript: URLs, data: URLs (except data:image/ in an <img> src) and style
+     * strings.
      *
      * @example
      * // Model: { linkAttrs: { href: url, target: "_blank", 'aria-disabled': false } }
@@ -2570,11 +2603,16 @@ const BINDING_HANDLERS = {
         bind(element, viewModel, path, context) {
             valueEffect(element, viewModel, "attr", path, context, value => {
                 if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-                    Object.keys(value).forEach(attrName => {
-                        const attrValue = value[attrName];
-                        const handler = getAttrHandler(attrValue);
-                        handler.apply(element, attrName, attrValue);
+                    // Plan and check every entry first: a refused object writes nothing.
+                    const writes = Object.keys(value).map(attrName => {
+                        const write = attrWrites.planAttrWrite(attrName, value[attrName]);
+                        const refusal = attrWrites.attrRefusal(element, write);
+                        if (refusal) {
+                            throw attrRefusalError(element, path, write.name, refusal);
+                        }
+                        return write;
                     });
+                    writes.forEach(write => attrWrites.applyAttrWrite(element, write));
                 } else if (value !== null && value !== undefined) {
                     throw bindingError("E303", element, "attr", path,
                         `the value must be an object of { attributeName: value }, e.g. { href: url, target: "_blank" }; ` +
@@ -2759,6 +2797,11 @@ const ROW_NAMES = ["$data", "$index", "$parent", "$root"];
 
 const KNOWN_HOOKS = ["onBind", "onChange", "properties"];
 
+// Elements whose text or attributes are code, or change where the page loads code from: a
+// built-in binding on one would let data run script (a <script>'s text, a <style>'s rules,
+// a <base> href, a <meta http-equiv>), so it throws. Matched by local name, in any namespace.
+const CODE_ELEMENTS = ["script", "style", "base", "meta"];
+
 function createDataBinderClass(deps = {}) {
     const Version = deps.version || `v${VERSION}`;
     const getBindingHandler = deps.getBindingHandler;
@@ -2871,6 +2914,17 @@ function createDataBinderClass(deps = {}) {
      */
     function checkStatically(element, bindings) {
         checkInternalAttributes(element);
+        const localName = String(element.localName || element.tagName).toLowerCase();
+        if (CODE_ELEMENTS.indexOf(localName) !== -1) {
+            const builtIn = bindings.find(binding => BUILT_IN_NAMES.has(binding.type));
+            if (builtIn) {
+                throw new Error(
+                    `[Stitch E326] ${paths.describeBinding(element, builtIn.attributeName, builtIn.path)}: a <${localName}> element ` +
+                    "holds code or decides where the page loads code from, so Stitch does not bind it (data could run script). " +
+                    "Bind an ordinary element (e.g. a <span>) instead."
+                );
+            }
+        }
         const types = bindings.map(binding => binding.type);
         if (types.indexOf("foreach") !== -1 && types.indexOf("text") !== -1) {
             throw new Error(
@@ -3700,7 +3754,7 @@ function bindForeach(element, viewModel, path, context, deps) {
     // bound (foreach is a binding boundary), so they are simply taken out; if the first
     // render throws they are put back, so the element can be bound again once fixed.
     const originalChildren = Array.from(element.childNodes);
-    originalChildren.forEach(node => element.removeChild(node));
+    element.replaceChildren();
 
     const isSelect = element.tagName === "SELECT";
     const valuePath = isSelect && element.hasAttribute("data-value") ? element.getAttribute("data-value").trim() : null;
@@ -3862,10 +3916,7 @@ function bindForeach(element, viewModel, path, context, deps) {
     } catch (error) {
         // The first render threw (effect() has released the effect, and reconcile has
         // released any rows it built): restore the element as it was before bind().
-        while (element.firstChild) {
-            element.removeChild(element.firstChild);
-        }
-        originalChildren.forEach(node => element.appendChild(node));
+        element.replaceChildren(...originalChildren);
         throw error;
     }
 
@@ -4687,86 +4738,246 @@ module.exports = {
 "use strict";
 
 /**
- * Internal registry for attribute value type handling.
- * Mirrors Stitch runtime behavior for attr binding semantics.
+ * data-attr: how each { attributeName: value } entry is written, and which writes are
+ * refused because the value (which comes from data) could make the page run script.
+ *
+ * The binding (binding-runtime.js) plans every entry first (planAttrWrite), asks
+ * attrRefusal() about each plan, throws a coded error for the first refusal, and only then
+ * writes (applyAttrWrite). So a refused object changes nothing, and the text that was
+ * checked is exactly the text that is written.
+ *
+ * Refused:
+ *   - any attribute name starting with "on" (an event handler: its value runs as script);
+ *   - srcdoc (a whole HTML document, scripts included);
+ *   - a javascript: or vbscript: URL in a URL-bearing attribute, after the URL parser's own
+ *     normalisation (case, tabs and newlines anywhere, leading control characters and
+ *     spaces) and, to be safe, after decoding character references and percent-escapes
+ *     and removing every control, space and invisible character;
+ *   - a data: URL in a URL-bearing attribute, except data:image/... in an <img> src;
+ *   - style as a string (a strict Content-Security-Policy blocks style strings; an object
+ *     is written through the CSSOM, property by property).
  */
-const ATTR_VALUE_HANDLERS = {
-    null: {
-        apply(element, attrName, attrValue) {
-            element.removeAttribute(attrName);
-        }
-    },
-    undefined: {
-        apply(element, attrName, attrValue) {
-            element.removeAttribute(attrName);
-        }
-    },
-    boolean: {
-        apply(element, attrName, attrValue) {
-            if (attrValue === true) {
-                element.setAttribute(attrName, "");
-            } else {
-                element.removeAttribute(attrName);
+
+// Attributes whose value the browser reads as a URL, on any element.
+const URL_ATTRIBUTES = [
+    "href", "src", "action", "formaction", "xlink:href", "xml:base", "poster", "cite", "background",
+    "data", "codebase", "classid", "longdesc", "lowsrc", "dynsrc", "manifest", "icon", "profile",
+    "usemap", "srcset", "imagesrcset", "ping", "archive"
+];
+// URL lists: srcset-style (comma-separated candidates, each "url descriptor"), or
+// whitespace/comma separated URLs.
+const SRCSET_ATTRIBUTES = ["srcset", "imagesrcset"];
+const URL_LIST_ATTRIBUTES = ["ping", "archive"];
+// SVG animation elements can set another attribute (href) to these values.
+const SVG_ANIMATION_ELEMENTS = ["animate", "set", "animatemotion", "animatetransform", "animatecolor"];
+const SVG_ANIMATION_VALUES = ["values", "from", "to", "by"];
+const SCRIPT_SCHEMES = ["javascript", "vbscript"];
+
+// Named character references that decode to characters a scheme or its separator can be
+// made of (the rest cannot form "javascript:", "vbscript:" or "data:"). Looked up in lower case.
+const NAMED_REFERENCES = {
+    colon: ":", tab: "\t", newline: "\n", nbsp: "\u00a0", sol: "/", bsol: "\\", lpar: "(", rpar: ")",
+    amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", period: ".", comma: ",", semi: ";", excl: "!",
+    num: "#", percnt: "%", plus: "+", equals: "=", quest: "?", commat: "@", lowbar: "_", dollar: "$",
+    ast: "*", hyphen: "-", dash: "-", grave: "`", zwsp: "\u200b", shy: "\u00ad"
+};
+// Every control, space, format and invisible character: removed in the deny-biased view.
+const INVISIBLE = /[\u0000-\u0020\u007f-\u00a0\u00ad\u034f\u061c\u115f\u1160\u1680\u17b4\u17b5\u180b-\u180e\u2000-\u200f\u2028-\u202f\u205f-\u206f\u3000\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8]/g;
+const SCHEME = /^([A-Za-z][A-Za-z0-9+.-]*):/;
+
+function decodeReferences(text) {
+    let current = text;
+    // Repeated, so "&amp;#106;" is seen as "j" too (stricter than one HTML parse).
+    for (let round = 0; round < 4; round++) {
+        const next = current.replace(/&(?:#(\d+)|#[xX]([0-9A-Fa-f]+)|([A-Za-z][A-Za-z0-9]*));?/g, (match, dec, hex, name) => {
+            if (name !== undefined) {
+                const key = name.toLowerCase();
+                return Object.prototype.hasOwnProperty.call(NAMED_REFERENCES, key) ? NAMED_REFERENCES[key] : match;
             }
-        }
-    },
-    object: {
-        apply(element, attrName, attrValue) {
-            if (attrName === "style" && typeof attrValue === "object") {
-                const cssString = Object.keys(attrValue).map(key => {
-                    const kebabKey = key.replace(/([A-Z])/g, "-$1").toLowerCase();
-                    return `${kebabKey}: ${attrValue[key]}`;
-                }).join("; ");
-                element.setAttribute(attrName, cssString);
-            } else {
-                element.setAttribute(attrName, JSON.stringify(attrValue));
-            }
-        }
-    },
-    array: {
-        apply(element, attrName, attrValue) {
-            if (attrName === "class") {
-                element.setAttribute(attrName, attrValue.join(" "));
-            } else {
-                element.setAttribute(attrName, attrValue.join(","));
-            }
-        }
-    },
-    default: {
-        apply(element, attrName, attrValue) {
-            element.setAttribute(attrName, String(attrValue));
+            const codePoint = dec !== undefined ? parseInt(dec, 10) : parseInt(hex, 16);
+            return codePoint > 0 && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : "\ufffd";
+        });
+        if (next === current) break;
+        current = next;
+    }
+    return current;
+}
+
+function decodePercent(text) {
+    try {
+        return decodeURIComponent(text);
+    } catch (_error) {
+        return text.replace(/%([0-9A-Fa-f]{2})/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)));
+    }
+}
+
+/** The schemes (lower case) a URL text could be read as, by the browser or a laxer reader. */
+function urlSchemes(text) {
+    const schemes = new Set();
+    const add = (form) => {
+        const m = SCHEME.exec(form);
+        if (m) schemes.add(m[1].toLowerCase());
+    };
+    const forms = [text, decodeReferences(text)];
+    forms.push(decodePercent(forms[1]));
+    for (const form of forms) {
+        // The URL parser's view: tabs and newlines removed anywhere, C0 controls and spaces trimmed.
+        add(form.replace(/[\t\n\r]/g, "").replace(/^[\u0000- ]+/, ""));
+        // The deny-biased view: every control, space and invisible character removed.
+        add(form.replace(INVISIBLE, ""));
+    }
+    // The browser's own parser, where there is one.
+    if (typeof URL === "function") {
+        try {
+            const base = typeof document !== "undefined" && document.baseURI ? document.baseURI : "http://localhost/";
+            add(new URL(text, base).protocol);
+        } catch (_error) {
+            // Not a URL the browser can parse: nothing to follow.
         }
     }
-};
+    return schemes;
+}
+
+/** The URL texts inside an attribute value: one, or each entry of a list. */
+function urlParts(element, name, text) {
+    const parts = [text];
+    if (SRCSET_ATTRIBUTES.indexOf(name) !== -1) {
+        text.split(",").forEach(candidate => parts.push(candidate.trim().split(/\s+/)[0] || ""));
+    } else if (URL_LIST_ATTRIBUTES.indexOf(name) !== -1) {
+        text.split(/[\s,]+/).forEach(part => parts.push(part));
+    } else if (isSvgAnimationValue(element, name)) {
+        text.split(";").forEach(part => parts.push(part.trim()));
+    }
+    return parts;
+}
+
+function localNameOf(element) {
+    return String(element && (element.localName || element.tagName) || "").toLowerCase();
+}
+
+function isSvgAnimationValue(element, name) {
+    return SVG_ANIMATION_ELEMENTS.indexOf(localNameOf(element)) !== -1 && SVG_ANIMATION_VALUES.indexOf(name) !== -1;
+}
+
+function isUrlAttribute(element, name) {
+    return URL_ATTRIBUTES.indexOf(name) !== -1 || isSvgAnimationValue(element, name);
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 /**
- * Selects appropriate attribute value handler based on value type.
- *
- * @param {*} value
- * @returns {{apply: Function}}
+ * What writing { [name]: value } does: { name, remove: true }, { name, text } or, for a style
+ * object, { name, style: { property: value } }. The text is computed once, here.
  */
-function getAttrHandler(value) {
-    if (value === null) {
-        return ATTR_VALUE_HANDLERS.null;
+function planAttrWrite(name, value) {
+    const attrName = String(name);
+    if (value === null || value === undefined || value === false) {
+        return { name: attrName, remove: true };
     }
-    if (value === undefined) {
-        return ATTR_VALUE_HANDLERS.undefined;
+    if (value === true) {
+        return { name: attrName, text: "" };
     }
-    if (typeof value === "boolean") {
-        return ATTR_VALUE_HANDLERS.boolean;
+    if (attrName.toLowerCase() === "style" && isPlainObject(value)) {
+        return { name: attrName, style: Object.assign({}, value) };
     }
     if (Array.isArray(value)) {
-        return ATTR_VALUE_HANDLERS.array;
+        return { name: attrName, text: value.join(attrName === "class" ? " " : ",") };
     }
     if (typeof value === "object") {
-        return ATTR_VALUE_HANDLERS.object;
+        return { name: attrName, text: JSON.stringify(value) };
     }
-    return ATTR_VALUE_HANDLERS.default;
+    return { name: attrName, text: String(value) };
+}
+
+/**
+ * Why a planned write is refused, or null. Kinds: "event-handler", "srcdoc", "style-string",
+ * "script-url" (with scheme) and "data-url".
+ */
+function attrRefusal(element, write) {
+    const name = write.name.toLowerCase();
+    if (name.slice(0, 2) === "on") {
+        return { kind: "event-handler" };
+    }
+    if (name === "srcdoc") {
+        return { kind: "srcdoc" };
+    }
+    if (write.remove) {
+        return null;
+    }
+    if (name === "style") {
+        return write.style ? null : { kind: "style-string" };
+    }
+    if (!isUrlAttribute(element, name)) {
+        return null;
+    }
+    const imageSource = localNameOf(element) === "img" && name === "src";
+    for (const part of urlParts(element, name, write.text)) {
+        const schemes = urlSchemes(part);
+        const script = SCRIPT_SCHEMES.find(scheme => schemes.has(scheme));
+        if (script) {
+            return { kind: "script-url", scheme: script };
+        }
+        if (schemes.has("data")) {
+            const image = /^data:image\//i.test(decodeReferences(part).replace(INVISIBLE, ""));
+            if (!(imageSource && image)) {
+                return { kind: "data-url" };
+            }
+        }
+    }
+    return null;
+}
+
+// Style properties each element got from data-attr, so a later value can remove the ones
+// it no longer lists (and only those: data-visible's display, for one, is left alone).
+const STYLE_PROPERTIES = new WeakMap();
+
+function cssPropertyName(key) {
+    return key.slice(0, 2) === "--" ? key : key.replace(/([A-Z])/g, "-$1").toLowerCase();
+}
+
+function applyStyle(element, style) {
+    const previous = STYLE_PROPERTIES.get(element) || [];
+    const next = [];
+    Object.keys(style || {}).forEach(key => {
+        const property = cssPropertyName(key);
+        const value = style[key];
+        if (value === null || value === undefined || value === false) {
+            element.style.removeProperty(property);
+            return;
+        }
+        const text = String(value);
+        const important = /\s*!\s*important\s*$/i.exec(text);
+        element.style.setProperty(property, important ? text.slice(0, important.index) : text, important ? "important" : "");
+        next.push(property);
+    });
+    previous.forEach(property => {
+        if (next.indexOf(property) === -1) {
+            element.style.removeProperty(property);
+        }
+    });
+    STYLE_PROPERTIES.set(element, next);
+}
+
+/** Writes a planned entry (never a style string: a style plan is an object). */
+function applyAttrWrite(element, write) {
+    if (write.name.toLowerCase() === "style") {
+        // Through the CSSOM: removing means removing the properties data-attr wrote.
+        applyStyle(element, write.remove ? null : write.style);
+        return;
+    }
+    if (write.remove) {
+        element.removeAttribute(write.name);
+    } else {
+        element.setAttribute(write.name, write.text);
+    }
 }
 
 module.exports = {
-    ATTR_VALUE_HANDLERS,
-    getAttrHandler
+    planAttrWrite,
+    attrRefusal,
+    applyAttrWrite
 };
 
   };

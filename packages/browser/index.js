@@ -40,7 +40,7 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
     setProperty: runtimeHelpers.setProperty,
     getValueHandler,
     getValueValidator,
-    getAttrHandler: attrValueHandlers.getAttrHandler,
+    attrWrites: attrValueHandlers,
     bindForeach(element, viewModel, path, context) {
         return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
             pathReader: bindingPaths.pathReader,

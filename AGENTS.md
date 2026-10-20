@@ -116,7 +116,12 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 17. `data-value` must name a writable property: not a computed, not `$index` / `$data` / `$parent` /
     `$root`. To write through a nested object (`address.city`), that object must not be `null`.
 18. `data-class` takes a class string (replaces all classes) or `{ className: boolean }`.
-    `data-attr` takes `{ attributeName: value }`. Both usually come from a computed.
+    `data-attr` takes `{ attributeName: value }`. Both usually come from a computed. `data-attr`
+    throws, and writes nothing, for: an attribute name starting with `on`, `srcdoc`, a
+    `javascript:`/`vbscript:` URL, a `data:` URL (except `data:image/...` in an `<img>` `src`), and
+    `style` as a string (give `style` an object: `{ color: 'red' }`). Never put a binding on
+    `<script>`, `<style>`, `<base>` or `<meta>` (it throws). Behaviour goes in `data-click` /
+    `data-event`, never in an attribute.
 19. Number inputs give numbers (`null` when empty or invalid); range inputs give numbers. A
     `<select>` always gives strings, even if the model held a number: add `data-type="int"` for
     numbers. Checkboxes give booleans.

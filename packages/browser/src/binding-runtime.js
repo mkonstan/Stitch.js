@@ -7,7 +7,7 @@ function createBindingRuntime(deps = {}) {
     const setProperty = deps.setProperty;
     const getValueHandler = deps.getValueHandler;
     const getValueValidator = deps.getValueValidator;
-    const getAttrHandler = deps.getAttrHandler;
+    const attrWrites = deps.attrWrites;
     const bindForeach = deps.bindForeach;
 
 /**
@@ -34,6 +34,33 @@ function bindingErrorContext(element, type, path) {
 /** An error about one binding, with its stable code: `[Stitch E###] <span data-text="x">: message`. */
 function bindingError(code, element, type, path, message) {
     return new Error(`[Stitch ${code}] ${paths.describeBinding(element, `data-${type}`, path)}: ${message}`);
+}
+
+/** The coded error for a data-attr entry that could run script (see attrRefusal). */
+function attrRefusalError(element, path, attrName, refusal) {
+    switch (refusal.kind) {
+        case "event-handler":
+            return bindingError("E321", element, "attr", path,
+                `"${attrName}" is an event-handler attribute, whose value runs as script, so data may not set it. ` +
+                "Attach behaviour with data-click or data-event instead.");
+        case "srcdoc":
+            return bindingError("E322", element, "attr", path,
+                "srcdoc holds a whole HTML document, scripts included, so data may not set it. " +
+                "Point src at a page instead, or show the text with data-text.");
+        case "script-url":
+            return bindingError("E323", element, "attr", path,
+                `"${attrName}" would get a ${refusal.scheme}: URL, which runs script when it is followed, so it is refused. ` +
+                "Use an http(s), mailto, tel, #anchor or relative URL.");
+        case "data-url":
+            return bindingError("E324", element, "attr", path,
+                `"${attrName}" would get a data: URL, which can carry a document with scripts. Only data:image/... in an <img> src ` +
+                "is allowed; serve anything else from a URL.");
+        case "style-string":
+        default:
+            return bindingError("E325", element, "attr", path,
+                "style must be an object of { property: value }, written through the CSSOM, e.g. { style: { color: \"red\" } }; " +
+                "a style string is refused (a strict Content-Security-Policy blocks it).");
+    }
 }
 
 function describeValue(value) {
@@ -267,8 +294,14 @@ const BINDING_HANDLERS = {
      *
      * The value names a property holding an object of { attributeName: value }; only the
      * attributes it lists are managed (static attributes stay; a listed one is overwritten).
-     * Supports strings, numbers, booleans, objects (style), arrays (class), null/undefined
-     * (removes the attribute). A null / undefined object: no change. Any other value throws.
+     * Supports strings, numbers, booleans, objects (style, written through the CSSOM),
+     * arrays (class), null/undefined/false (removes the attribute). A null / undefined
+     * object: no change. Any other value throws.
+     *
+     * The values come from data, so a write that could run script is refused, with a coded
+     * error, before anything is written (attr-value-handlers.js): event-handler names, srcdoc,
+     * javascript:/vbscript: URLs, data: URLs (except data:image/ in an <img> src) and style
+     * strings.
      *
      * @example
      * // Model: { linkAttrs: { href: url, target: "_blank", 'aria-disabled': false } }
@@ -278,11 +311,16 @@ const BINDING_HANDLERS = {
         bind(element, viewModel, path, context) {
             valueEffect(element, viewModel, "attr", path, context, value => {
                 if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-                    Object.keys(value).forEach(attrName => {
-                        const attrValue = value[attrName];
-                        const handler = getAttrHandler(attrValue);
-                        handler.apply(element, attrName, attrValue);
+                    // Plan and check every entry first: a refused object writes nothing.
+                    const writes = Object.keys(value).map(attrName => {
+                        const write = attrWrites.planAttrWrite(attrName, value[attrName]);
+                        const refusal = attrWrites.attrRefusal(element, write);
+                        if (refusal) {
+                            throw attrRefusalError(element, path, write.name, refusal);
+                        }
+                        return write;
                     });
+                    writes.forEach(write => attrWrites.applyAttrWrite(element, write));
                 } else if (value !== null && value !== undefined) {
                     throw bindingError("E303", element, "attr", path,
                         `the value must be an object of { attributeName: value }, e.g. { href: url, target: "_blank" }; ` +

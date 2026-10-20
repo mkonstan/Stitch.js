@@ -117,7 +117,7 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `packages/utils/index.js` | Utils package entry: `Stitch.debug` (read-only `stats()`; there is no debug mode), `onError`, utility exports | `stitch.entry.js`, other packages |
 | `packages/utils/src/runtime-helpers.js` | `getProperty`, `setProperty`, `assertPathExists`, arrow-function detection | API + browser |
 | `packages/utils/src/error-hook.js` | `Stitch.onError`: where errors raised inside reactive updates go (re-thrown uncaught when no handler) | core, browser |
-| `packages/utils/src/attr-value-handlers.js` | `data-attr` value-type strategy handlers | browser binding runtime |
+| `packages/utils/src/attr-value-handlers.js` | `data-attr` writes (style through the CSSOM) and the refusals for values that could run script (event-handler names, srcdoc, javascript:/vbscript:/data: URLs, style strings) | browser binding runtime |
 | `packages/utils/src/value-binding-helpers.js` | value validators and value handlers (input/select/radio/number/range/default) | browser binding runtime |
 | `packages/utils/src/type-converters.js` | converter registry (`int`, `float`, `boolean`, `string`, `date`, `datetime`, `auto`) | value binding helpers |
 | `packages/utils/src/foreach-keys.js` | The list key rule (`id` / `data-key` / plain values; missing or duplicate keys throw) | foreach binding |

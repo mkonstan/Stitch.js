@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js attribute safety</title>
+</head>
+<body>
+    <h1>Attribute safety</h1>
+    <p>
+        Values reach attributes through data-attr. Every value that could run script is refused
+        with its code and writes nothing: event-handler names, srcdoc, javascript: and vbscript:
+        URLs in any of their evasion forms, data: URLs (except data:image/ in an img src) and
+        style strings. Legitimate values keep working; style objects are written through the
+        CSSOM; script, style, base and meta elements cannot be bound.
+    </p>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script src="tests/xss-corpus.js"></script>
+    <script src="tests/attr-safety.js"></script>
+</body>
+</html>
