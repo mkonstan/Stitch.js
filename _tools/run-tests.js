@@ -55,6 +55,7 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 const STRICT_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; " +
     "require-trusted-types-for 'script'; object-src 'none'; base-uri 'none'";
 const PAGE_TIMEOUT_MS = 20000;
+const MAX_PAGE_TIMEOUT_MS = 60000;
 const ACCEPTANCE_TEST_TIMEOUT_MS = 15000;
 const ACCEPTANCE_HELPERS = "tests/acceptance/helpers.js";
 // Only acceptance specs (whose pages are written later, by the fresh-agent gate) may be pending.
@@ -190,7 +191,12 @@ function loadSuites(list) {
         if (seen.has(entry.page)) throw new Error(`suite listed twice: ${entry.page}`);
         seen.add(entry.page);
         if (entry.csp !== undefined && typeof entry.csp !== "boolean") throw new Error(`suite ${entry.page}: "csp" must be true or false`);
-        return { page: entry.page.replace(/\\/g, "/"), csp: entry.csp === true };
+        // A page that runs many frames (the executable docs) may need longer than the default;
+        // the override is explicit, bounded and per page.
+        if (entry.timeoutMs !== undefined && !(Number.isInteger(entry.timeoutMs) && entry.timeoutMs > PAGE_TIMEOUT_MS && entry.timeoutMs <= MAX_PAGE_TIMEOUT_MS)) {
+            throw new Error(`suite ${entry.page}: "timeoutMs" must be an integer above ${PAGE_TIMEOUT_MS} and at most ${MAX_PAGE_TIMEOUT_MS}`);
+        }
+        return { page: entry.page.replace(/\\/g, "/"), csp: entry.csp === true, timeoutMs: entry.timeoutMs || null };
     });
 }
 
@@ -669,9 +675,10 @@ async function runEngine(config, engine, runs, report) {
             const target = `${engine} ${build}`;
             server.state.buildBytes = fs.readFileSync(path.join(ROOT, build));
             runs[target] = [];
-            for (const { page, csp } of config.suites) {
+            for (const { page, csp, timeoutMs } of config.suites) {
                 if (!fs.existsSync(path.join(ROOT, page))) continue;
-                let raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs, csp);
+                const pageTimeoutMs = timeoutMs || config.pageTimeoutMs;
+                let raw = await runPage(browser, server.baseUrl, page, pageTimeoutMs, csp);
                 const connectFailure = connectionFailure(raw);
                 if (connectFailure) {
                     // Retry ONCE, only for a connect-phase failure (the request never reached
@@ -679,16 +686,16 @@ async function runEngine(config, engine, runs, report) {
                     // anything it gets wrong, including the same failure, is fatal.
                     // Say what the discarded run got wrong, so a retry never hides a real failure
                     // that happened to coincide with the connect failure.
-                    const discarded = analysePage(raw, config.pageTimeoutMs);
+                    const discarded = analysePage(raw, pageTimeoutMs);
                     const discardedFailures = discarded.tests.filter((t) => t.status !== "pass")
                         .map((t) => `${t.status} ${t.id}: ${String(t.detail).split("\n")[0]}`);
                     console.log(`RETRY   ${page} [${target}]: ${connectFailure}. Re-running the page once. ` +
                         `The discarded run had ${discarded.problems.length} page problem(s) and ${discardedFailures.length} non-passing test(s):`);
                     for (const line of discarded.problems.concat(discardedFailures)) console.log(`        discarded: ${line}`);
                     report.retries.push({ page, build: target, reason: connectFailure, discardedProblems: discarded.problems, discardedFailures });
-                    raw = await runPage(browser, server.baseUrl, page, config.pageTimeoutMs, csp);
+                    raw = await runPage(browser, server.baseUrl, page, pageTimeoutMs, csp);
                 }
-                const analysed = analysePage(raw, config.pageTimeoutMs);
+                const analysed = analysePage(raw, pageTimeoutMs);
                 runs[target].push(analysed);
                 logRun(target, page, analysed);
             }

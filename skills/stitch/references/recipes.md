@@ -2,29 +2,31 @@
 
 Each recipe is a complete, working fragment: markup plus script. Every block is executed by the
 library's test suite, so it is correct as written. Copy the closest one, then change names and data.
-Load `stitch.js` before the script (as in the page in `SKILL.md`).
+Load `stitch.js` before the script (as in the page in `SKILL.md`). Read only the recipe you need:
+it starts at the line given below (its heading is `## N. Title`).
 
-| Task | Recipe |
-|---|---|
-| List of objects: add, edit in place, remove | [1](#1-keyed-list-add-edit-remove) |
-| Rows keyed by another field | [2](#2-rows-keyed-by-another-field-data-key) |
-| Table body, row computeds, totals | [3](#3-table-body-from-a-template-with-totals) |
-| Recursive tree with expand/collapse | [4](#4-recursive-tree-with-expand-and-collapse) |
-| Search, filter and sort | [5](#5-search-filter-and-sort) |
-| Master-detail selection | [6](#6-master-detail-selection) |
-| Form with validation | [7](#7-form-with-validation-inside-a-form) |
-| Selects: objects, plain values, numbers, multiple | [8](#8-selects-over-objects-plain-values-and-numbers) |
-| Cascading selects | [9](#9-cascading-selects) |
-| Every input type, two-way | [10](#10-two-way-inputs-by-type) |
-| Handlers in nested lists, keyboard events | [11](#11-handlers-in-nested-lists-and-keyboard-events) |
-| Events between parts of the page | [12](#12-events-root-only-emit-and-on) |
-| Error reporting | [13](#13-error-reporting-with-onerror) |
-| Custom bindings (path and literal) | [14](#14-custom-bindings-path-and-literal) |
-| Links, images, ARIA, styles from data | [15](#15-attributes-from-data-links-images-aria-style) |
-| Loading data from a server | [16](#16-loading-data-from-a-server) |
-| An element only for some rows | [17](#17-an-element-only-for-some-rows) |
-| Tabs and wizard steps | [18](#18-tabs-and-wizard-steps) |
-| Teardown, rebind, removers | [19](#19-lifecycle-rebind-teardown-removers) |
+| Task | Recipe | Line |
+|---|---|---|
+| List of objects: add, edit in place, remove | [1](#1-keyed-list-add-edit-remove) | 31 |
+| Rows keyed by another field | [2](#2-rows-keyed-by-another-field-data-key) | 68 |
+| Table body, row computeds, totals | [3](#3-table-body-from-a-template-with-totals) | 87 |
+| Recursive tree with expand/collapse | [4](#4-recursive-tree-with-expand-and-collapse) | 131 |
+| Search, filter and sort | [5](#5-search-filter-and-sort) | 177 |
+| Master-detail selection | [6](#6-master-detail-selection) | 217 |
+| Form with validation | [7](#7-form-with-validation-inside-a-form) | 262 |
+| Selects: objects, plain values, numbers, multiple | [8](#8-selects-over-objects-plain-values-and-numbers) | 331 |
+| Cascading selects | [9](#9-cascading-selects) | 377 |
+| Every input type, two-way | [10](#10-two-way-inputs-by-type) | 416 |
+| Handlers in nested lists ($parent / $root), keyboard events | [11](#11-handlers-in-nested-lists-and-keyboard-events) | 459 |
+| Events between parts of the page | [12](#12-events-root-only-emit-and-on) | 505 |
+| Error reporting | [13](#13-error-reporting-with-onerror) | 535 |
+| Custom bindings (path and literal) | [14](#14-custom-bindings-path-and-literal) | 573 |
+| Links, images, ARIA, styles from data | [15](#15-attributes-from-data-links-images-aria-style) | 635 |
+| Loading data from a server | [16](#16-loading-data-from-a-server) | 681 |
+| An element only for some rows | [17](#17-an-element-only-for-some-rows) | 726 |
+| Tabs and wizard steps | [18](#18-tabs-and-wizard-steps) | 762 |
+| Teardown, rebind, removers | [19](#19-lifecycle-rebind-teardown-removers) | 798 |
+| Nested lists, group subtotals and a grand total | [20](#20-nested-lists-with-group-subtotals) | 840 |
 
 ## 1. Keyed list: add, edit, remove
 
@@ -84,8 +86,10 @@ one added before `create()`: `rows.map((r, i) => ({ id: i + 1, ...r }))`.
 
 ## 3. Table body from a template, with totals
 
-Put `data-foreach` on the `<tbody>` and the row in a `<template>`. Row computeds go into each row
-object before it reaches the model. Format numbers in computeds.
+Put `data-foreach` on the `<tbody>`, never on the `<table>` (the parser would insert a `<tbody>`
+that becomes the row). The row may be inline (`<tbody data-foreach="lines"><tr>...</tr></tbody>`) or,
+as here, a `<template>`. Row computeds go into each row object before it reaches the model. Format
+numbers in computeds.
 
 ```html run
 <table id="cart">
@@ -366,13 +370,14 @@ placeholder whose value is `data-default-value` (default `""`).
   text). `<option data-value="$data">` throws E313.
 - A select writes strings. Numbers need `data-type="int"` (or `float`).
 - A select WITHOUT `data-value` keeps the user's choice while its list changes.
-- When the selected option leaves the list, the select shows another option but the model keeps
-  the old value: reset the property yourself (recipe 9).
+- With `data-value`, when the chosen option leaves the list the choice is cleared: the model gets
+  the placeholder's value (or `null` without a placeholder), and `$watch` / `$onChange` see it. To
+  keep a choice across a reload, assign the new list in one step (never `[]` first).
 
 ## 9. Cascading selects
 
-The second list is a computed of the first choice. Reset the second choice when the first changes,
-with `$watch` (synchronous; it returns a remover).
+The second list is a computed of the first choice. When the first choice changes, the chosen city
+leaves the city list, so its select clears `city` (to the placeholder's value): no reset code.
 
 ```html run
 <div id="cascade">
@@ -397,7 +402,6 @@ with `$watch` (synchronous; it returns a remover).
         hasCountry: Stitch.computed(function () { return this.country !== ''; }),
         summary: Stitch.computed(function () { return this.country + '/' + this.city; })
     });
-    model.$watch('country', function () { model.city = ''; });
     new Stitch.DataBinder().bind('#cascade', model);
 </script>
 ```
@@ -563,7 +567,8 @@ keeps its last good state.
 <!-- check: tick().then(() => text('#error-banner') === 'binding: Divisor must not be zero' && text('#ratio') === '5') -->
 
 - A second `Stitch.onError(fn)` while one is installed throws E902; call the remover first.
-- An `async` handler's rejected promise does NOT reach `onError`: catch inside the handler.
+- An `async` handler's rejected promise reaches `onError` too (source `handler`); to show the
+  failure in the page, catch it inside the handler (recipe 16).
 
 ## 14. Custom bindings: path and literal
 
@@ -677,7 +682,8 @@ that drops the markup's `noopener`/`noreferrer` (E329). No built-in binding may 
 
 Declare the list and the state flags up front. Normalize each row (key, every bound field) before it
 reaches the model. `data-loading` disables the button and sets `aria-busy` while true. Catch errors
-inside the `async` method: a rejected handler promise does not reach `Stitch.onError`.
+inside the `async` method to show them in the page (an uncaught rejection only reaches
+`Stitch.onError`).
 
 ```html run
 <div id="loader">
@@ -792,8 +798,10 @@ on the element.
 ## 19. Lifecycle: rebind, teardown, removers
 
 Bind a root once. To bind it to another model, `unbind` first (or change the data of the one model).
-`dispose()` releases everything a binder bound; the binder cannot bind again. Watches, change
-handlers and event subscriptions belong to the model: only their removers stop them.
+`dispose()` releases everything a binder bound; the binder cannot bind again. Neither `unbind()` nor
+`dispose()` touches the DOM: the elements stay as rendered, they only stop following the model.
+Watches, change handlers and event subscriptions belong to the model: only their removers stop
+them.
 
 ```html run
 <div id="panel"><h2 id="panel-title" data-text="title"></h2></div>
@@ -811,17 +819,80 @@ handlers and event subscriptions belong to the model: only their removers stop t
     const stopChange = final.$onChange(function (change) { seen.push('change ' + change.field); });
     const stopEvent = final.$on('saved', function () { seen.push('saved'); });
 
-    final.title = 'Final 2';
+    final.title = 'Final 2';                  // the watch and the change handler see it
     stopWatch(); stopChange(); stopEvent();
     final.title = 'Final 3';                  // not seen: removed
-    binder.dispose();                         // the page section goes away
-    final.title = 'Final 4';                  // the page no longer follows
 </script>
 ```
-<!-- check: text('#panel-title') === 'Final' && seen.join('|') === 'Final->Final 2|change title' -->
+<!-- check: text('#panel-title') === 'Final 3' && seen.join('|') === 'Final->Final 2|change title' -->
+<!-- check: (binder.dispose(), final.title = 'Final 4', true) -->
+<!-- check: text('#panel-title') === 'Final 3' && document.getElementById('panel-title') !== null -->
+
+After `binder.dispose()` the heading still shows "Final 3" (the DOM stays as it is) and no longer
+follows `final.title`.
 
 - `bind()` on an already bound element throws E601; `unbind()` of an element with nothing bound
   throws E607; `bind()` after `dispose()` throws E605.
 - Never bind a root inside another bound root; bind sibling roots, one model each.
 - `Stitch.debug.stats()` returns `{ effects, subscriptions, parentLinks }`; counts that grow with every
   show/hide cycle mean something is not released.
+
+## 20. Nested lists with group subtotals
+
+Groups that hold rows: each group carries its own computed (subtotal) and the model a computed over
+all groups (grand total). Row computeds read their row; group computeds read their group's rows.
+Inside the inner list `$parent` is the group, `$root` the model.
+
+```html run
+<div id="orders">
+    <section data-foreach="groups">
+        <div>
+            <h3><span data-text="name"></span>: <span class="subtotal" data-text="subtotalText"></span></h3>
+            <ul data-foreach="lines">
+                <li>
+                    <span data-text="item"></span>
+                    <input type="number" min="0" data-value="qty">
+                    <button type="button" data-click="$parent.removeLine">x</button>
+                </li>
+            </ul>
+            <button type="button" class="add" data-click="$root.addLine">Add pen</button>
+        </div>
+    </section>
+    <p>Total: <span id="grand" data-text="grandText"></span></p>
+</div>
+<script>
+    let nextId = 10;
+    function line(raw) {
+        return Object.assign({}, raw, { amount: Stitch.computed(function () { return this.price * (this.qty || 0); }) });
+    }
+    function group(raw) {
+        return {
+            id: raw.id,
+            name: raw.name,
+            lines: raw.lines.map(line),
+            subtotal: Stitch.computed(function () { return this.lines.reduce((sum, l) => sum + l.amount, 0); }),
+            subtotalText: Stitch.computed(function () { return this.subtotal.toFixed(2); }),
+            removeLine(lineItem, event) { this.lines.splice(this.lines.indexOf(lineItem), 1); }
+        };
+    }
+    const model = Stitch.Observable.create({
+        groups: [
+            { id: 1, name: 'Office', lines: [{ id: 1, item: 'Pen', price: 1.5, qty: 2 }, { id: 2, item: 'Pad', price: 3, qty: 1 }] },
+            { id: 2, name: 'Kitchen', lines: [{ id: 3, item: 'Cup', price: 4, qty: 2 }] }
+        ].map(group),
+        grandText: Stitch.computed(function () { return this.groups.reduce((sum, g) => sum + g.subtotal, 0).toFixed(2); }),
+        addLine(groupItem, event) { groupItem.lines.push(line({ id: nextId++, item: 'Pen', price: 1.5, qty: 1 })); }
+    });
+    new Stitch.DataBinder().bind('#orders', model);
+</script>
+```
+<!-- check: texts('#orders .subtotal').join(',') === '6.00,8.00' && text('#grand') === '14.00' -->
+<!-- check: type('#orders section > div:first-child li:first-child input', '4') -->
+<!-- check: texts('#orders .subtotal').join(',') === '9.00,8.00' && text('#grand') === '17.00' -->
+<!-- check: click('#orders section > div:nth-child(2) .add') -->
+<!-- check: texts('#orders .subtotal').join(',') === '9.00,9.50' && text('#grand') === '18.50' -->
+<!-- check: click('#orders section > div:first-child li:nth-child(2) button') -->
+<!-- check: texts('#orders .subtotal').join(',') === '6.00,9.50' && text('#grand') === '15.50' -->
+
+`$root.addLine` receives the group (the item of the row the button is in), so one model method
+serves every group. `$parent.removeLine` is the group's own method, called with the line.

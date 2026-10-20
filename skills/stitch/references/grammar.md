@@ -7,7 +7,7 @@ signature. Error codes: look them up in `errors.md` (next to this file).
 
 | Kind | Grammar | Examples | Invalid (code) |
 |---|---|---|---|
-| path | names joined by dots; a name is `[A-Za-z_$][A-Za-z0-9_$]*` or digits (array index); surrounding spaces trimmed | `name`, `user.email`, `items.0.title`, `$data`, `$index`, `$parent.total`, `$root.rate`, `$data.name` | `""` (E101), `!done` / `a + b` / `x ? y : z` / `n > 0` (E102), `{ a: b }` (E103), `fmt(x)` (E104), `a, visible: b` (E105), `items[0]` / `a..b` (E106) |
+| path | names joined by dots; a name is `[A-Za-z_$][A-Za-z0-9_$]*` or digits (array index); surrounding spaces trimmed | `name`, `user.email`, `items.0.title`, `$data`, `$index`, `$parent.total`, `$root.rate`, `$data.name` | `""` (E101), `!done` / `a + b` / `n > 0` / `items[0]` (E102), `{ a: b }` (E103), `fmt(x)` (E104), `a, visible: b` / `x ? y : z` (E105), `a..b` (E106) |
 | handler | `name`, `name.name`, `$parent.name`, `$root.name` (one prefix, once) | `save`, `$root.remove`, `$parent.rename`, `$root.actions.save` | `save()` / `remove(item)` / `!x` (E108), `$root` alone (E109), `$parent.$parent.x` / `$data.x` (E110) |
 | literal | the attribute text, not looked up | `data-default-text="Choose..."`, a custom binding registered with `value: 'literal'` | none |
 
@@ -27,8 +27,8 @@ allowed on `<script>`, `<style>`, `<base>`, `<meta>` (E326, bind).
 | Attribute | Value | The bound value must be | Two-way | Checked at bind | Checked later |
 |---|---|---|---|---|---|
 | `data-text` | path | anything but a function; `null`/`undefined` show as empty; written with `textContent` | no | function (E301); element contains bound elements (E535); with `data-foreach` (E534) | function (E301, update) |
-| `data-value` | path | a writable property; on `input`, `textarea`, `select` (on other elements nothing happens, no error) | yes, on `input` and `change` | computed (E311); getter without setter (E312); `$data`, `$index`, `$parent`, `$root` at any depth (E313) | typing through a `null` object (E314, to `onError`, possibly twice per edit) |
-| `data-visible` | path | truthy shows (`style.display = ''`), falsy hides (`display: none`) | no | path only | none |
+| `data-value` | path | a writable property; on `input`, `textarea`, `select` (on other elements nothing happens, no error) | yes, on `input` and `change` | computed (E311); getter without setter (E312); a row-context value itself: `$data`, `$index`, `$parent`, `$root`, also behind a prefix (`$parent.$index`, `$root.$data`) (E313). `$data.name`, `$parent.name`, `$root.name` are writable | typing through a `null` object (E314, to `onError`, possibly twice per edit) |
+| `data-visible` | path | truthy shows (`style.display = ''`: clears only the inline value, so a `hidden` attribute or a stylesheet `display: none` keeps the element hidden), falsy hides (`display: none`) | no | path only | none |
 | `data-enabled` | path | truthy enables; `element.disabled = !value` | no | path only | none |
 | `data-class` | path | a string (REPLACES all classes), `{ className: boolean }` (toggles only those), `null`/`undefined` (no change) | no | other kinds (E302) | other kinds (E302, update) |
 | `data-attr` | path | `{ name: value }` or `null`/`undefined`; entry value `null`/`false` removes, `true` writes `""`, arrays join, `style` takes an object | no | not an object (E303); refused entries (E321-E325, E327-E329) | same, update; nothing from that object is written |
@@ -36,6 +36,12 @@ allowed on `<script>`, `<style>`, `<base>`, `<meta>` (E326, bind).
 | `data-click` | handler | a method; called as `fn.call(owner, item, event)` | no | not found / not a function outside lists (E401, E402); `$parent.` outside a list (E403); `$root.` in a row template (E406, E407); `$parent.` in a top-level row template (E404, E405) | bare names in rows and `$parent.` in nested lists (E401, row); looked up again on every click |
 | `data-event` | path | an object `{ eventName: handlerName or function }` (names resolve like `data-click`; a function must not be an arrow, E707 at create) | no | not an object (E304); bad entry (E305); names not found (E401 ...) | same, update; replacing the object re-registers listeners |
 | `data-foreach` | path | an array, `null` or `undefined` (no rows); other bindings may sit on the list element (applied after the rows), except `data-text` | no | not an array (E521); keys of present rows (E501-E505); template (E511-E516) | non-array (E521), keys of new rows (E501, E502, E503); the DOM keeps its last good rows |
+
+A `<select data-foreach>` with `data-value`: when the chosen option leaves the list, the choice is
+cleared: the model gets the placeholder's value (`data-default-value`, default `""`), or `null` with
+nothing selected when there is no placeholder; a multiple select drops the value from its array. The
+write is an ordinary change (`$watch` / `$onChange` see it). A value no option has shown yet (options
+that arrive later) is left alone.
 
 ## List attributes (only beside data-foreach)
 
@@ -61,8 +67,9 @@ allowed on `<script>`, `<style>`, `<base>`, `<meta>` (E326, bind).
 
 Called as `handler.call(owner, item, event)`: `owner` is the object the method is on (`this`), `item`
 is the current row's item (outside a list: the model), `event` is the DOM event. An error thrown
-synchronously goes to `Stitch.onError` (uncaught without it). A rejected promise from an `async`
-handler goes to `unhandledrejection`, not `onError`.
+synchronously goes to `Stitch.onError` (uncaught without it). When a handler returns a promise (an
+`async` handler), its rejection goes to `Stitch.onError` the same way (source `handler`); without
+`onError` it is re-thrown, so the browser reports an unhandled rejection.
 
 ## Stitch global
 
@@ -75,7 +82,7 @@ handler goes to `unhandledrejection`, not `onError`.
 | `Stitch.Observable.isReactive(value)` | `true` / `false` | |
 | `Stitch.Observable.computed(config)` | same as `Stitch.computed` | |
 | `Stitch.Observable.reset()` | nothing | tests only: replaces the shared reactive system |
-| `Stitch.computed(fn)` / `Stitch.computed({ get, deps })` | a marker for `create()` | `fn` gets the holder as `this` AND as its argument; lazy; read-only (assignment E713); E721, E722 |
+| `Stitch.computed(fn)` / `Stitch.computed({ get, deps })` | a marker for `create()` | `fn` gets the holder as `this` AND as its argument; lazy; read-only (assignment E713); `fn` may only read: a write (E724) or a list/Map/Set change (E725) inside it throws; E721, E722 |
 | `new Stitch.DataBinder(hooks)` | a binder | `hooks` only `onBind`, `onChange`, `properties` (E611-E617) |
 | `Stitch.DataBinder.registerBinding(name, { value, bind(element, model, value, context) })` | nothing | before the first `bind()` (E621); name lowercase-dashed (E622, E623), not reserved (E624) or taken (E627); `value` `'path'` (default) or `'literal'` (E626); `bind` required (E625); `context` is `{ reactiveSystem, binder }` |
 | `Stitch.onError(fn)` | a remover | `fn(error, context)`; `context.source` is `binding`, `watch`, `change-handler`, `handler`, `messageBus`, `unbind`, `dispose`, `scheduler`, `effect` or `unknown`; `null` removes; second handler E902; not a function E901 |
@@ -104,7 +111,7 @@ On the root model unless noted. Every object, list, Map and Set of a model has `
 |---|---|---|
 | `model.$onChange(fn)` | a remover | `fn({ field, oldValue, newValue, target })`; own writes synchronously, nested writes later with dotted `field` and `nestedChange: true`; any object; a string first E803; two arguments E804 |
 | `model.$offChange(fn)` | `undefined` | the same `fn`; no "remove all" (E807, E809) |
-| `model.$watch(path, callback, options)` | a remover | root from `create()` only (`model.user.$watch` is not a function); `callback(newValue, oldValue, info)`; synchronous, `{ batch: true }` once per batch; missing path E204, `_` path E205, no callback E817 |
+| `model.$watch(path, callback, options)` | a remover | root from `create()` only (`model.user.$watch` is not a function); `callback(newValue, oldValue, info)`; synchronous, `{ batch: true }` once per batch; a callback that keeps writing its own path is stopped after 100 nested runs (E912, to `onError`); missing path E204, `_` path E205, no callback E817 |
 | `model.$get(path)` | the value | missing name E204; not a path E107 |
 | `model.$set(path, value)` | `undefined` | a NEW single name becomes reactive; an existing path is assigned; a missing dotted path E204 |
 | `model.$on(event, callback)` | an unsubscribe function | root only (E801); `$on(fn)` E811; swapped E810 |

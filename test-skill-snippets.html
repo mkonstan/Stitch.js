@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test: the Claude skill's code blocks and gotcha proofs</title>
+    <title>Test: the Claude skill's code blocks</title>
     <script src="stitch.js"></script>
     <script src="tests/harness.js"></script>
     <script src="tests/doc-snippets.js"></script>
 </head>
 <body>
     <h1>The Claude skill, executed</h1>
-    <p>Every <code>html</code> / <code>js</code> code block of the skill in <code>skills/stitch/</code>, and every
-    proof in <code>tests/skill-proofs.md</code> (SKILL_SET in <code>tests/doc-snippets.js</code>), runs here, each
-    in its own frame, against the build under test. A <code>run</code> block must not throw; a
-    <code>throws</code> block must throw the error code its "Throws:" line names; hidden <code>check</code>
-    comments must hold.</p>
+    <p>Every <code>html</code> / <code>js</code> code block of the skill in <code>skills/stitch/</code>
+    (SKILL_SET in <code>tests/doc-snippets.js</code>) runs here, each in its own frame, against the build
+    under test. A <code>run</code> block must not throw; hidden <code>check</code> comments must hold.</p>
     <p id="snippet-summary"></p>
     <div id="frames"></div>
     <script>

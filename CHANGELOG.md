@@ -9,9 +9,38 @@
   `references/` holds recipes, gotchas (habits from other frameworks included) with the error each
   one produces, the attribute grammar and API, and a table of every error code generated from
   `docs/ERRORS.md`. Every code block in it is run by the test suite, every error code a gotcha
-  names is proven by `tests/skill-proofs.md`, and a static check (`skill`) keeps its names, codes
-  and error table in step with the library. Install: see README, "AI agents".
+  and every gotcha row is executed both ways by `tests/skill-proofs.md` (the mistake fails as stated,
+  the advice works), and a static check (`skill`) keeps its names, codes, error table, recipe index
+  and gotcha proofs in step with the library. Install: see README, "AI agents".
 - `npm run build:skill` (part of `npm run build`) regenerates the skill's error table.
+- Error codes E724 (a computed wrote to the model), E725 (a computed changed a list, Map or Set) and
+  E912 (an effect re-running itself), with entries in `docs/ERRORS.md`.
+
+### Changed
+
+- A computed only reads: a write inside it throws E724, a method that changes a model list, Map or
+  Set inside it (`sort`, `push`, `set`, ...) throws E725, before anything changes. Before, the write
+  was accepted and a list sorted in place inside a computed could stop updating, silently.
+- A `$watch` callback (or a custom binding's effect) that keeps re-running itself by writing what
+  it reads is stopped after 100 nested runs with E912, reported to `Stitch.onError`, on every
+  engine. Before, it overflowed the call stack (uncaught in Firefox).
+- A handler (`data-click`, `data-event`) that returns a promise: a rejection goes to
+  `Stitch.onError` with `source: "handler"`, or is re-thrown as an unhandled rejection when none is
+  installed. Before, the promise was ignored.
+- Arrow-function methods are refused (E707) wherever data enters a model, including rows given to a
+  list at create, `push`, `unshift`, `splice` and `fill`, at any depth, before anything is added.
+  Before, such a row was accepted and threw only when first read, which stopped the list rendering.
+- `<select data-foreach data-value>`: when the chosen option leaves the list, the model is cleared
+  to the placeholder's value (or `null`, with nothing selected, without a placeholder; a multiple
+  select drops the value). Before, the select showed another option while the model kept the old
+  value.
+
+### Fixed
+
+- A list row that holds the focus keeps it when the list reorders (the other rows move around it).
+- `$watch`: a callback that writes the watched path now sees the right old value on the nested call,
+  and the outer call no longer overwrites the stored value with a stale one.
+- The test runner accepts a per-page `timeoutMs` (tests/suites.js) for pages that run many frames.
 
 ## 3.0.0 (2026-10-20)
 

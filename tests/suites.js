@@ -8,7 +8,8 @@
  *   - test-examples.html, which loads every page in `examples` and fails on
  *     any error.
  * Each suite page reports through tests/harness.js. Paths are relative to the
- * repository root.
+ * repository root. An entry may set timeoutMs (above the runner's 20 s default, at most
+ * 60 s) for a page that runs many frames.
  */
 (function (root, factory) {
     var lists = factory();
@@ -45,10 +46,12 @@
         { page: "test-v3-defects.html", title: "v3 defects", about: "The known v2 defects, asserted at their v3 target behaviour" },
         { page: "test-examples.html", title: "Examples smoke", about: "Every public example page loads with no page error, console error or failed request" },
         { page: "test-api-contracts.html", title: "API contracts", about: "Removers from $watch/$onChange, boolean isReactive, computed argument, frozen data refused, bind report covers data-type, custom-binding literal hint, error codes" },
+        { page: "test-silent-failures.html", title: "Silent failures made loud", about: "A select choice whose option leaves the list is cleared; writes and list changes inside a computed throw (E724, E725); a $watch that writes its own path stops with E912; async handler rejections reach onError; arrow methods refused at every entry point; a focused row keeps the focus when rows move" },
         { page: "test-attr-safety.html", title: "Attribute safety", about: "data-attr refuses every value that could run script (the XSS corpus), with its code, writing nothing; legitimate values work; style through the CSSOM; code elements are not bound" },
         { page: "test-strict-csp.html", csp: true, title: "Strict CSP", about: "Every binding, keyed lists, templates, custom bindings, onError, error paths and the XSS corpus, served with a strict Content-Security-Policy (no inline script or style, Trusted Types); any violation fails" },
-        { page: "test-doc-snippets.html", title: "Executable docs", about: "Every html/js code block in the docs runs; mistakes throw their documented message" },
-        { page: "test-skill-snippets.html", title: "Executable skill", about: "Every code block of the Claude skill (skills/stitch/) runs, and every gotcha proof in tests/skill-proofs.md asserts its error code" }
+        { page: "test-doc-snippets.html", timeoutMs: 45000, title: "Executable docs", about: "Every html/js code block in the docs runs; mistakes throw their documented message" },
+        { page: "test-skill-snippets.html", title: "Executable skill", about: "Every code block of the Claude skill (skills/stitch/) runs" },
+        { page: "test-skill-proofs.html", timeoutMs: 45000, title: "Skill gotchas, executed", about: "Both halves of every gotcha row (tests/skill-proofs.md): the wrong code fails with its code or its misbehaviour, the advised code works" }
     ];
     // Every public example page (example*.html at the root). The runner fails if one is missing.
     var examples = [

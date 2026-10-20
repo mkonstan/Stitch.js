@@ -721,7 +721,34 @@ const staticFixtures = {
             SKILL_TREE.forEach((rel) => copyTree(rel, dir));
             fs.appendFileSync(path.join(dir, "skills/stitch/references/gotchas.md"), "\n| G999 | `data-text=\"x\"` on a missing x | declare x | it must exist | E201 bind |\n");
         },
-        expect: FAIL("G999 names E201 but tests/skill-proofs.md has no")
+        expect: FAIL("G999 has no \"## G999\" section in tests/skill-proofs.md")
+    },
+    "skill-gotcha-advice-inverted": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            // Swap "About to write" and "Write instead" of one row: the advice now recommends the
+            // mistake, and no longer matches the code its proof executes.
+            const file = path.join(dir, "skills/stitch/references/gotchas.md");
+            const text = fs.readFileSync(file, "utf8");
+            const row = text.split("\n").find((l) => l.startsWith("| G30 |"));
+            const cells = row.split(" | ");
+            const swapped = [cells[0], cells[2], cells[1]].concat(cells.slice(3)).join(" | ");
+            fs.writeFileSync(file, text.replace(row, swapped));
+        },
+        expect: FAIL("G30: the Right half does not contain")
+    },
+    "skill-gotcha-guidance-unlisted": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            const file = path.join(dir, "tests/skill-proofs.md");
+            const text = fs.readFileSync(file, "utf8");
+            const start = text.indexOf("## G1\n");
+            const end = text.indexOf("## G2\n");
+            fs.writeFileSync(file, text.slice(0, start) + "## G1\n\nGuidance only: not executed.\n\n" + text.slice(end));
+        },
+        expect: FAIL("G1 is marked \"Guidance only\" but is not in SKILL_GUIDANCE_ONLY")
     },
     "skill-proof-wrong-code": {
         check: "skill",
@@ -730,7 +757,7 @@ const staticFixtures = {
             const file = path.join(dir, "tests/skill-proofs.md");
             fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("Throws: `[Stitch E103]`", "Throws: `[Stitch E102]`"));
         },
-        expect: FAIL("the G2 section does not assert E103")
+        expect: FAIL("G2: the Wrong half does not assert E103")
     },
     "skill-grammar-gap": {
         check: "skill",

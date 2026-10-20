@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: the skill's gotchas, executed</title>
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script src="tests/doc-snippets.js"></script>
+</head>
+<body>
+    <h1>The skill's gotchas, executed</h1>
+    <p>Both halves of every row of <code>skills/stitch/references/gotchas.md</code>, from
+    <code>tests/skill-proofs.md</code> (PROOFS_SET in <code>tests/doc-snippets.js</code>): the wrong code fails
+    as the row says (a <code>throws</code> block must throw the code its "Throws:" line names) and the
+    advised code works (a <code>run</code> block must not throw; its <code>check</code> comments must hold).</p>
+    <p id="snippet-summary"></p>
+    <div id="frames"></div>
+    <script>
+        StitchDocSnippets.run(StitchDocSnippets.PROOFS_SET, { host: document.getElementById('frames'), concurrency: 20 }).catch(function (error) {
+            // A document that cannot be fetched or parsed fails the page loudly.
+            setTimeout(function () { throw error; }, 0);
+        });
+    </script>
+</body>
+</html>

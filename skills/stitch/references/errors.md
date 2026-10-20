@@ -140,6 +140,8 @@ Find the code below, apply the fix, and read the rest of the message for the nam
 | E721 | computed() of the wrong kind | Pass `function () { return ...; }` or `{ get() { ... }, deps: [...] }`. |
 | E722 | deps is not an array | Pass an array of property names, or leave `deps` out (dependencies are tracked automatically). |
 | E723 | Computed deps form a cycle | Remove the computed from its own dependency chain. |
+| E724 | A computed wrote to the model | Keep computeds read-only. Do the write in a handler or a `$watch` callback, or turn the written value into a computed of its own. |
+| E725 | A computed changed a list, Map or Set | Work on a copy and return it: `this.items.slice().sort(...)`, `[...this.items].reverse()`. `filter()` and `map()` already return new arrays. |
 
 ## E8xx: Model helpers, events and the message bus
 
@@ -175,6 +177,7 @@ Find the code below, apply the fix, and read the rest of the message for the nam
 | E901 | onError() or onBindReport() without a function | Pass a function, or `null` to remove the installed one. |
 | E902 | Second onError() or onBindReport() handler | Remove the first one (call the function the first call returned, or pass `null`), then install the new one. |
 | E911 | Updates triggering each other forever | Move the write out of the effect, or guard it so the value stops changing. |
+| E912 | An effect re-running itself | Write only when the value must change (`if (value !== wanted) model.a = wanted;`), or move the write to a handler. |
 | E991 | Effect on a disposed reactive system | Create a new model (and binder) to bind again. |
 | E992 | Scheduler got something that is not an effect | Report it as a bug. |
 | E993 | foreach binding missing | Use the published `stitch.js` / `stitch.min.js`; report it as a bug. |

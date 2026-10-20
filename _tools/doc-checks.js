@@ -18,6 +18,11 @@
  *                  two different messages.
  *   doc-hygiene    Public documents state rules, not the project's private history: no
  *                  decision numbers (D12), no analysis/ paths, no triage numbers.
+ *   skill          The Claude skill (skills/stitch/): names only attributes, APIs, $ helpers and
+ *                  codes that exist; its grammar covers the public surface; its error table is
+ *                  generated from docs/ERRORS.md; its recipe index gives real lines; every
+ *                  gotcha row has a Wrong half and a Right half in tests/skill-proofs.md that
+ *                  contain the row's code (see checkGotchaProofs).
  *
  * A message is read as its static parts, with "…" for every part filled in at run time (a
  * name, a value, a path). See canonicalMessages().
@@ -736,6 +741,29 @@ function checkSkill(root, files) {
         if (main.indexOf(local) === -1) problems.push(`${SKILL_FILE}: does not route to ${local} (a reference file nothing points to is never read)`);
     }
 
+    // 1b. The recipe index gives each recipe's line, so a model reads only that recipe.
+    const recipesFile = `${SKILL_DIR}references/recipes.md`;
+    if (files.indexOf(recipesFile) !== -1) {
+        const lines = read(root, recipesFile).replace(/\r\n/g, "\n").split("\n");
+        const headings = new Map();
+        lines.forEach((line, i) => {
+            const m = /^## (\d+)\. /.exec(line);
+            if (m) headings.set(m[1], i + 1);
+        });
+        const indexed = new Set();
+        lines.forEach((line, i) => {
+            const m = /^\|.*\|\s*\[(\d+)\]\(#[^)]*\)\s*\|\s*(\d+)\s*\|\s*$/.exec(line);
+            if (!m) return;
+            indexed.add(m[1]);
+            if (headings.get(m[1]) !== Number(m[2])) {
+                problems.push(`${recipesFile}:${i + 1}: the index says recipe ${m[1]} starts at line ${m[2]}; it starts at line ${headings.get(m[1]) || "(no such recipe)"}`);
+            }
+        });
+        for (const n of headings.keys()) {
+            if (!indexed.has(n)) problems.push(`${recipesFile}:${headings.get(n)}: recipe ${n} has no row (with its line) in the index`);
+        }
+    }
+
     // 2. Every name the skill mentions exists; names it calls absent are absent.
     const notStitch = new Set(SKILL_NOT_STITCH);
     for (const name of notStitch) {
@@ -794,37 +822,142 @@ function checkSkill(root, files) {
         }
     }
 
-    // 5. Every error code a gotcha promises is proven in tests/skill-proofs.md.
+    // 5. Every gotcha's advice is executed: tests/skill-proofs.md has a WRONG half (the
+    //    "About to write" code, failing as the row says) and a RIGHT half (the "Write
+    //    instead" code, working) for every row, except the rows listed in
+    //    SKILL_GUIDANCE_ONLY. See checkGotchaProofs.
     if (files.indexOf(SKILL_GOTCHAS) !== -1) {
-        const gotchas = read(root, SKILL_GOTCHAS).replace(/\r\n/g, "\n");
-        const proofsText = files.indexOf(SKILL_PROOFS) !== -1 ? read(root, SKILL_PROOFS).replace(/\r\n/g, "\n") : "";
-        const proofs = new Map();
-        const sections = proofsText.split(/^## (?=G\d+\s*$)/m).slice(1);
-        for (const section of sections) proofs.set(/^(G\d+)/.exec(section)[1], section);
-        const ids = new Set();
-        gotchas.split("\n").forEach((line, i) => {
-            const m = /^\|\s*(G\d+)\s*\|/.exec(line);
-            if (!m) return;
-            const id = m[1];
-            if (ids.has(id)) problems.push(`${SKILL_GOTCHAS}:${i + 1}: ${id} is used twice`);
-            ids.add(id);
-            const cells = line.replace(/\\\|/g, "").split("|");
-            const promised = (cells[cells.length - 2] || "").match(/\bE\d{3}\b/g) || [];
-            if (!promised.length) return;
-            const proof = proofs.get(id);
-            if (!proof) {
-                problems.push(`${SKILL_GOTCHAS}:${i + 1}: ${id} names ${promised.join(", ")} but ${SKILL_PROOFS} has no "## ${id}" section proving it`);
-                return;
+        const proofsText = files.indexOf(SKILL_PROOFS) !== -1 ? read(root, SKILL_PROOFS) : "";
+        problems.push(...checkGotchaProofs(read(root, SKILL_GOTCHAS), proofsText));
+    }
+    return problems;
+}
+
+// Gotcha rows whose advice cannot be executed in the test page (it needs a server header, or
+// an engine without a date control). They are marked "Guidance only:" in tests/skill-proofs.md;
+// this list is the count, so a new unexecuted row cannot slip in.
+const SKILL_GUIDANCE_ONLY = ["G85", "G123"];
+
+/** The code spans of a table cell, with escaped pipes restored. */
+function cellSpans(cell) {
+    const out = [];
+    const re = /`([^`]+)`/g;
+    let m;
+    while ((m = re.exec(cell)) !== null) out.push(m[1].replace(/\\\|/g, "|"));
+    return out;
+}
+
+const squash = (text) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Both halves of every gotcha, structurally (test-skill-proofs.html then runs them):
+ *   - a "## G#" section per row, with a "Wrong:" half and a "Right:" half (or, for a row in
+ *     SKILL_GUIDANCE_ONLY only, a "Guidance only: <why>" line and no code);
+ *   - every code span of the row's "About to write" cell occurs in the Wrong half's code, and
+ *     every code span of its "Write instead" cell in the Right half's code, so the advice text
+ *     is the code that is executed (inverting or editing a cell breaks the link);
+ *   - the Wrong half asserts every error code the row names (a Throws: line with
+ *     `[Stitch E###]`); a row without a code shows its misbehaviour (a throws block, or checks);
+ *   - the Right half is run blocks only (it must not throw), with at least one check.
+ * What it cannot see: the "Because" text, and the bind / row / later column.
+ */
+function checkGotchaProofs(gotchasText, proofsText) {
+    const problems = [];
+    const gotchas = gotchasText.replace(/\r\n/g, "\n");
+    const proofsLines = proofsText.replace(/\r\n/g, "\n").split("\n");
+    const parsed = snippets.parse(proofsText, SKILL_PROOFS);
+    // Sections: id -> { start, end, lines: [{ kind, line }] }
+    const sections = new Map();
+    let current = null;
+    proofsLines.forEach((line, i) => {
+        const head = /^## (G\d+)\s*$/.exec(line);
+        if (head) {
+            current = { id: head[1], start: i + 1, end: proofsLines.length, markers: [], guidance: null };
+            if (sections.has(head[1])) problems.push(`${SKILL_PROOFS}:${i + 1}: "## ${head[1]}" appears twice`);
+            sections.set(head[1], current);
+            return;
+        }
+        if (/^## /.test(line) && current) { current.end = i; current = null; return; }
+        if (!current) return;
+        if (/^Wrong:\s*$/.test(line)) current.markers.push({ half: "wrong", line: i + 1 });
+        else if (/^Right:\s*$/.test(line)) current.markers.push({ half: "right", line: i + 1 });
+        else if (/^Guidance only:/.test(line)) current.guidance = line.replace(/^Guidance only:\s*/, "");
+    });
+    let previous = null;
+    for (const section of sections.values()) {
+        if (previous && previous.end > section.start) previous.end = section.start - 1;
+        previous = section;
+    }
+    const halfOf = (section, line) => {
+        let half = null;
+        for (const marker of section.markers) if (marker.line < line) half = marker.half;
+        return half;
+    };
+    const ids = new Set();
+    let guidanceRows = 0;
+    gotchas.split("\n").forEach((line, i) => {
+        const m = /^\|\s*(G\d+)\s*\|/.exec(line);
+        if (!m) return;
+        const id = m[1];
+        const where = `${SKILL_GOTCHAS}:${i + 1}`;
+        if (ids.has(id)) problems.push(`${where}: ${id} is used twice`);
+        ids.add(id);
+        const cells = line.replace(/\\\|/g, "\u0000").split("|").map((c) => c.replace(/\u0000/g, "\\|"));
+        // | ID | About to write | Write instead | Because | Error |
+        const wrongSpans = cellSpans(cells[2] || "");
+        const rightSpans = cellSpans(cells[3] || "");
+        const promised = (cells[5] || "").match(/\bE\d{3}\b/g) || [];
+        const section = sections.get(id);
+        if (!section) {
+            problems.push(`${where}: ${id} has no "## ${id}" section in ${SKILL_PROOFS} (a Wrong: half and a Right: half)`);
+            return;
+        }
+        if (section.guidance !== null) {
+            guidanceRows++;
+            if (SKILL_GUIDANCE_ONLY.indexOf(id) === -1) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} is marked "Guidance only" but is not in SKILL_GUIDANCE_ONLY (_tools/doc-checks.js); prove it instead`);
+            if (!section.guidance.trim()) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: "Guidance only:" needs the reason it cannot run`);
+            if (promised.length) problems.push(`${where}: ${id} names ${promised.join(", ")}, so it cannot be guidance only`);
+            return;
+        }
+        if (SKILL_GUIDANCE_ONLY.indexOf(id) !== -1) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} is in SKILL_GUIDANCE_ONLY but its section has no "Guidance only:" line`);
+        const own = parsed.snippets.filter((sn) => sn.line > section.start && sn.line <= section.end);
+        const halves = { wrong: [], right: [] };
+        for (const sn of own) {
+            const half = halfOf(section, sn.line);
+            if (!half) problems.push(`${SKILL_PROOFS}:${sn.line}: a ${id} block before any "Wrong:" / "Right:" line`);
+            else halves[half].push(sn);
+        }
+        const codeOf = (list) => squash(list.map((sn) => (sn.page || "") + "\n" + sn.code).join("\n"));
+        if (!halves.wrong.length) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} has no Wrong half (the "About to write" code, failing)`);
+        if (!halves.right.length) problems.push(`${SKILL_PROOFS}:${section.start}: ${id} has no Right half (the "Write instead" code, working)`);
+        if (halves.wrong.length) {
+            const wrongCode = codeOf(halves.wrong);
+            for (const span of wrongSpans) {
+                if (wrongCode.indexOf(squash(span)) === -1) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Wrong half does not contain \`${span}\` (from "About to write")`);
             }
             for (const code of promised) {
-                const asserted = proof.split("\n").some((l) => (/^Throws:/.test(l) && l.indexOf(`[Stitch ${code}]`) !== -1) ||
-                    (/^<!-- check:/.test(l) && l.indexOf(code) !== -1));
-                if (!asserted) problems.push(`${SKILL_PROOFS}: the ${id} section does not assert ${code} (a Throws: line with \`[Stitch ${code}]\`)`);
+                if (!halves.wrong.some((sn) => sn.mode === "throws" && sn.expect && sn.expect.indexOf(`[Stitch ${code}]`) !== -1)) {
+                    problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Wrong half does not assert ${code} (a throws block with "Throws: \`[Stitch ${code}]\`")`);
+                }
             }
-        });
-        for (const id of proofs.keys()) {
-            if (!ids.has(id)) problems.push(`${SKILL_PROOFS}: "## ${id}" proves a gotcha that ${SKILL_GOTCHAS} does not have`);
+            if (!promised.length && !halves.wrong.some((sn) => sn.mode === "throws" || sn.checks.length)) {
+                problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Wrong half shows nothing (add checks for the misbehaviour, or a throws block)`);
+            }
         }
+        if (halves.right.length) {
+            const rightCode = codeOf(halves.right);
+            for (const span of rightSpans) {
+                if (rightCode.indexOf(squash(span)) === -1) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Right half does not contain \`${span}\` (from "Write instead")`);
+            }
+            if (halves.right.some((sn) => sn.mode !== "run")) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Right half must only run (no throws blocks)`);
+            if (!halves.right.some((sn) => sn.checks.length)) problems.push(`${SKILL_PROOFS}:${section.start}: ${id}: the Right half has no check showing that it works`);
+        }
+    });
+    for (const id of sections.keys()) {
+        if (!ids.has(id)) problems.push(`${SKILL_PROOFS}: "## ${id}" proves a gotcha that ${SKILL_GOTCHAS} does not have`);
+    }
+    if (guidanceRows !== SKILL_GUIDANCE_ONLY.length) {
+        problems.push(`${SKILL_PROOFS}: ${guidanceRows} rows are guidance only, SKILL_GUIDANCE_ONLY lists ${SKILL_GUIDANCE_ONLY.length}`);
     }
     return problems;
 }
@@ -836,6 +969,8 @@ module.exports = {
     checkErrorCoverage,
     checkDocHygiene,
     checkSkill,
+    checkGotchaProofs,
+    SKILL_GUIDANCE_ONLY,
     enumerateApi,
     canonicalMessages,
     documentedApi,

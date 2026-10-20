@@ -148,13 +148,14 @@ Core property dependency tracking is handled by `ReactiveSystem`, not MessageBus
 | `_tools/doc-checks.js` | the documentation checks: doc-snippets, api-coverage, error-coverage, doc-hygiene, skill |
 | `_tools/skill-errors.js` | `npm run build:skill`: generates `skills/stitch/references/errors.md` from `docs/ERRORS.md` |
 | `skills/stitch/` | the Claude skill (`SKILL.md` plus `references/`): rules, a starting page, recipes, gotchas, grammar, error table |
-| `tests/skill-proofs.md` | one executed proof per gotcha that names an error code (or pins a silent behaviour) |
+| `tests/skill-proofs.md` | both halves of every gotcha: the mistake failing as stated, the advice working |
 | `tests/doc-snippets.js` | the doc-snippet parser and browser runner; `DOC_SET` lists the documents whose code blocks run |
 | `test-doc-snippets.html` | the suite page that runs every runnable code block of `DOC_SET` except `SKILL_SET` |
-| `test-skill-snippets.html` | the suite page that runs `SKILL_SET`: the skill's code blocks and `tests/skill-proofs.md` |
+| `test-skill-snippets.html` | the suite page that runs `SKILL_SET`: the skill's code blocks |
+| `test-skill-proofs.html` | the suite page that runs `PROOFS_SET`: both halves of every gotcha (`tests/skill-proofs.md`) |
 | `test-strict-csp.html`, `tests/strict-csp.js` | the strict-CSP suite (served with the policy; see 7.4) |
 | `test-attr-safety.html`, `tests/attr-safety.js`, `tests/xss-corpus.js` | the attribute XSS corpus: every payload refused with its code, legitimate values still work |
-| `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`): suite pages, example pages, acceptance specs |
+| `tests/suites.js` | THE suite list (read by the runner and by `run-tests.html`): suite pages (an entry may set `timeoutMs`, 20-60 s, for a page that runs many frames), example pages, acceptance specs |
 | `tests/acceptance/` | acceptance specs (Playwright, drive a page like a user), their helpers, and `TASKS.md` (what each page must do) |
 | `tests/harness.js` | in-page reporting protocol every suite uses |
 | `tests/known-failing.json` | tests that fail today because of a known defect, with the defect and the planned fix |
@@ -237,7 +238,7 @@ npm run build:assembly:all
    - api-coverage: the public surface read from the code (`window.Stitch` and what hangs off it, the model helpers, the bindings and the attributes Stitch reads, the row-context names) and the `###` headings of `docs/API.md` match in both directions; code spans in the guides that name an API must name a real one;
    - error-coverage: by code, both ways. Every error built in `packages/` starts with a stable code (`[Stitch E###]`; an error without one fails); every code has one `### E###: title` entry in `docs/ERRORS.md` with a Cause, a Fix and a `**Message:**` line equal to the message's static text (`…` for run-time parts); every entry's code is thrown; two sites using one code for different messages fail. Codes are public API: grouped by area (first digit), numbered once, never reused;
    - doc-hygiene: public documents state rules, not private project history: no decision numbers, triage numbers or paths into private notes;
-   - skill: the Claude skill in `skills/stitch/` mentions only attributes, `Stitch.*` / `binder.` / `bus.` / `reactiveSystem.` names, `$` helpers and error codes that exist (names it calls absent, `SKILL_NOT_STITCH`, must be absent); `skills/stitch/references/grammar.md` names every public API name; `skills/stitch/references/errors.md` equals what `docs/ERRORS.md` generates; every error code a row of `skills/stitch/references/gotchas.md` names is asserted by that row's section in `tests/skill-proofs.md`; `SKILL.md` has a valid name and description naming its triggers, stays within 200 lines and routes to every reference file.
+   - skill: the Claude skill in `skills/stitch/` mentions only attributes, `Stitch.*` / `binder.` / `bus.` / `reactiveSystem.` names, `$` helpers and error codes that exist (names it calls absent, `SKILL_NOT_STITCH`, must be absent); `skills/stitch/references/grammar.md` names every public API name; `skills/stitch/references/errors.md` equals what `docs/ERRORS.md` generates; every row of `skills/stitch/references/gotchas.md` has a section in `tests/skill-proofs.md` with a Wrong half (containing every code span of its "About to write" cell, asserting every error code the row names, or checking the misbehaviour) and a Right half (containing every code span of its "Write instead" cell, run blocks with checks), except the rows listed in `SKILL_GUIDANCE_ONLY` (`test-skill-proofs.html` then executes both halves); the recipe index gives each recipe's real line; `SKILL.md` has a valid name and description naming its triggers, stays within 200 lines and routes to every reference file. It does not check the gotchas' "Because" text or their bind / row / later column.
 2. **Browser suites**: every page in `tests/suites.js`, on three engines (Playwright Chromium, Firefox and
    WebKit, which stand for Chrome and Edge, Firefox, and Safari), each served over its own local HTTP server.
    The engines run side by side; within an engine, pages run one at a time. Each page's `stitch.js` request is
@@ -272,8 +273,8 @@ CI (`.github/workflows/test.yml`) installs the three engines, runs `npm run buil
 
 The public documents (README, AGENTS.md, CHANGELOG.md, MIGRATION.md, docs/GUIDE.md, docs/API.md,
 docs/ERRORS.md, docs/ACCESSIBILITY.md, the skill's files and `tests/skill-proofs.md`: `DOC_SET` in
-`tests/doc-snippets.js`) are tests. `test-doc-snippets.html` (and `test-skill-snippets.html`, for the
-skill's part, `SKILL_SET`) runs every `run` and `throws` block in its own iframe against the build under test:
+`tests/doc-snippets.js`) are tests. `test-doc-snippets.html` (and `test-skill-snippets.html` / `test-skill-proofs.html` for
+`SKILL_SET` / `PROOFS_SET`) runs every `run` and `throws` block in its own iframe against the build under test:
 
 - `run`: must not throw (now or in a later update) and must not log a console error;
 - `page`: markup only, used as the page of the next `js` block;
