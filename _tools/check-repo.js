@@ -45,6 +45,10 @@
  *   api-coverage,     in the docs has a mode and is run by test-doc-snippets.html; docs/API.md
  *   error-coverage,   and the code name the same API; docs/ERRORS.md and packages/ name the
  *   doc-hygiene       same error messages; public docs carry no private references.
+ *   skill             The Claude skill (skills/stitch/) names only attributes, APIs and error
+ *                     codes that exist; its grammar covers the public surface; its error table
+ *                     equals what docs/ERRORS.md generates; every code a gotcha names is proven
+ *                     in tests/skill-proofs.md (see _tools/doc-checks.js).
  *
  * Usage: node _tools/check-repo.js [--root <dir>] [--only <check>[,<check>]]
  * --root points the checks at another tree (the gate self-tests use this).
@@ -636,7 +640,8 @@ const CHECKS = {
     "doc-snippets": (root, files) => docChecks.checkDocSnippets(root, files),
     "api-coverage": (root, files) => docChecks.checkApiCoverage(root, files),
     "error-coverage": (root, files) => docChecks.checkErrorCoverage(root, files),
-    "doc-hygiene": (root, files) => docChecks.checkDocHygiene(root, files)
+    "doc-hygiene": (root, files) => docChecks.checkDocHygiene(root, files),
+    "skill": (root, files) => docChecks.checkSkill(root, files)
 };
 
 async function runChecks(options = {}) {

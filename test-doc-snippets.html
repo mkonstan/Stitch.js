@@ -11,13 +11,14 @@
 <body>
     <h1>Executable documentation</h1>
     <p>Every <code>html</code> / <code>js</code> code block in the documents listed in
-    <code>tests/doc-snippets.js</code> (DOC_SET) runs here, each in its own frame, against the build under
+    <code>tests/doc-snippets.js</code> (DOC_SET, except the skill files of SKILL_SET, which
+    <code>test-skill-snippets.html</code> runs) runs here, each in its own frame, against the build under
     test. A <code>run</code> block must not throw; a <code>throws</code> block must throw the message its
     "Throws:" line documents; hidden <code>check</code> comments must hold.</p>
     <p id="snippet-summary"></p>
     <div id="frames"></div>
     <script>
-        StitchDocSnippets.run(StitchDocSnippets.DOC_SET, { host: document.getElementById('frames') }).catch(function (error) {
+        StitchDocSnippets.run(StitchDocSnippets.DOC_SET.filter(function (f) { return StitchDocSnippets.SKILL_SET.indexOf(f) === -1; }), { host: document.getElementById('frames') }).catch(function (error) {
             // A document that cannot be fetched or parsed fails the page loudly.
             setTimeout(function () { throw error; }, 0);
         });

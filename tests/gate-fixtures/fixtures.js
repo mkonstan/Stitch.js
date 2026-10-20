@@ -668,6 +668,96 @@ const staticFixtures = {
         expect: FAIL("cannot read the message of this error")
     },
 
+    // skill: the Claude skill names only what exists and stays in step with the library.
+    "skill-control": {
+        check: "skill",
+        create: (dir, { copyTree }) => SKILL_TREE.forEach((rel) => copyTree(rel, dir)),
+        expect: PASS
+    },
+    "skill-unknown-api": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/SKILL.md"), "\nCreate it with `Stitch.Observable.make(data)`.\n");
+        },
+        expect: FAIL("Stitch.Observable.make is not part of the API")
+    },
+    "skill-unknown-binding": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/references/recipes.md"), "\nShow it with `<p data-" + "txet=\"name\">`.\n");
+        },
+        expect: FAIL("data-" + "txet is not a Stitch attribute")
+    },
+    "skill-unknown-code": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/references/gotchas.md"), "\nThis throws E" + "999.\n");
+        },
+        expect: FAIL("E" + "999 is not an error code the library throws")
+    },
+    "skill-unknown-helper": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/references/grammar.md"), "\nStop it with `model.$unwatch(path)`.\n");
+        },
+        expect: FAIL("$unwatch is neither a model helper nor a row-context name")
+    },
+    "skill-errors-stale": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            const file = path.join(dir, "docs/ERRORS.md");
+            fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("**Fix:** Write the name of a model property", "**Fix:** Write the name of a property"));
+        },
+        expect: FAIL("skills/stitch/references/errors.md differs from what docs/ERRORS.md generates")
+    },
+    "skill-gotcha-without-proof": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/references/gotchas.md"), "\n| G999 | `data-text=\"x\"` on a missing x | declare x | it must exist | E201 bind |\n");
+        },
+        expect: FAIL("G999 names E201 but tests/skill-proofs.md has no")
+    },
+    "skill-proof-wrong-code": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            const file = path.join(dir, "tests/skill-proofs.md");
+            fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("Throws: `[Stitch E103]`", "Throws: `[Stitch E102]`"));
+        },
+        expect: FAIL("the G2 section does not assert E103")
+    },
+    "skill-grammar-gap": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            const file = path.join(dir, "skills/stitch/references/grammar.md");
+            fs.writeFileSync(file, fs.readFileSync(file, "utf8").split("\n").filter((l) => l.indexOf("`bus.flush()`") === -1).join("\n"));
+        },
+        expect: FAIL("bus.flush exists in the code but the grammar does not name it")
+    },
+    "skill-core-too-long": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.appendFileSync(path.join(dir, "skills/stitch/SKILL.md"), "\nMore.\n".repeat(120));
+        },
+        expect: FAIL("the core must stay at most 200")
+    },
+    "skill-unrouted-reference": {
+        check: "skill",
+        create: (dir, { copyTree }) => {
+            SKILL_TREE.forEach((rel) => copyTree(rel, dir));
+            fs.writeFileSync(path.join(dir, "skills/stitch/references/extra.md"), "# Extra\n");
+        },
+        expect: FAIL("does not route to references/extra.md")
+    },
+
     // doc-hygiene: public docs state rules, not private history.
     "doc-hygiene-control": {
         check: "doc-hygiene",
@@ -690,5 +780,7 @@ function docSetFiles(files) {
 
 // What api-coverage and error-coverage read: the bundle, the packages and the docs.
 const API_TREE = BUILD_TREE.concat(["docs/API.md", "docs/ERRORS.md", "docs/GUIDE.md", "README.md", "AGENTS.md"]);
+// What the skill check reads: the code (for the API and the codes), docs/ERRORS.md, the skill, the proofs.
+const SKILL_TREE = API_TREE.concat(["skills", "tests/skill-proofs.md"]);
 
 module.exports = { browser, static: staticFixtures };

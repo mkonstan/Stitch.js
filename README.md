@@ -64,11 +64,24 @@ and a row appears.
   patterns for labels, ARIA states, live regions, loading, validation and focus.
 - [RELEASE.md](RELEASE.md): how a version is released.
 - [AGENTS.md](AGENTS.md): the rules in short form, for AI agents and quick reference.
+- [Claude skill](#ai-agents): `skills/stitch/`, for Claude Code and the Agent SDK.
 - [Migration guide](MIGRATION.md): upgrading from v2.
 - [Changelog](CHANGELOG.md).
 - [Examples](#examples) below.
 
 The code blocks in these documents are run by the test suite, so they work as written.
+
+## AI agents
+
+[AGENTS.md](AGENTS.md) lists the rules in short form. For Claude (Claude Code or the Agent SDK),
+the `skills/stitch/` folder is a skill: it loads when a page uses Stitch and gives the model the
+rules, a page to start from, recipes, gotchas, the attribute grammar and every error code. Install
+it by copying the folder into your project's `.claude/skills/` folder (or `~/.claude/skills/` for
+every project):
+
+```bash
+cp -r skills/stitch your-project/.claude/skills/stitch
+```
 
 ## Examples
 

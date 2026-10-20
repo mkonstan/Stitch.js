@@ -654,12 +654,188 @@ function checkDocHygiene(root, files) {
     return problems;
 }
 
+// ---------------------------------------------------------------------------
+// skill: the Claude skill in skills/stitch/ names only what exists, and stays in step with the
+// library: its error table is generated from docs/ERRORS.md, its grammar covers the whole public
+// surface, and every error code a gotcha promises is proven by tests/skill-proofs.md.
+
+const SKILL_DIR = "skills/stitch/";
+const SKILL_FILE = `${SKILL_DIR}SKILL.md`;
+const SKILL_GOTCHAS = `${SKILL_DIR}references/gotchas.md`;
+const SKILL_GRAMMAR = `${SKILL_DIR}references/grammar.md`;
+const SKILL_PROOFS = "tests/skill-proofs.md";
+const SKILL_MAX_LINES = 200;
+const SKILL_MAX_DESCRIPTION = 1024;
+// The description must name these triggers, or the skill is not loaded when it should be.
+const SKILL_TRIGGERS = ["Stitch.js", "data-text", "data-value", "data-foreach", "data-click", "Stitch.Observable.create", "[Stitch E"];
+// Names the skill cites as NOT Stitch's (habits from other libraries, removed v2 APIs, other
+// libraries' attributes). Each must really be absent: if one becomes real, the skill is wrong.
+const SKILL_NOT_STITCH = ["data-if", "data-show", "data-html", "data-bind", "data-model", "data-for", "Stitch.debug.enable"];
+
+function skillFiles(files) {
+    return files.filter((rel) => rel.startsWith(SKILL_DIR) && rel.endsWith(".md")).sort();
+}
+
+function lineAt(text, index) {
+    return text.slice(0, index).split("\n").length;
+}
+
+/** The Stitch names a skill text mentions, by kind, with line numbers. */
+function skillMentions(text) {
+    const found = [];
+    const scan = (regex, kind, pick) => {
+        regex.lastIndex = 0;
+        let m;
+        while ((m = regex.exec(text)) !== null) found.push({ kind, name: pick(m), line: lineAt(text, m.index) });
+    };
+    scan(/(?<![\w-])data-[a-z][a-z0-9-]*(?![\w-])/g, "attribute", (m) => m[0]);
+    scan(/\bE\d{3}\b/g, "code", (m) => m[0]);
+    scan(/\bStitch((?:\.[A-Za-z_$][\w$]*)+)/g, "api", (m) => "Stitch" + m[1]);
+    scan(/\b(binder|bus|reactiveSystem)\.([A-Za-z_$][\w$]*)/g, "api", (m) => `${m[1]}.${m[2]}`);
+    scan(/(?<![\w$])\$([A-Za-z_][\w$]*)/g, "dollar", (m) => "$" + m[1]);
+    return found;
+}
+
+function checkSkill(root, files) {
+    const problems = [];
+    const skill = skillFiles(files);
+    if (files.indexOf(SKILL_FILE) === -1) return [`${SKILL_FILE} does not exist`];
+    let known;
+    try {
+        known = enumerateApi(root);
+    } catch (error) {
+        return [`skill: could not read the public surface from the code: ${error.message}`];
+    }
+    const codes = new Set(canonicalMessages(root).found.map((f) => f.code));
+
+    // 1. SKILL.md: frontmatter, triggers, size, routing to every reference file.
+    const main = read(root, SKILL_FILE).replace(/\r\n/g, "\n");
+    const front = /^---\n([\s\S]*?)\n---\n/.exec(main);
+    if (!front) {
+        problems.push(`${SKILL_FILE}: must start with YAML frontmatter (--- name / description ---)`);
+    } else {
+        const fields = {};
+        for (const line of front[1].split("\n")) {
+            const m = /^([a-z-]+):\s?(.*)$/.exec(line);
+            if (m) fields[m[1]] = m[2];
+        }
+        if (fields.name !== "stitch") problems.push(`${SKILL_FILE}: frontmatter name must be "stitch" (the folder name), got ${JSON.stringify(fields.name)}`);
+        const description = fields.description || "";
+        if (!description) problems.push(`${SKILL_FILE}: frontmatter needs a one-line description`);
+        if (description.length > SKILL_MAX_DESCRIPTION) problems.push(`${SKILL_FILE}: the description has ${description.length} characters (at most ${SKILL_MAX_DESCRIPTION})`);
+        if (/: |\s#|^[\s"'[{>|*&!%@`-]/.test(description)) problems.push(`${SKILL_FILE}: the description must be a plain YAML scalar (no ": ", no " #", no leading quote or bracket)`);
+        for (const trigger of SKILL_TRIGGERS) {
+            if (description.indexOf(trigger) === -1) problems.push(`${SKILL_FILE}: the description does not name the trigger ${JSON.stringify(trigger)}`);
+        }
+    }
+    const lineCount = main.replace(/\n$/, "").split("\n").length;
+    if (lineCount > SKILL_MAX_LINES) problems.push(`${SKILL_FILE}: ${lineCount} lines; the core must stay at most ${SKILL_MAX_LINES} (move depth to references/)`);
+    for (const rel of skill) {
+        if (!rel.startsWith(`${SKILL_DIR}references/`)) continue;
+        const local = rel.slice(SKILL_DIR.length);
+        if (main.indexOf(local) === -1) problems.push(`${SKILL_FILE}: does not route to ${local} (a reference file nothing points to is never read)`);
+    }
+
+    // 2. Every name the skill mentions exists; names it calls absent are absent.
+    const notStitch = new Set(SKILL_NOT_STITCH);
+    for (const name of notStitch) {
+        if (known.has(name)) problems.push(`skill: ${name} is listed as not part of Stitch (SKILL_NOT_STITCH) but exists in the code; fix the skill`);
+    }
+    const registered = new Set();
+    const texts = skill.map((rel) => ({ rel, text: read(root, rel).replace(/\r\n/g, "\n") }));
+    for (const { text } of texts) {
+        const re = /registerBinding\(\s*['"]([a-z0-9-]+)['"]/g;
+        let m;
+        while ((m = re.exec(text)) !== null) registered.add(`data-${m[1]}`);
+    }
+    for (const { rel, text } of texts) {
+        for (const mention of skillMentions(text)) {
+            const where = `${rel}:${mention.line}`;
+            if (mention.kind === "code") {
+                if (!codes.has(mention.name)) problems.push(`${where}: ${mention.name} is not an error code the library throws`);
+            } else if (mention.kind === "attribute") {
+                if (!known.has(mention.name) && !registered.has(mention.name) && !notStitch.has(mention.name)) {
+                    problems.push(`${where}: ${mention.name} is not a Stitch attribute (nor a custom binding the skill registers, nor in SKILL_NOT_STITCH)`);
+                }
+            } else if (mention.kind === "api") {
+                if (mention.name === "Stitch.js" || notStitch.has(mention.name)) continue;
+                if (!known.has(mention.name)) problems.push(`${where}: ${mention.name} is not part of the API`);
+            } else if (mention.kind === "dollar") {
+                if (!known.has(mention.name) && !known.has(`model.${mention.name}`)) {
+                    problems.push(`${where}: ${mention.name} is neither a model helper nor a row-context name`);
+                }
+            }
+        }
+    }
+
+    // 3. The grammar names the whole public surface.
+    if (files.indexOf(SKILL_GRAMMAR) === -1) {
+        problems.push(`${SKILL_GRAMMAR} does not exist`);
+    } else {
+        const grammar = read(root, SKILL_GRAMMAR);
+        for (const name of Array.from(known).sort()) {
+            if (grammar.indexOf("`" + name) === -1) problems.push(`${SKILL_GRAMMAR}: ${name} exists in the code but the grammar does not name it`);
+        }
+    }
+
+    // 4. The error table is generated from docs/ERRORS.md.
+    const skillErrors = require("./skill-errors.js");
+    if (files.indexOf(skillErrors.TARGET) === -1) {
+        problems.push(`${skillErrors.TARGET} does not exist (npm run build:skill)`);
+    } else if (files.indexOf(ERRORS_DOC) !== -1) {
+        let expected = null;
+        try {
+            expected = skillErrors.generate(root);
+        } catch (error) {
+            problems.push(`${skillErrors.TARGET}: cannot generate it: ${error.message}`);
+        }
+        if (expected !== null && read(root, skillErrors.TARGET).replace(/\r\n/g, "\n") !== expected) {
+            problems.push(`${skillErrors.TARGET} differs from what ${ERRORS_DOC} generates; run npm run build:skill`);
+        }
+    }
+
+    // 5. Every error code a gotcha promises is proven in tests/skill-proofs.md.
+    if (files.indexOf(SKILL_GOTCHAS) !== -1) {
+        const gotchas = read(root, SKILL_GOTCHAS).replace(/\r\n/g, "\n");
+        const proofsText = files.indexOf(SKILL_PROOFS) !== -1 ? read(root, SKILL_PROOFS).replace(/\r\n/g, "\n") : "";
+        const proofs = new Map();
+        const sections = proofsText.split(/^## (?=G\d+\s*$)/m).slice(1);
+        for (const section of sections) proofs.set(/^(G\d+)/.exec(section)[1], section);
+        const ids = new Set();
+        gotchas.split("\n").forEach((line, i) => {
+            const m = /^\|\s*(G\d+)\s*\|/.exec(line);
+            if (!m) return;
+            const id = m[1];
+            if (ids.has(id)) problems.push(`${SKILL_GOTCHAS}:${i + 1}: ${id} is used twice`);
+            ids.add(id);
+            const cells = line.replace(/\\\|/g, "").split("|");
+            const promised = (cells[cells.length - 2] || "").match(/\bE\d{3}\b/g) || [];
+            if (!promised.length) return;
+            const proof = proofs.get(id);
+            if (!proof) {
+                problems.push(`${SKILL_GOTCHAS}:${i + 1}: ${id} names ${promised.join(", ")} but ${SKILL_PROOFS} has no "## ${id}" section proving it`);
+                return;
+            }
+            for (const code of promised) {
+                const asserted = proof.split("\n").some((l) => (/^Throws:/.test(l) && l.indexOf(`[Stitch ${code}]`) !== -1) ||
+                    (/^<!-- check:/.test(l) && l.indexOf(code) !== -1));
+                if (!asserted) problems.push(`${SKILL_PROOFS}: the ${id} section does not assert ${code} (a Throws: line with \`[Stitch ${code}]\`)`);
+            }
+        });
+        for (const id of proofs.keys()) {
+            if (!ids.has(id)) problems.push(`${SKILL_PROOFS}: "## ${id}" proves a gotcha that ${SKILL_GOTCHAS} does not have`);
+        }
+    }
+    return problems;
+}
+
 module.exports = {
     tokenize,
     checkDocSnippets,
     checkApiCoverage,
     checkErrorCoverage,
     checkDocHygiene,
+    checkSkill,
     enumerateApi,
     canonicalMessages,
     documentedApi,

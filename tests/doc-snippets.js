@@ -53,8 +53,19 @@
         "docs/GUIDE.md",
         "docs/API.md",
         "docs/ERRORS.md",
-        "docs/ACCESSIBILITY.md"
+        "docs/ACCESSIBILITY.md",
+        "skills/stitch/SKILL.md",
+        "skills/stitch/references/recipes.md",
+        "skills/stitch/references/gotchas.md",
+        "skills/stitch/references/grammar.md",
+        "skills/stitch/references/errors.md",
+        "tests/skill-proofs.md"
     ];
+    // The part of DOC_SET that test-skill-snippets.html runs (the Claude skill and its proofs);
+    // test-doc-snippets.html runs the rest. Two pages keep each within the runner's page timeout.
+    var SKILL_SET = DOC_SET.filter(function (file) {
+        return file.indexOf("skills/") === 0 || file === "tests/skill-proofs.md";
+    });
     // Files that may end with a history section (old-version code, not run).
     var HISTORY_SECTIONS = ["MIGRATION.md"];
     var MODES = ["run", "page", "throws", "fragment"];
@@ -365,6 +376,7 @@
 
     return {
         DOC_SET: DOC_SET,
+        SKILL_SET: SKILL_SET,
         HISTORY_SECTIONS: HISTORY_SECTIONS,
         MODES: MODES,
         parse: parse,

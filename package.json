@@ -9,10 +9,11 @@
   "scripts": {
     "test": "node _tools/run-tests.js",
     "test:static": "node _tools/check-repo.js",
-    "build": "npm run build:assembly && npm run build:min",
+    "build": "npm run build:assembly && npm run build:min && npm run build:skill",
     "build:assembly": "node _tools/build-stitch-assembly.js",
     "build:assembly:all": "node _tools/build-stitch-assembly.js --mode=all",
     "build:min": "node minify.js",
+    "build:skill": "node _tools/skill-errors.js",
     "test:acceptance": "node _tools/run-tests.js --acceptance"
   },
   "license": "MIT",

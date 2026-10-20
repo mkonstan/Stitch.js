@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `skills/stitch/`: a Claude skill for building pages with Stitch.js v3. `SKILL.md` holds the rules
+  ranked by how often they bite, a page to start from, what is checked when, and a routing table;
+  `references/` holds recipes, gotchas (habits from other frameworks included) with the error each
+  one produces, the attribute grammar and API, and a table of every error code generated from
+  `docs/ERRORS.md`. Every code block in it is run by the test suite, every error code a gotcha
+  names is proven by `tests/skill-proofs.md`, and a static check (`skill`) keeps its names, codes
+  and error table in step with the library. Install: see README, "AI agents".
+- `npm run build:skill` (part of `npm run build`) regenerates the skill's error table.
+
 ## 3.0.0 (2026-10-20)
 
 v3 makes every mistake loud and fixes the list defects of v2. Upgrading: see
