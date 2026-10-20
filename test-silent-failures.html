@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stitch.js: silent failures made loud</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .stage { border: 1px dashed #bbb; margin: 6px 0; padding: 6px; }
+    </style>
+</head>
+<body>
+    <h1>Silent failures made loud</h1>
+    <p>
+        Six ways a page could go wrong without an error, each now either fixed or reported with a
+        code: a select whose chosen option leaves its list; a computed that changes a list; a
+        computed that writes the model; a $watch that writes its own path; an async handler that
+        rejects; an arrow-function method in a row added after create. Also: a focused row keeps
+        the focus when the list reorders.
+    </p>
+    <div id="stage"></div>
+
+    <script src="stitch.js"></script>
+    <script src="tests/harness.js"></script>
+    <script>
+        StitchTest.plan([
+            'select-choice-that-leaves-the-list-is-cleared',
+            'computed-that-changes-a-list-throws-e725',
+            'computed-that-writes-throws-e724',
+            'watch-that-writes-its-own-path-stops-with-e912',
+            'watch-old-value-is-right-when-the-callback-writes',
+            'async-handler-rejection-goes-to-on-error',
+            'async-handler-rejection-without-on-error-is-not-swallowed',
+            'arrow-methods-are-refused-at-every-entry-point',
+            'focused-row-keeps-focus-when-rows-move'
+        ]);
+
+        const tick = (ms = 20) => new Promise(resolve => setTimeout(resolve, ms));
+
+        function mount(html) {
+            const host = document.createElement('div');
+            host.className = 'stage';
+            host.innerHTML = html;
+            document.getElementById('stage').appendChild(host);
+            return host;
+        }
+
+        function codeOf(fn) {
+            try {
+                fn();
+            } catch (error) {
+                const m = /^\[Stitch (E\d{3})\]/.exec(String(error && error.message));
+                return m ? m[1] : 'not a Stitch error: ' + (error && error.message);
+            }
+            return 'no error';
+        }
+
+        // Collects what reaches Stitch.onError while fn runs (and settles); removes the handler after.
+        async function withOnError(fn) {
+            const seen = [];
+            const remove = Stitch.onError((error, context) => seen.push({ error, context }));
+            try {
+                await fn(seen);
+                await tick();
+            } finally {
+                remove();
+            }
+            return seen;
+        }
+
+        const codes = seen => seen.map(entry => (/^\[Stitch (E\d{3})\]/.exec(entry.error.message) || [, entry.error.message])[1]);
+
+        const tests = [];
+        const test = (id, fn) => tests.push([id, fn]);
+
+        test('select-choice-that-leaves-the-list-is-cleared', async (t) => {
+            // With a placeholder: the model gets the placeholder's value, and $watch sees it.
+            const a = mount('<select data-foreach="cities" data-value="city" data-default-text="City"><option data-text="$data"></option></select>');
+            const ma = Stitch.Observable.create({ city: 'Lyon', cities: ['Paris', 'Lyon'] });
+            const changes = [];
+            ma.$watch('city', (now, before) => changes.push(`${before}->${now}`));
+            new Stitch.DataBinder().bind(a, ma);
+            const sa = a.querySelector('select');
+            t.equal(sa.value, 'Lyon', 'the chosen option shows');
+            ma.cities = ['Paris'];
+            await tick();
+            t.equal(ma.city, '', 'the model is cleared to the placeholder value when its option leaves the list');
+            t.equal(sa.value, '', 'the select shows the placeholder');
+            t.deepEqual(changes, ['Lyon->'], 'the clear is an ordinary change ($watch sees it)');
+
+            // Without a placeholder: null, and nothing selected.
+            const b = mount('<select data-foreach="ids" data-value="pick" data-type="int"><option data-value="id" data-text="name"></option></select>');
+            const mb = Stitch.Observable.create({ pick: 2, ids: [{ id: 1, name: 'one' }, { id: 2, name: 'two' }] });
+            new Stitch.DataBinder().bind(b, mb);
+            const sb = b.querySelector('select');
+            t.equal(sb.value, '2', 'the numeric choice shows');
+            mb.ids = [{ id: 1, name: 'one' }];
+            await tick();
+            t.equal(mb.pick, null, 'without a placeholder the model becomes null');
+            t.equal(sb.selectedIndex, -1, 'and the select shows no option');
+
+            // A value whose options have not arrived yet is not a choice: it stays.
+            const c = mount('<select data-foreach="later" data-value="code" data-default-text="Pick"><option data-text="$data"></option></select>');
+            const mc = Stitch.Observable.create({ code: 'FR', later: [] });
+            new Stitch.DataBinder().bind(c, mc);
+            mc.later = ['DE'];
+            await tick();
+            t.equal(mc.code, 'FR', 'a value no option ever showed is left alone');
+            mc.later = ['DE', 'FR'];
+            await tick();
+            t.equal(c.querySelector('select').value, 'FR', 'and shows once its option arrives');
+
+            // A multiple select drops the values whose options left.
+            const d = mount('<select multiple data-foreach="tags" data-value="picked"><option data-text="$data"></option></select>');
+            const md = Stitch.Observable.create({ picked: ['a', 'b'], tags: ['a', 'b', 'c'] });
+            new Stitch.DataBinder().bind(d, md);
+            md.tags = ['a', 'c'];
+            await tick();
+            t.deepEqual(Stitch.Observable.toRaw(md.picked), ['a'], 'a multiple select drops the value whose option left');
+        });
+
+        test('computed-that-changes-a-list-throws-e725', async (t) => {
+            const model = Stitch.Observable.create({
+                rows: [{ id: 2 }, { id: 1 }],
+                tags: new Set(['x']),
+                prices: new Map([['a', 1]]),
+                sorted: Stitch.computed(function () { return this.rows.sort((a, b) => a.id - b.id); }),
+                pushed: Stitch.computed(function () { this.rows.push({ id: 3 }); return 1; }),
+                added: Stitch.computed(function () { this.tags.add('y'); return 1; }),
+                setInMap: Stitch.computed(function () { this.prices.set('b', 2); return 1; }),
+                copy: Stitch.computed(function () { return this.rows.slice().sort((a, b) => a.id - b.id).map(r => r.id).join(','); })
+            });
+            t.equal(codeOf(() => model.sorted), 'E725', 'sort() inside a computed');
+            t.equal(codeOf(() => model.pushed), 'E725', 'push() inside a computed');
+            t.equal(codeOf(() => model.added), 'E725', 'Set.add() inside a computed');
+            t.equal(codeOf(() => model.setInMap), 'E725', 'Map.set() inside a computed');
+            t.equal(model.rows.map(r => r.id).join(','), '2,1', 'the model is unchanged');
+            t.equal(model.tags.size + model.prices.size, 2, 'the Set and the Map are unchanged');
+            t.equal(model.copy, '1,2', 'sorting a copy is fine');
+
+            // Bound: bind() throws it; and a later re-render reports it to onError.
+            const host = mount('<ul data-foreach="sorted"><li data-text="id"></li></ul>');
+            t.equal(codeOf(() => new Stitch.DataBinder().bind(host.firstChild, model)), 'E725', 'bind() throws it');
+            const later = Stitch.Observable.create({
+                rows: [{ id: 2 }, { id: 1 }],
+                bad: false,
+                view: Stitch.computed(function () { return this.bad ? this.rows.reverse() : this.rows.slice(); })
+            });
+            const host2 = mount('<ul data-foreach="view"><li data-text="id"></li></ul>');
+            new Stitch.DataBinder().bind(host2.firstChild, later);
+            const seen = await withOnError(async () => { later.bad = true; });
+            t.deepEqual(codes(seen), ['E725'], 'a re-render reports it to onError');
+            t.equal(Array.from(host2.querySelectorAll('li'), li => li.textContent).join(','), '2,1', 'the list keeps its last good rows');
+        });
+
+        test('computed-that-writes-throws-e724', async (t) => {
+            const model = Stitch.Observable.create({
+                count: 0,
+                rows: [{ id: 1 }],
+                bumps: Stitch.computed(function () { this.count++; return this.count; }),
+                setsNew: Stitch.computed(function () { this.$set('extra', 1); return 1; }),
+                writesIndex: Stitch.computed(function () { this.rows[0] = { id: 9 }; return 1; }),
+                writesRow: Stitch.computed(function () { this.rows[0].id = 5; return 1; })
+            });
+            t.equal(codeOf(() => model.bumps), 'E724', 'an assignment inside a computed');
+            t.equal(codeOf(() => model.setsNew), 'E724', '$set inside a computed');
+            t.equal(codeOf(() => model.writesIndex), 'E724', 'an index write inside a computed');
+            t.equal(codeOf(() => model.writesRow), 'E724', 'a write to a row inside a computed');
+            t.equal(model.count, 0, 'nothing was written');
+            t.equal(model.rows[0].id, 1, 'the row is unchanged');
+            t.ok(!('extra' in model), '$set added nothing');
+            const host = mount('<p data-text="bumps"></p>');
+            t.equal(codeOf(() => new Stitch.DataBinder().bind(host.firstChild, model)), 'E724', 'bind() throws it');
+            // Writes outside a computed still work, also inside a binding's update.
+            model.count = 3;
+            t.equal(model.count, 3, 'ordinary writes are unaffected');
+        });
+
+        test('watch-that-writes-its-own-path-stops-with-e912', async (t) => {
+            const model = Stitch.Observable.create({ a: 1 });
+            model.$watch('a', value => { model.a = value + 1; });
+            const seen = await withOnError(async () => { model.a = 2; });
+            t.deepEqual(codes(seen), ['E912'], 'one E912 reaches onError (no stack overflow)');
+            t.equal(seen.length && seen[0].context.source, 'watch', 'with the watch as its source');
+            t.ok(model.a > 2 && model.a < 200, 'it stopped after a bounded number of runs');
+
+            // With no onError installed it is uncaught (a normal page error), not a stack overflow.
+            const model2 = Stitch.Observable.create({ b: 1 });
+            model2.$watch('b', value => { model2.b = value + 1; });
+            const uncaught = [];
+            const listener = (event) => {
+                if (/^\[Stitch E912\]/.test(String(event.error && event.error.message))) {
+                    uncaught.push('E912');
+                    event.preventDefault();
+                }
+            };
+            window.addEventListener('error', listener);
+            model2.b = 2;
+            await tick(50);
+            window.removeEventListener('error', listener);
+            t.deepEqual(uncaught, ['E912'], 'without onError it is re-thrown uncaught, once');
+        });
+
+        test('watch-old-value-is-right-when-the-callback-writes', async (t) => {
+            const model = Stitch.Observable.create({ level: 1 });
+            const seen = [];
+            model.$watch('level', (now, before) => {
+                seen.push(`${before}->${now}`);
+                if (now > 10) model.level = 10; // clamp: writes once
+            });
+            model.level = 20;
+            model.level = 5;
+            t.deepEqual(seen, ['1->20', '20->10', '10->5'], 'every call gets the value it replaced');
+        });
+
+        test('async-handler-rejection-goes-to-on-error', async (t) => {
+            const host = mount('<button data-click="save">save</button><input data-event="events">');
+            const model = Stitch.Observable.create({
+                events: { input: 'check' },
+                async save() { throw new Error('save failed'); },
+                check() { return Promise.reject(new Error('check failed')); }
+            });
+            new Stitch.DataBinder().bind(host, model);
+            const seen = await withOnError(async () => {
+                host.querySelector('button').click();
+                host.querySelector('input').dispatchEvent(new Event('input', { bubbles: true }));
+                await tick();
+            });
+            t.deepEqual(seen.map(e => e.error.message).sort(), ['check failed', 'save failed'], 'both rejections reach onError');
+            t.deepEqual(seen.map(e => e.context.source), ['handler', 'handler'], 'as handler errors');
+            t.ok(seen.some(e => e.context.binding === 'data-click="save"'), 'naming the binding');
+        });
+
+        test('async-handler-rejection-without-on-error-is-not-swallowed', async (t) => {
+            // A real unhandled rejection would fail this page (it is a page error), so the
+            // rejection callback Stitch attaches to the handler's promise is captured and called
+            // directly: with no onError installed it must re-throw the original error (which the
+            // browser then reports as an unhandled rejection), never swallow it.
+            const host = mount('<button data-click="save">save</button>');
+            const pending = new Promise(() => {});
+            const model = Stitch.Observable.create({ save() { return pending; } });
+            new Stitch.DataBinder().bind(host, model);
+            const originalThen = Promise.prototype.then;
+            let onRejected = null;
+            Promise.prototype.then = function (fulfilled, rejected) {
+                if (this === pending && typeof rejected === 'function') onRejected = rejected;
+                return originalThen.call(this, fulfilled, rejected);
+            };
+            try {
+                host.querySelector('button').click();
+            } finally {
+                Promise.prototype.then = originalThen;
+            }
+            t.equal(typeof onRejected, 'function', 'Stitch attaches a rejection handler to the promise a handler returns');
+            const reason = new Error('nobody handles this');
+            let rethrown = null;
+            try {
+                onRejected(reason);
+            } catch (error) {
+                rethrown = error;
+            }
+            t.ok(rethrown === reason, 'without onError the original error is re-thrown (an unhandled rejection), not swallowed');
+            const seen = await withOnError(async () => { onRejected(reason); });
+            t.ok(seen.length === 1 && seen[0].error === reason, 'with onError installed the same callback reports it there');
+        });
+
+        test('arrow-methods-are-refused-at-every-entry-point', async (t) => {
+            const arrowRow = () => ({ id: 9, go: () => 1 });
+            const deepRow = () => ({ id: 8, parts: [{ id: 1, run: () => 1 }] });
+            t.equal(codeOf(() => Stitch.Observable.create({ rows: [arrowRow()] })), 'E707', 'create: a row with an arrow method');
+            t.equal(codeOf(() => Stitch.Observable.create({ rows: [deepRow()] })), 'E707', 'create: deeper in a row');
+            const model = Stitch.Observable.create({ rows: [{ id: 1 }], holder: null, byKey: new Map(), set: new Set() });
+            t.equal(codeOf(() => model.rows.push(arrowRow())), 'E707', 'push');
+            t.equal(codeOf(() => model.rows.unshift(deepRow())), 'E707', 'unshift (deep)');
+            t.equal(codeOf(() => model.rows.splice(0, 0, arrowRow())), 'E707', 'splice');
+            t.equal(codeOf(() => model.rows.fill(arrowRow())), 'E707', 'fill');
+            t.equal(codeOf(() => { model.rows[0] = arrowRow(); }), 'E707', 'an index write');
+            t.equal(codeOf(() => { model.rows = [arrowRow()]; }), 'E707', 'assigning a new list');
+            t.equal(codeOf(() => { model.holder = arrowRow(); }), 'E707', 'assigning an object');
+            t.equal(codeOf(() => model.byKey.set('a', arrowRow())), 'E707', 'Map.set');
+            t.equal(codeOf(() => model.set.add(arrowRow())), 'E707', 'Set.add');
+            t.equal(codeOf(() => model.$set('extra', arrowRow())), 'E707', '$set');
+            t.equal(model.rows.length, 1, 'the list is unchanged');
+            t.equal(model.rows[0].id, 1, 'its row is the original one');
+            model.rows.push({ id: 2, go() { return this.id; }, total: Stitch.computed(r => r.id * 2) });
+            t.equal(model.rows[1].go() + model.rows[1].total, 6, 'methods and arrow computeds are fine');
+
+            // Bound: the bad push throws to the caller and the list keeps rendering later pushes.
+            const host = mount('<ul data-foreach="rows"><li data-text="id"></li></ul>');
+            const bound = Stitch.Observable.create({ rows: [{ id: 1 }] });
+            new Stitch.DataBinder().bind(host.firstChild, bound);
+            t.equal(codeOf(() => bound.rows.push(arrowRow())), 'E707', 'a push into a bound list throws to the caller');
+            bound.rows.push({ id: 2 });
+            await tick();
+            t.equal(host.querySelectorAll('li').length, 2, 'later pushes still render');
+        });
+
+        test('focused-row-keeps-focus-when-rows-move', async (t) => {
+            const host = mount('<ul data-foreach="rows"><li><input data-value="name"></li></ul>');
+            const model = Stitch.Observable.create({ rows: [{ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }] });
+            new Stitch.DataBinder().bind(host.firstChild, model);
+            const input = host.querySelectorAll('input')[1];
+            input.focus();
+            t.equal(document.activeElement, input, 'precondition: the second row has the focus');
+            model.rows.reverse();
+            await tick();
+            t.deepEqual(Array.from(host.querySelectorAll('input'), i => i.value), ['c', 'b', 'a'], 'the rows are reordered');
+            t.equal(document.activeElement, input, 'the focused row kept the focus');
+            model.rows.sort((x, y) => (x.name === 'b' ? -1 : y.name === 'b' ? 1 : 0));
+            await tick();
+            t.equal(Array.from(host.querySelectorAll('input'), i => i.value)[0], 'b', 'moved to the top');
+            t.equal(document.activeElement, input, 'and still has the focus');
+            input.blur();
+        });
+
+        (async function () {
+            for (const [id, fn] of tests) {
+                await StitchTest.test(id, fn);
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -132,6 +132,8 @@ function defineRowIndex(itemContext, index, reactiveSystem) {
  * @param {Object} deps
  * @param {Function} deps.pathReader - (element, attribute, path) => strict reader (binding-paths.js)
  * @param {Function} deps.getValueValidator
+ * @param {Function} deps.getTypeConverter - (element, value) => converter with equals()
+ * @param {Function} deps.setProperty - (model, path, value): writes the select's data-value
  * @param {Function} deps.createItemContext
  * @param {Function} deps.resolveRowKeys
  * @param {Function} deps.runAllThenThrow
@@ -290,9 +292,21 @@ function bindForeach(element, viewModel, path, context, deps) {
             releaseError = { error };
         }
 
-        // 4. Put rows in order after the placeholder (if any).
-        let cursor = placeholder ? placeholder.nextSibling : element.firstChild;
-        for (const row of ordered) {
+        // 4. Put rows in order after the placeholder (if any). A row that holds the focus is
+        //    never moved (moving a node blurs it): the other rows are placed around it.
+        const anchor = focusedRow(ordered);
+        if (anchor) {
+            let before = anchor.el;
+            for (let i = ordered.indexOf(anchor) - 1; i >= 0; i--) {
+                if (ordered[i].el.nextSibling !== before) {
+                    element.insertBefore(ordered[i].el, before);
+                }
+                before = ordered[i].el;
+            }
+        }
+        let cursor = anchor ? anchor.el.nextSibling : placeholder ? placeholder.nextSibling : element.firstChild;
+        for (let i = anchor ? ordered.indexOf(anchor) + 1 : 0; i < ordered.length; i++) {
+            const row = ordered[i];
             if (row.el === cursor) {
                 cursor = cursor.nextSibling;
             } else {
@@ -310,7 +324,77 @@ function bindForeach(element, viewModel, path, context, deps) {
         }
     }
 
-    function restoreSelectValue() {
+    /** The reused row that contains the focused element, if the focus is inside this list. */
+    function focusedRow(ordered) {
+        const active = doc && doc.activeElement;
+        if (!active || active === element || !element.contains(active)) {
+            return null;
+        }
+        for (const row of ordered) {
+            if (row.el.contains(active)) {
+                return row.el.parentNode === element ? row : null;
+            }
+        }
+        return null;
+    }
+
+    /** True when the select has a real option (not the placeholder) for value. */
+    function hasOption(value) {
+        const converter = deps.getTypeConverter(element, value);
+        return Array.from(element.options).some(option => option !== placeholder && converter.equals(option.value, value));
+    }
+
+    /**
+     * The chosen values (data-value on the select) that have an option now, read before the
+     * options change. A value the model holds but no option ever showed (options that arrive
+     * later) is not a choice yet and is left alone.
+     */
+    function shownChoices() {
+        if (!valuePath) {
+            return null;
+        }
+        const value = readValue(viewModel);
+        if (element.multiple) {
+            return Array.isArray(value) ? value.filter(hasOption) : [];
+        }
+        const isChoice = value !== undefined && value !== null && value !== "" &&
+            !(placeholder && String(value) === placeholder.value);
+        return isChoice && hasOption(value) ? [value] : [];
+    }
+
+    /**
+     * The model follows the select when a chosen option leaves the list: the choice is
+     * cleared (the placeholder's value, or null with nothing selected; for a multiple select,
+     * the value leaves the array). The write is an ordinary model change, so $watch and
+     * $onChange see it. Returns true when it wrote.
+     */
+    function clearChoicesThatLeft(before) {
+        if (!before || before.length === 0) {
+            return false;
+        }
+        const gone = before.filter(value => !hasOption(value));
+        if (gone.length === 0) {
+            return false;
+        }
+        if (element.multiple) {
+            const current = readValue(viewModel);
+            deps.setProperty(viewModel, valuePath, current.filter(value => gone.indexOf(value) === -1));
+            return true;
+        }
+        if (placeholder) {
+            element.value = placeholder.value;
+            deps.setProperty(viewModel, valuePath, placeholder.value);
+        } else {
+            element.selectedIndex = -1;
+            deps.setProperty(viewModel, valuePath, null);
+        }
+        return true;
+    }
+
+    function restoreSelectValue(before) {
+        if (clearChoicesThatLeft(before)) {
+            return;
+        }
         if (valuePath) {
             const currentValue = readValue(viewModel);
             if (currentValue !== undefined && currentValue !== null) {
@@ -334,9 +418,11 @@ function bindForeach(element, viewModel, path, context, deps) {
     let effect;
     try {
         effect = reactiveSystem.effect(() => {
-            reconcile(readItems());
+            const items = readItems();
+            const before = isSelect ? shownChoices() : null;
+            reconcile(items);
             if (isSelect) {
-                restoreSelectValue();
+                restoreSelectValue(before);
             }
         }, { batch: true, errorContext: { source: "binding", element, binding: `data-foreach="${path}"` } });
     } catch (error) {

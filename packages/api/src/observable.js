@@ -165,15 +165,18 @@ class Observable {
             const effect = factory.reactiveSystem.effect(() => {
                 const currentValue = getProperty(reactiveData, property);
 
-                // Call callback if value changed
+                // Call callback if value changed. previousValue moves first: a callback that writes
+                // the watched path re-runs this effect inside the call, and must see this value as
+                // the old one (and the outer call must not reset it afterwards).
                 if (currentValue !== previousValue) {
-                    callback(currentValue, previousValue, {
+                    const oldValue = previousValue;
+                    previousValue = currentValue;
+                    callback(currentValue, oldValue, {
                         key: property,
                         newValue: currentValue,
-                        oldValue: previousValue,
+                        oldValue,
                         target: reactiveData
                     });
-                    previousValue = currentValue;
                 }
             }, {
                 batch: options.batch !== undefined ? options.batch : false,  // Immediate by default

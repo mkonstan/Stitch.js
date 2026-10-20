@@ -189,15 +189,18 @@ class Observable {
             const effect = factory.reactiveSystem.effect(() => {
                 const currentValue = getProperty(reactiveData, property);
 
-                // Call callback if value changed
+                // Call callback if value changed. previousValue moves first: a callback that writes
+                // the watched path re-runs this effect inside the call, and must see this value as
+                // the old one (and the outer call must not reset it afterwards).
                 if (currentValue !== previousValue) {
-                    callback(currentValue, previousValue, {
+                    const oldValue = previousValue;
+                    previousValue = currentValue;
+                    callback(currentValue, oldValue, {
                         key: property,
                         newValue: currentValue,
-                        oldValue: previousValue,
+                        oldValue,
                         target: reactiveData
                     });
-                    previousValue = currentValue;
                 }
             }, {
                 batch: options.batch !== undefined ? options.batch : false,  // Immediate by default
@@ -349,7 +352,7 @@ module.exports = {
 "use strict";
 
 const { ReactiveSystem } = __stitchRequire(13);
-const { ComputedRef } = __stitchRequire(11);
+const { ComputedRef, COMPUTING } = __stitchRequire(11);
 const { MessageBus } = __stitchRequire(12);
 const { REACTIVE_TOTALS } = __stitchRequire(21);
 const runtimeHelpers = __stitchRequire(22);
@@ -459,6 +462,54 @@ function createReactiveFactory(options = {}) {
         );
     }
 
+    /**
+     * A computed only reads. While a computed getter runs, a write to any model (an assignment,
+     * $set, an index write) throws E724, and a method that changes a list, Map or Set throws
+     * E725, before anything changes. The error reaches whoever read the computed: bind(), the
+     * code that read it, or Stitch.onError for a binding that re-renders.
+     */
+    function refuseWriteInComputed(target, key) {
+        if (COMPUTING.depth === 0) return;
+        const where = formatPath(pathParts(target).concat([key]));
+        throw new Error(
+            `[Stitch E724] a computed wrote "${where}": a computed only reads the model and returns a value. ` +
+            "Move the write to a handler or a $watch callback, or make the written value a computed of its own."
+        );
+    }
+
+    function refuseMutationInComputed(target, method) {
+        if (COMPUTING.depth === 0) return;
+        const where = formatPath(pathParts(target)) || "the list";
+        throw new Error(
+            `[Stitch E725] a computed called ${where}.${method}(), which changes the model: a computed only reads. ` +
+            `Work on a copy and return it, e.g. ${where}.slice().sort(...) or [...${where}].reverse().`
+        );
+    }
+
+    /**
+     * Arrow functions are refused as methods wherever data enters a model (E707): at create,
+     * on assignment, and in the items of a list, which are converted only when first read.
+     * Plain data is scanned when it arrives, so a pushed row is refused at the push, not on a
+     * later read.
+     */
+    function checkNoArrowMethods(value, seen) {
+        if (!value || typeof value !== "object" || value.__isReactive || value.__isStitchComputed) return;
+        if (seen.has(value)) return;
+        seen.add(value);
+        if (value instanceof Map || value instanceof Set) {
+            value.forEach(entry => checkNoArrowMethods(entry, seen));
+            return;
+        }
+        for (const [childKey, child] of Object.entries(value)) {
+            if (typeof child === "function" && isArrowFunction(child)) throw arrowMethodError(childKey);
+            checkNoArrowMethods(child, seen);
+        }
+    }
+
+    function arrowMethodError(childKey) {
+        return new Error(`[Stitch E707] Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
+    }
+
     /** Array items are made reactive when first read; their keys are checked when they arrive. */
     function checkArrayItems(items, arrayParts, firstIndex, container) {
         items.forEach((item, i) => {
@@ -469,6 +520,7 @@ function createReactiveFactory(options = {}) {
                 return;
             }
             if (!Object.isExtensible(item)) refuseLocked(item, parts);
+            checkNoArrowMethods(item, new WeakSet);
             if (!Array.isArray(item) && !(item instanceof Map) && !(item instanceof Set)) {
                 checkReservedKeys(item, parts);
                 // A model one level down in a plain row is caught now, not when the row is read.
@@ -981,6 +1033,7 @@ function createReactiveFactory(options = {}) {
                 return internal[key];
             },
             set(newValue) {
+                refuseWriteInComputed(target, key);
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
                     return;
@@ -1111,7 +1164,7 @@ function createReactiveFactory(options = {}) {
         // Arrow function validation
         for (const [childKey, value] of Object.entries(obj)) {
             if (typeof value === "function" && isArrowFunction(value)) {
-                throw new Error(`[Stitch E707] Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
+                throw arrowMethodError(childKey);
             }
         }
         
@@ -1232,6 +1285,7 @@ function createReactiveFactory(options = {}) {
             if (typeof path !== "string" || path === "") {
                 throw new TypeError(`[Stitch E816] $set(key, value): key must be a non-empty string, got ${typeof path}.`);
             }
+            refuseWriteInComputed(target, path);
             if (path.indexOf(".") === -1) {
                 const descriptor = Object.getOwnPropertyDescriptor(target, path);
                 // An enumerable accessor is a reactive (or computed) property; a hidden one is
@@ -1358,6 +1412,7 @@ function createReactiveFactory(options = {}) {
                     // Common: clear
                     if (prop === 'clear') {
                         return function() {
+                            refuseMutationInComputed(target, "clear");
                             const oldSize = target.size;
                             if (oldSize > 0) {
                                 const removed = Array.from(target.values());
@@ -1407,6 +1462,7 @@ function createReactiveFactory(options = {}) {
                     return target.has(key);
                 },
                 set: function(key, val) {
+                    refuseMutationInComputed(target, "set");
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
                     const keyName = typeof key === "string" || typeof key === "number" ? key : "value";
@@ -1428,6 +1484,7 @@ function createReactiveFactory(options = {}) {
                     return result;
                 },
                 delete: function(key) {
+                    refuseMutationInComputed(target, "delete");
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
                     const result = target.delete(key);
@@ -1464,6 +1521,7 @@ function createReactiveFactory(options = {}) {
                     return target.has(normalizedKey);
                 },
                 add: function(val) {
+                    refuseMutationInComputed(target, "add");
                     const oldValue = val;
                     if (val && typeof val === "object" && val.__isReactive) {
                         checkIncoming(val, target, pathParts(target).concat(["value"]));
@@ -1484,6 +1542,7 @@ function createReactiveFactory(options = {}) {
                     return result;
                 },
                 delete: function(val) {
+                    refuseMutationInComputed(target, "delete");
                     const normalizedVal = normalizeSetLookup(val);
                     const oldHas = target.has(normalizedVal);
                     const result = target.delete(normalizedVal);
@@ -1538,6 +1597,7 @@ function createReactiveFactory(options = {}) {
                 reactiveSystem.track(target, key);
                 if (arrayMethods.includes(key)) {
                     return function (...args) {
+                        refuseMutationInComputed(target, key);
                         // New items: their keys are checked now, with the index they will take.
                         const arrayParts = pathParts(target);
                         if (key === "push") checkArrayItems(args, arrayParts, target.length, receiver);
@@ -1624,6 +1684,7 @@ function createReactiveFactory(options = {}) {
                 if (key === "on" || key === "off" || key === "get" || key === "set") {
                     throw migrationError(key);
                 }
+                refuseWriteInComputed(target, key);
                 const oldValue = target[key];
                 if (value && typeof value === "object" && value.__isReactive) {
                     checkIncoming(value, receiver, pathParts(target).concat([key]));
@@ -1794,6 +1855,8 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
         return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
             pathReader: bindingPaths.pathReader,
             getValueValidator,
+            getTypeConverter,
+            setProperty: runtimeHelpers.setProperty,
             createItemContext: foreachRowContext.createItemContext,
             resolveRowKeys: foreachKeys.resolveRowKeys,
             runAllThenThrow: errorHook.runAllThenThrow,
@@ -2308,13 +2371,28 @@ function createBindingRuntime(deps = {}) {
  * an ordinary uncaught error of the event listener.
  */
 function runHandler(element, type, path, run) {
+    const context = { source: "handler", element, binding: `data-${type}="${path}"` };
+    let result;
     try {
-        run();
+        result = run();
     } catch (error) {
         if (!hasErrorHandler()) {
             throw error;
         }
-        reportError(error, { source: "handler", element, binding: `data-${type}="${path}"` });
+        reportError(error, context);
+        return;
+    }
+    // An async handler (or one returning a promise): its rejection goes to Stitch.onError like
+    // a synchronous throw. With no handler installed it is re-thrown, so the browser reports
+    // an ordinary unhandled rejection. Never swallowed.
+    if (result !== null && (typeof result === "object" || typeof result === "function") &&
+        typeof result.then === "function") {
+        Promise.resolve(result).then(undefined, (error) => {
+            if (!hasErrorHandler()) {
+                throw error;
+            }
+            reportError(error, context);
+        });
     }
 }
 
@@ -2493,7 +2571,7 @@ const BINDING_HANDLERS = {
                 runHandler(element, "click", path, () => {
                     // Looked up again on every click: the model may have replaced the method.
                     const target = paths.resolveHandler(viewModel, ref, where);
-                    target.fn.call(target.owner, target.item, e);
+                    return target.fn.call(target.owner, target.item, e);
                 });
             };
             element.addEventListener("click", clickHandler);
@@ -2544,7 +2622,7 @@ const BINDING_HANDLERS = {
                         eventName,
                         listener: e => runHandler(element, "event", path, () => {
                             const target = paths.resolveHandler(viewModel, ref, entryWhere);
-                            target.fn.call(target.owner, target.item, e);
+                            return target.fn.call(target.owner, target.item, e);
                         })
                     };
                 });
@@ -3718,6 +3796,8 @@ function defineRowIndex(itemContext, index, reactiveSystem) {
  * @param {Object} deps
  * @param {Function} deps.pathReader - (element, attribute, path) => strict reader (binding-paths.js)
  * @param {Function} deps.getValueValidator
+ * @param {Function} deps.getTypeConverter - (element, value) => converter with equals()
+ * @param {Function} deps.setProperty - (model, path, value): writes the select's data-value
  * @param {Function} deps.createItemContext
  * @param {Function} deps.resolveRowKeys
  * @param {Function} deps.runAllThenThrow
@@ -3876,9 +3956,21 @@ function bindForeach(element, viewModel, path, context, deps) {
             releaseError = { error };
         }
 
-        // 4. Put rows in order after the placeholder (if any).
-        let cursor = placeholder ? placeholder.nextSibling : element.firstChild;
-        for (const row of ordered) {
+        // 4. Put rows in order after the placeholder (if any). A row that holds the focus is
+        //    never moved (moving a node blurs it): the other rows are placed around it.
+        const anchor = focusedRow(ordered);
+        if (anchor) {
+            let before = anchor.el;
+            for (let i = ordered.indexOf(anchor) - 1; i >= 0; i--) {
+                if (ordered[i].el.nextSibling !== before) {
+                    element.insertBefore(ordered[i].el, before);
+                }
+                before = ordered[i].el;
+            }
+        }
+        let cursor = anchor ? anchor.el.nextSibling : placeholder ? placeholder.nextSibling : element.firstChild;
+        for (let i = anchor ? ordered.indexOf(anchor) + 1 : 0; i < ordered.length; i++) {
+            const row = ordered[i];
             if (row.el === cursor) {
                 cursor = cursor.nextSibling;
             } else {
@@ -3896,7 +3988,77 @@ function bindForeach(element, viewModel, path, context, deps) {
         }
     }
 
-    function restoreSelectValue() {
+    /** The reused row that contains the focused element, if the focus is inside this list. */
+    function focusedRow(ordered) {
+        const active = doc && doc.activeElement;
+        if (!active || active === element || !element.contains(active)) {
+            return null;
+        }
+        for (const row of ordered) {
+            if (row.el.contains(active)) {
+                return row.el.parentNode === element ? row : null;
+            }
+        }
+        return null;
+    }
+
+    /** True when the select has a real option (not the placeholder) for value. */
+    function hasOption(value) {
+        const converter = deps.getTypeConverter(element, value);
+        return Array.from(element.options).some(option => option !== placeholder && converter.equals(option.value, value));
+    }
+
+    /**
+     * The chosen values (data-value on the select) that have an option now, read before the
+     * options change. A value the model holds but no option ever showed (options that arrive
+     * later) is not a choice yet and is left alone.
+     */
+    function shownChoices() {
+        if (!valuePath) {
+            return null;
+        }
+        const value = readValue(viewModel);
+        if (element.multiple) {
+            return Array.isArray(value) ? value.filter(hasOption) : [];
+        }
+        const isChoice = value !== undefined && value !== null && value !== "" &&
+            !(placeholder && String(value) === placeholder.value);
+        return isChoice && hasOption(value) ? [value] : [];
+    }
+
+    /**
+     * The model follows the select when a chosen option leaves the list: the choice is
+     * cleared (the placeholder's value, or null with nothing selected; for a multiple select,
+     * the value leaves the array). The write is an ordinary model change, so $watch and
+     * $onChange see it. Returns true when it wrote.
+     */
+    function clearChoicesThatLeft(before) {
+        if (!before || before.length === 0) {
+            return false;
+        }
+        const gone = before.filter(value => !hasOption(value));
+        if (gone.length === 0) {
+            return false;
+        }
+        if (element.multiple) {
+            const current = readValue(viewModel);
+            deps.setProperty(viewModel, valuePath, current.filter(value => gone.indexOf(value) === -1));
+            return true;
+        }
+        if (placeholder) {
+            element.value = placeholder.value;
+            deps.setProperty(viewModel, valuePath, placeholder.value);
+        } else {
+            element.selectedIndex = -1;
+            deps.setProperty(viewModel, valuePath, null);
+        }
+        return true;
+    }
+
+    function restoreSelectValue(before) {
+        if (clearChoicesThatLeft(before)) {
+            return;
+        }
         if (valuePath) {
             const currentValue = readValue(viewModel);
             if (currentValue !== undefined && currentValue !== null) {
@@ -3920,9 +4082,11 @@ function bindForeach(element, viewModel, path, context, deps) {
     let effect;
     try {
         effect = reactiveSystem.effect(() => {
-            reconcile(readItems());
+            const items = readItems();
+            const before = isSelect ? shownChoices() : null;
+            reconcile(items);
             if (isSelect) {
-                restoreSelectValue();
+                restoreSelectValue(before);
             }
         }, { batch: true, errorContext: { source: "binding", element, binding: `data-foreach="${path}"` } });
     } catch (error) {
@@ -4095,6 +4259,10 @@ const COMPUTED_VALUE_KEY = "value";
 // Ids are labels only: a counter (a label needs no randomness).
 let nextComputedId = 0;
 
+// How many computed getters are running right now (page-wide, every reactive system). A
+// computed only reads: while depth > 0, every write to a model is refused (E724, E725).
+const COMPUTING = { depth: 0 };
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -4158,6 +4326,7 @@ class ComputedRef {
                 }
             }
 
+            COMPUTING.depth++;
             try {
                 // this AND the first argument are the object that holds the computed, so an
                 // arrow function can read it too: total: m => m.price * m.qty.
@@ -4165,6 +4334,8 @@ class ComputedRef {
             } catch (error) {
                 this.failed = true;
                 throw error;
+            } finally {
+                COMPUTING.depth--;
             }
             this.dirty = false;
             this.failed = false;
@@ -4195,7 +4366,8 @@ class ComputedRef {
 
 module.exports = {
     ComputedRef,
-    COMPUTED_VALUE_KEY
+    COMPUTED_VALUE_KEY,
+    COMPUTING
 };
 
   };
@@ -4381,6 +4553,11 @@ const { reportError } = __stitchRequire(16);
 // Effect ids: a counter (an id is only a label; it needs no randomness).
 let nextEffectId = 0;
 
+// A synchronous effect (a $watch, a custom binding's effect) that writes what it reads re-runs
+// itself from inside its own run. Past this depth it is stopped with E912, reported to
+// Stitch.onError, long before any engine's call stack overflows.
+const MAX_EFFECT_REENTRY = 100;
+
 /**
  * Calls every change handler of target (model.on()). A handler that throws goes to
  * Stitch.onError; it does not stop the other handlers or the write that caused the change.
@@ -4554,13 +4731,22 @@ class ReactiveSystem {
             if (effect.disposed || this.disposed) {
                 return undefined;
             }
+            if (effect.running >= MAX_EFFECT_REENTRY) {
+                throw new Error(
+                    `[Stitch E912] Stopped an effect that kept re-running itself: it ran ${MAX_EFFECT_REENTRY} times ` +
+                    "inside one change, because it writes a value it reads (for example a $watch callback that " +
+                    "writes the watched path). Write only when the value must change (if (value !== wanted)), or " +
+                    "move the write to a handler."
+                );
+            }
             const unread = this._untrack(effect);
             this.effectStack.push(effect);
-
+            effect.running++;
 
             try {
                 return fn();
             } finally {
+                effect.running--;
                 this.effectStack.pop();
                 // Only computeds the re-run did not read again are released.
                 this._releaseUnread(unread);
@@ -4568,6 +4754,7 @@ class ReactiveSystem {
         };
 
         effect.deps = new Set();
+        effect.running = 0;
         effect.options = options;
         effect.id = effectId;
         effect.disposed = false;

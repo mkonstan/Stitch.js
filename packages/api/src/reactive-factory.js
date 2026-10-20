@@ -1,7 +1,7 @@
 "use strict";
 
 const { ReactiveSystem } = require("../../core/src/reactive-system");
-const { ComputedRef } = require("../../core/src/computed-ref");
+const { ComputedRef, COMPUTING } = require("../../core/src/computed-ref");
 const { MessageBus } = require("../../core/src/message-bus");
 const { REACTIVE_TOTALS } = require("../../utils/src/reactive-stats");
 const runtimeHelpers = require("../../utils/src/runtime-helpers");
@@ -111,6 +111,54 @@ function createReactiveFactory(options = {}) {
         );
     }
 
+    /**
+     * A computed only reads. While a computed getter runs, a write to any model (an assignment,
+     * $set, an index write) throws E724, and a method that changes a list, Map or Set throws
+     * E725, before anything changes. The error reaches whoever read the computed: bind(), the
+     * code that read it, or Stitch.onError for a binding that re-renders.
+     */
+    function refuseWriteInComputed(target, key) {
+        if (COMPUTING.depth === 0) return;
+        const where = formatPath(pathParts(target).concat([key]));
+        throw new Error(
+            `[Stitch E724] a computed wrote "${where}": a computed only reads the model and returns a value. ` +
+            "Move the write to a handler or a $watch callback, or make the written value a computed of its own."
+        );
+    }
+
+    function refuseMutationInComputed(target, method) {
+        if (COMPUTING.depth === 0) return;
+        const where = formatPath(pathParts(target)) || "the list";
+        throw new Error(
+            `[Stitch E725] a computed called ${where}.${method}(), which changes the model: a computed only reads. ` +
+            `Work on a copy and return it, e.g. ${where}.slice().sort(...) or [...${where}].reverse().`
+        );
+    }
+
+    /**
+     * Arrow functions are refused as methods wherever data enters a model (E707): at create,
+     * on assignment, and in the items of a list, which are converted only when first read.
+     * Plain data is scanned when it arrives, so a pushed row is refused at the push, not on a
+     * later read.
+     */
+    function checkNoArrowMethods(value, seen) {
+        if (!value || typeof value !== "object" || value.__isReactive || value.__isStitchComputed) return;
+        if (seen.has(value)) return;
+        seen.add(value);
+        if (value instanceof Map || value instanceof Set) {
+            value.forEach(entry => checkNoArrowMethods(entry, seen));
+            return;
+        }
+        for (const [childKey, child] of Object.entries(value)) {
+            if (typeof child === "function" && isArrowFunction(child)) throw arrowMethodError(childKey);
+            checkNoArrowMethods(child, seen);
+        }
+    }
+
+    function arrowMethodError(childKey) {
+        return new Error(`[Stitch E707] Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
+    }
+
     /** Array items are made reactive when first read; their keys are checked when they arrive. */
     function checkArrayItems(items, arrayParts, firstIndex, container) {
         items.forEach((item, i) => {
@@ -121,6 +169,7 @@ function createReactiveFactory(options = {}) {
                 return;
             }
             if (!Object.isExtensible(item)) refuseLocked(item, parts);
+            checkNoArrowMethods(item, new WeakSet);
             if (!Array.isArray(item) && !(item instanceof Map) && !(item instanceof Set)) {
                 checkReservedKeys(item, parts);
                 // A model one level down in a plain row is caught now, not when the row is read.
@@ -633,6 +682,7 @@ function createReactiveFactory(options = {}) {
                 return internal[key];
             },
             set(newValue) {
+                refuseWriteInComputed(target, key);
                 const oldValue = internal[key];
                 if (oldValue === newValue) {
                     return;
@@ -763,7 +813,7 @@ function createReactiveFactory(options = {}) {
         // Arrow function validation
         for (const [childKey, value] of Object.entries(obj)) {
             if (typeof value === "function" && isArrowFunction(value)) {
-                throw new Error(`[Stitch E707] Arrow function detected in property '${childKey}'\n\n` + `Arrow functions cannot access reactive properties via 'this'.\n` + `They use lexical 'this' binding which cannot be changed.\n\n` + `Convert to regular function or ES6 method shorthand:\n` + `  ❌ ${childKey}: () => { return this.someValue; }\n` + `  ✅ ${childKey}() { return this.someValue; }\n` + `  ✅ ${childKey}: function() { return this.someValue; }\n\n` + `Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`);
+                throw arrowMethodError(childKey);
             }
         }
         
@@ -884,6 +934,7 @@ function createReactiveFactory(options = {}) {
             if (typeof path !== "string" || path === "") {
                 throw new TypeError(`[Stitch E816] $set(key, value): key must be a non-empty string, got ${typeof path}.`);
             }
+            refuseWriteInComputed(target, path);
             if (path.indexOf(".") === -1) {
                 const descriptor = Object.getOwnPropertyDescriptor(target, path);
                 // An enumerable accessor is a reactive (or computed) property; a hidden one is
@@ -1010,6 +1061,7 @@ function createReactiveFactory(options = {}) {
                     // Common: clear
                     if (prop === 'clear') {
                         return function() {
+                            refuseMutationInComputed(target, "clear");
                             const oldSize = target.size;
                             if (oldSize > 0) {
                                 const removed = Array.from(target.values());
@@ -1059,6 +1111,7 @@ function createReactiveFactory(options = {}) {
                     return target.has(key);
                 },
                 set: function(key, val) {
+                    refuseMutationInComputed(target, "set");
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
                     const keyName = typeof key === "string" || typeof key === "number" ? key : "value";
@@ -1080,6 +1133,7 @@ function createReactiveFactory(options = {}) {
                     return result;
                 },
                 delete: function(key) {
+                    refuseMutationInComputed(target, "delete");
                     const oldHas = target.has(key);
                     const oldValue = target.get(key);
                     const result = target.delete(key);
@@ -1116,6 +1170,7 @@ function createReactiveFactory(options = {}) {
                     return target.has(normalizedKey);
                 },
                 add: function(val) {
+                    refuseMutationInComputed(target, "add");
                     const oldValue = val;
                     if (val && typeof val === "object" && val.__isReactive) {
                         checkIncoming(val, target, pathParts(target).concat(["value"]));
@@ -1136,6 +1191,7 @@ function createReactiveFactory(options = {}) {
                     return result;
                 },
                 delete: function(val) {
+                    refuseMutationInComputed(target, "delete");
                     const normalizedVal = normalizeSetLookup(val);
                     const oldHas = target.has(normalizedVal);
                     const result = target.delete(normalizedVal);
@@ -1190,6 +1246,7 @@ function createReactiveFactory(options = {}) {
                 reactiveSystem.track(target, key);
                 if (arrayMethods.includes(key)) {
                     return function (...args) {
+                        refuseMutationInComputed(target, key);
                         // New items: their keys are checked now, with the index they will take.
                         const arrayParts = pathParts(target);
                         if (key === "push") checkArrayItems(args, arrayParts, target.length, receiver);
@@ -1276,6 +1333,7 @@ function createReactiveFactory(options = {}) {
                 if (key === "on" || key === "off" || key === "get" || key === "set") {
                     throw migrationError(key);
                 }
+                refuseWriteInComputed(target, key);
                 const oldValue = target[key];
                 if (value && typeof value === "object" && value.__isReactive) {
                     checkIncoming(value, receiver, pathParts(target).concat([key]));

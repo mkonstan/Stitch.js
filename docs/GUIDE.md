@@ -110,7 +110,9 @@ Names starting with `_` are never reactive; keep them out of bindings.
 
 - Plain values, nested objects, arrays, `Map` and `Set`. All of them are reactive at any depth.
 - Methods, written as `name() { ... }` or `name: function () { ... }`. Arrow functions are
-  rejected as methods, because they cannot see the model through `this`.
+  rejected as methods, because they cannot see the model through `this`, wherever data enters the
+  model: at create, on assignment, and in rows added later (`push`, `splice`, an index write),
+  which throw E707 before anything is added.
 - Computed properties, made with `Stitch.computed(...)` (see [Computed properties](#computed-properties)).
   A computed's function gets the object as its argument as well as `this`, so it may be an arrow
   function that uses the argument: `total: Stitch.computed(m => m.price * m.qty)`. An arrow
@@ -454,7 +456,7 @@ Keys compare as JavaScript values: `1` and `"1"` are different keys. A list of r
 natural key needs one added before you create the model (for example from an index or a counter).
 
 A row is reused only when it keeps the same key AND is the same object. Rows that stay keep their
-DOM state (focus, typed text, scroll). If you replace an item with a new object under the same key
+DOM state (focus, typed text, scroll); a row that holds the focus keeps it when the list reorders. If you replace an item with a new object under the same key
 (for example after reloading data from a server), its row is rebuilt for the new object, so the page
 shows the new values.
 
@@ -623,7 +625,7 @@ new Stitch.DataBinder().bind('#files', model);
 ### Filtering and sorting
 
 Bind the list to a computed that returns the rows to show. Copy before sorting: `sort()` on the
-model's own array reorders the model.
+model's own array inside a computed would reorder the model, so it throws E725.
 
 ```html page
 <div id="app">
@@ -662,6 +664,27 @@ Put `data-foreach` on the `<select>` itself and `<option data-value="..." data-t
 template. `data-default-text` adds a first placeholder option (`data-default-value` sets its value,
 default `""`). With `data-value` on the select, the selection is two-way. Without it, the user's
 choice stays selected while the list changes, as long as its option is still in the list.
+
+With `data-value`, when the chosen option leaves the list (the list is filtered, or replaced by one
+without it), the choice is cleared, so the select and the model never disagree: the model gets the
+placeholder's value (`data-default-value`, default `""`), or `null` with nothing selected when there
+is no placeholder (a multiple select drops the value from its array). It is an ordinary write, so
+`$watch` and `$onChange` see it; cascading selects need no reset code. A value that no option has
+shown yet (options that arrive later) is left alone. To keep a choice across a reload, assign the new
+list in one step, not `[]` first.
+
+```html page
+<select id="city" data-foreach="cities" data-value="city" data-default-text="City">
+    <option data-text="$data"></option>
+</select>
+```
+
+```js run
+const model = Stitch.Observable.create({ city: 'Lyon', cities: ['Paris', 'Lyon'] });
+new Stitch.DataBinder().bind('#city', model);
+model.cities = ['Paris'];
+```
+<!-- check: model.city === '' && document.getElementById('city').value === '' -->
 
 ```html page
 <select id="country" data-foreach="countries" data-key="code" data-value="selected" data-default-text="Choose...">
@@ -752,6 +775,11 @@ A handler is called as `handler(item, event)` with `this` set to the object the 
 - `item` is the current row's item (the same object as in the model's list). Outside a list it is
   the model itself, so a root-level handler gets the model first and the event second.
 - `event` is the DOM event.
+
+An error the handler throws goes to `Stitch.onError` (uncaught without it). When the handler returns
+a promise (an `async` handler), a rejection goes there too; with no `onError` installed it is
+re-thrown, so the browser reports an unhandled rejection. To show the failure in the page, catch it
+in the handler.
 
 ```html page
 <div id="app">
@@ -964,6 +992,9 @@ model.qty = 4;
 - It is lazy: it runs when first read, and again only after something it read has changed and it is
   read again. A computed that nothing reads stops listening to its sources.
 - It is read-only: assigning to it throws, and so does a two-way binding to it.
+- It only reads. A write to the model inside its function (`this.count++`, `$set`) throws E724, and
+  a method that changes a model list, Map or Set (`this.items.sort(...)`, `push`, `set`, `add`)
+  throws E725, before anything changes. Sort a copy: `this.items.slice().sort(...)`.
 - If it throws while updating the page, the error goes to [`Stitch.onError`](#errors).
 - Rows can carry computeds too: put `Stitch.computed(...)` in the row object before you add it.
 
@@ -1001,6 +1032,9 @@ setTimeout(function () {
 changes, synchronously (pass `{ batch: true }` as a third argument to run it once per batch instead).
 `$watch` exists on the model `Observable.create()` returned, not on nested objects. It returns a
 function that stops the watch for good (and releases it); call it when the watch is no longer needed.
+A callback that writes the watched path runs again inside its own call; one that keeps writing (for
+example `model.a = value + 1`) is stopped after 100 nested runs with E912, reported to
+`Stitch.onError`. Write only when the value must change.
 
 ```js run
 const model = Stitch.Observable.create({ country: 'FR', city: 'Paris' });

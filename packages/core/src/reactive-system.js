@@ -9,6 +9,11 @@ const { reportError } = require("../../utils/src/error-hook");
 // Effect ids: a counter (an id is only a label; it needs no randomness).
 let nextEffectId = 0;
 
+// A synchronous effect (a $watch, a custom binding's effect) that writes what it reads re-runs
+// itself from inside its own run. Past this depth it is stopped with E912, reported to
+// Stitch.onError, long before any engine's call stack overflows.
+const MAX_EFFECT_REENTRY = 100;
+
 /**
  * Calls every change handler of target (model.on()). A handler that throws goes to
  * Stitch.onError; it does not stop the other handlers or the write that caused the change.
@@ -182,13 +187,22 @@ class ReactiveSystem {
             if (effect.disposed || this.disposed) {
                 return undefined;
             }
+            if (effect.running >= MAX_EFFECT_REENTRY) {
+                throw new Error(
+                    `[Stitch E912] Stopped an effect that kept re-running itself: it ran ${MAX_EFFECT_REENTRY} times ` +
+                    "inside one change, because it writes a value it reads (for example a $watch callback that " +
+                    "writes the watched path). Write only when the value must change (if (value !== wanted)), or " +
+                    "move the write to a handler."
+                );
+            }
             const unread = this._untrack(effect);
             this.effectStack.push(effect);
-
+            effect.running++;
 
             try {
                 return fn();
             } finally {
+                effect.running--;
                 this.effectStack.pop();
                 // Only computeds the re-run did not read again are released.
                 this._releaseUnread(unread);
@@ -196,6 +210,7 @@ class ReactiveSystem {
         };
 
         effect.deps = new Set();
+        effect.running = 0;
         effect.options = options;
         effect.id = effectId;
         effect.disposed = false;

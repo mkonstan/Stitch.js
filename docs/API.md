@@ -59,6 +59,8 @@ Makes a computed property for a model. Put the result in the data you pass to
   model.
 - Returns: a marker object that `Observable.create()` turns into a read-only property.
 - Throws: if `config` is neither form, or `deps` is not an array.
+- The function only reads: a write to a model inside it throws E724, a method that changes a model
+  list, Map or Set (`sort`, `push`, `set`, `add`, ...) throws E725, before anything changes.
 - There is no setter: in the object form only `get` and `deps` are read (any other key, such as
   `set`, is ignored), and assigning to the property throws (E713).
 
@@ -97,7 +99,9 @@ Throws when:
 - `data` is not an object, is already a model, or is an object inside a model ("already belongs to
   a model");
 - `options` has an unknown key (there is no `debug` option);
-- a method is an arrow function (write `name() {}`);
+- a method is an arrow function (write `name() {}`), at any depth. The same check (E707) runs on
+  assignment, `$set`, `Map.set` / `Set.add` and on the rows given to a list (`push`, `unshift`,
+  `splice`, `fill`, an index write, a new array), before anything is added;
 - a field uses a reserved name (`toJSON` or a `$` helper name);
 - `data` contains another model, or an array, Map or Set that already belongs to another model;
 - `data`, or an object inside it, is frozen, sealed or not extensible (E714: pass a copy, such as
@@ -224,6 +228,9 @@ Calls `callback(newValue, oldValue, info)` whenever the value at `path` changes,
 - Runs synchronously after each change; with `options = { batch: true }`, once per batch (in a
   microtask) with the latest value.
 - Returns: a function that stops the watch for good and releases it (safe to call twice).
+- A callback that writes the watched path runs again inside its own call (with the right old value);
+  one that keeps re-running itself is stopped after 100 nested runs with E912, reported to
+  `Stitch.onError`.
 - Throws: `path` names a property that does not exist or is not reactive; `callback` is not a
   function.
 
@@ -394,7 +401,10 @@ the user (on `input` and `change` events).
 | `select multiple` | array of selected values |
 
 If the model holds a value no option of a `select` has, the select shows its placeholder (or its
-first option) and the model is left alone until the user picks.
+first option) and the model is left alone until the user picks. On a `<select data-foreach>`, when
+the chosen option leaves the list, the choice is cleared instead: the model is set to the
+placeholder's value (or `null`, with nothing selected, when there is no placeholder; a multiple
+select drops the value). The write is an ordinary change.
 
 On an `<option>` inside a `<select data-foreach>`, `data-value` sets the option's value. For options
 from a list of plain values, leave it out and write `<option data-text="$data">`: an option without
@@ -493,6 +503,9 @@ Calls a method on click.
   so a replaced method is used.
 - An error in the handler goes to `Stitch.onError` if one is installed; otherwise it is an ordinary
   uncaught error of the click listener.
+- If the handler returns a promise (or any thenable), a rejection goes to `Stitch.onError` with
+  `source: "handler"`; with no `onError` installed it is re-thrown, so the browser reports an
+  unhandled rejection. The same holds for `data-event` handlers.
 
 ### `data-event="path"`
 
@@ -522,6 +535,7 @@ Renders one row per item of the array at `path`. See [Lists in the Guide](GUIDE.
 - Inside a row, paths resolve against the [row context](#row-context).
 - On a `<select>`, the rows are the options; see `data-default-text` and `data-value`.
 - Bindings on the list element itself are allowed except `data-text`.
+- A row that holds the focus keeps it when the list reorders (the other rows move around it).
 
 ## List attributes
 

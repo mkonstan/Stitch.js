@@ -82,12 +82,13 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
    property is not reactive.
 5. Never `delete` a model property: set it to `null`. Remove list items with `splice`, Map/Set
    entries with `.delete(key)`.
-6. Write methods as `name() { ... }`, never as arrow functions. In a method, `this` is the object
-   the method is on.
+6. Write methods as `name() { ... }`, never as arrow functions, also in rows you push later (an arrow
+   method throws E707 at the push). In a method, `this` is the object the method is on.
 7. A computed is `Stitch.computed(function () { return this.price * this.qty; })`, or an arrow
    function that uses its ARGUMENT: `Stitch.computed(m => m.price * m.qty)`. The argument and
    `this` are the object that holds the computed (the model, or the row for a row computed). Never
-   use `this` inside an arrow function: an arrow's `this` is not the model.
+   use `this` inside an arrow function: an arrow's `this` is not the model. A computed only reads:
+   a write inside it throws E724, `sort`/`push`/`splice` on a model list inside it throws E725.
 8. Do not name data fields `toJSON` or `$on`, `$off`, `$onChange`, `$offChange`, `$get`, `$set`,
    `$emit`, `$once`, `$use`, `$watch`. Fields named `on`, `off`, `get`, `set` are fine.
 9. One model is one root. Never put a model inside another model: assign plain data, or
@@ -143,7 +144,7 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
     whose root element contains another list with the same `data-template`. Every node needs every
     field the template binds (including `children: []` on leaves).
 24. Filter and sort with a computed that returns a new array. Copy before sorting:
-    `this.items.slice().sort(...)`; `sort()` on the model's own array reorders the model.
+    `this.items.slice().sort(...)`; `sort()` on the model's own array inside a computed throws E725.
 25. `data-foreach` takes an array, `null` or `undefined`. Anything else throws.
 26. To show an element only for some rows: `data-visible="flag"` (it stays rendered and hidden; its
     bindings must still resolve), or, to leave it out of the page, wrap it in
@@ -154,7 +155,9 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
     select for the selection (optionally `data-default-text` for a placeholder). For a list of
     objects, the option is `<option data-value="code" data-text="name">` (and `data-key` if the key is
     not `id`). For a list of plain values (strings), the option is `<option data-text="$data">`, with
-    NO `data-value` (an option without a value uses its text). `data-value="$data"` throws.
+    NO `data-value` (an option without a value uses its text). `data-value="$data"` throws. When the
+    chosen option leaves the list, the choice is cleared (the model gets the placeholder's value, or
+    `null`).
 
 ```html run
 <select id="sector" data-foreach="sectors" data-value="sector" data-default-text="All sectors">
@@ -210,10 +213,12 @@ fix. Details: [docs/GUIDE.md](docs/GUIDE.md), [docs/API.md](docs/API.md),
 34. `obj.$onChange(fn)` reports writes to `obj` and returns a remover. `model.$watch(path, fn)` calls
     `fn(newValue, oldValue)` when one path changes and returns a remover too. These belong to the
     model: `binder.dispose()` does NOT stop them, only their removers do. Prefer computeds and bindings.
+    A `$watch` callback that keeps writing its own path is stopped with E912: write only when needed.
 35. Every Stitch error starts with a stable code, `[Stitch E###]`. Look it up in
     [docs/ERRORS.md](docs/ERRORS.md); match errors by code, not by wording.
 36. Install `Stitch.onError(fn)` once per page. Errors in later updates (list re-renders, computeds,
-    handlers) go there; without it they are uncaught. Errors in `bind()` are thrown to your code.
+    handlers, the rejection of an `async` handler) go there; without it they are uncaught. Errors in
+    `bind()` are thrown to your code.
 37. There is no debug mode. `Stitch.onBindReport(fn)` lists bound and ignored `data-*` attributes;
     `Stitch.debug.stats()` gives live counts.
 38. Register custom bindings with `Stitch.DataBinder.registerBinding(name, handler)` BEFORE the first

@@ -607,6 +607,27 @@ model.count = 2;
   applies: move the option into the model. A v2 arrow computed that used `this` silently read
   the wrong object; it still does, so rewrite it to use the argument.
 
+### Changes after the first v3 release (unreleased)
+
+Five silent failures of the first v3 release now fail loudly or are fixed. A page written to the rules is not
+affected; check for these patterns:
+
+- A computed that writes the model (`this.count++`) or changes a list, Map or Set in place
+  (`return this.items.sort(...)`) now throws E724 / E725 where it is read. It used to be accepted and the
+  list could stop updating. Sort a copy: `this.items.slice().sort(...)`.
+- A `$watch` callback that keeps writing its own path is stopped with E912 (to `Stitch.onError`)
+  instead of overflowing the call stack. A callback that writes its path once also gets the right
+  old value now.
+- A rejected promise returned by a handler (an `async` handler) goes to `Stitch.onError`; the
+  promise used to be ignored.
+- An arrow-function method in a row given to a list (at create, `push`, `splice`, ...) throws E707
+  at once; it used to be thrown later, when the row was first read, and the list stopped rendering.
+- `<select data-foreach data-value>`: when the chosen option leaves the list, the model is cleared
+  (the placeholder's value, or `null`); the select used to show another option while the model kept the old
+  value. Code that reset the value itself (a `$watch` on the first select of a cascade) still works.
+
+Also fixed: a list row that holds the focus keeps it when the list reorders.
+
 ### New in v3
 
 `data-key`, `$root.` handler and path prefixes, `Stitch.onError`, `Stitch.onBindReport`,

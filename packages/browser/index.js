@@ -45,6 +45,8 @@ const runtimeBinding = bindingRuntime.createBindingRuntime({
         return foreachBindingOrchestrator.bindForeach(element, viewModel, path, context, {
             pathReader: bindingPaths.pathReader,
             getValueValidator,
+            getTypeConverter,
+            setProperty: runtimeHelpers.setProperty,
             createItemContext: foreachRowContext.createItemContext,
             resolveRowKeys: foreachKeys.resolveRowKeys,
             runAllThenThrow: errorHook.runAllThenThrow,

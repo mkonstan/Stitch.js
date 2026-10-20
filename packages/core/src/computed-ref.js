@@ -8,6 +8,10 @@ const COMPUTED_VALUE_KEY = "value";
 // Ids are labels only: a counter (a label needs no randomness).
 let nextComputedId = 0;
 
+// How many computed getters are running right now (page-wide, every reactive system). A
+// computed only reads: while depth > 0, every write to a model is refused (E724, E725).
+const COMPUTING = { depth: 0 };
+
 class ComputedRef {
     constructor(getter, reactiveSystem, context, explicitDeps = null) {
         this.getter = getter;
@@ -71,6 +75,7 @@ class ComputedRef {
                 }
             }
 
+            COMPUTING.depth++;
             try {
                 // this AND the first argument are the object that holds the computed, so an
                 // arrow function can read it too: total: m => m.price * m.qty.
@@ -78,6 +83,8 @@ class ComputedRef {
             } catch (error) {
                 this.failed = true;
                 throw error;
+            } finally {
+                COMPUTING.depth--;
             }
             this.dirty = false;
             this.failed = false;
@@ -108,5 +115,6 @@ class ComputedRef {
 
 module.exports = {
     ComputedRef,
-    COMPUTED_VALUE_KEY
+    COMPUTED_VALUE_KEY,
+    COMPUTING
 };

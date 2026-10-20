@@ -852,7 +852,7 @@ Throws: `[Stitch E621]`
 
 ## E7xx: Models and computed properties
 
-[E701](#e701-create-without-an-object) · [E702](#e702-createarray-without-an-array) · [E703](#e703-create-of-a-model) · [E704](#e704-create-or-reactive-of-an-object-inside-a-model) · [E705](#e705-options-are-not-an-object) · [E706](#e706-unknown-option) · [E707](#e707-arrow-function-as-a-method) · [E708](#e708-arrow-function-assigned-to-a-property) · [E709](#e709-reserved-field-name) · [E710](#e710-a-model-inside-another-model) · [E711](#e711-one-array-map-or-set-in-two-models) · [E712](#e712-delete-on-a-list-map-or-set) · [E713](#e713-assignment-to-a-computed) · [E714](#e714-frozen-sealed-or-non-extensible-data) · [E721](#e721-computed-of-the-wrong-kind) · [E722](#e722-deps-is-not-an-array) · [E723](#e723-computed-deps-form-a-cycle)
+[E701](#e701-create-without-an-object) · [E702](#e702-createarray-without-an-array) · [E703](#e703-create-of-a-model) · [E704](#e704-create-or-reactive-of-an-object-inside-a-model) · [E705](#e705-options-are-not-an-object) · [E706](#e706-unknown-option) · [E707](#e707-arrow-function-as-a-method) · [E708](#e708-arrow-function-assigned-to-a-property) · [E709](#e709-reserved-field-name) · [E710](#e710-a-model-inside-another-model) · [E711](#e711-one-array-map-or-set-in-two-models) · [E712](#e712-delete-on-a-list-map-or-set) · [E713](#e713-assignment-to-a-computed) · [E714](#e714-frozen-sealed-or-non-extensible-data) · [E721](#e721-computed-of-the-wrong-kind) · [E722](#e722-deps-is-not-an-array) · [E723](#e723-computed-deps-form-a-cycle) · [E724](#e724-a-computed-wrote-to-the-model) · [E725](#e725-a-computed-changed-a-list-map-or-set)
 
 ### E701: create() without an object
 
@@ -911,7 +911,7 @@ Throws: `[Stitch E706]`
 
 **Message:** `Arrow function detected in property '…' Arrow functions cannot access reactive properties via 'this'. They use lexical 'this' binding which cannot be changed. Convert to regular function or ES6 method shorthand: ❌ …: () => { return this.someValue; } ✅ …() { return this.someValue; } ✅ …: function() { return this.someValue; } Learn more: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions`
 
-**Cause:** A method of the data is an arrow function. Arrow functions cannot see the model through `this`.
+**Cause:** A method of the data is an arrow function. Arrow functions cannot see the model through `this`. Checked wherever data enters a model: `Observable.create()`, assignment, `$set`, and the rows given to a list (at create, `push`, `unshift`, `splice`, `fill`, an index write, a new array), at any depth; nothing is added when it throws.
 
 **Fix:** Write `name() { ... }` or `name: function () { ... }`.
 
@@ -1013,6 +1013,40 @@ Throws: `[Stitch E714]`
 **Cause:** The `deps` lists lead back to the computed itself.
 
 **Fix:** Remove the computed from its own dependency chain.
+
+### E724: A computed wrote to the model
+
+**Message:** `a computed wrote "…": a computed only reads the model and returns a value. Move the write to a handler or a $watch callback, or make the written value a computed of its own.`
+
+**Cause:** While a computed's function ran, it assigned a model property (`this.count++`), called `$set`, or wrote a list index. A computed runs whenever it is read again, so a write there changes the model at unpredictable times. The write does not happen; the error goes to whoever read the computed (`bind()`, your code, or `Stitch.onError` for a binding that re-renders).
+
+**Fix:** Keep computeds read-only. Do the write in a handler or a `$watch` callback, or turn the written value into a computed of its own.
+
+```js throws
+const model = Stitch.Observable.create({
+    reads: 0,
+    total: Stitch.computed(function () { this.reads++; return 1; })
+});
+model.total;
+```
+Throws: `[Stitch E724]`
+
+### E725: A computed changed a list, Map or Set
+
+**Message:** `a computed called ….…(), which changes the model: a computed only reads. Work on a copy and return it, e.g. ….slice().sort(...) or [...…].reverse().`
+
+**Cause:** While a computed's function ran, it called a method that changes a model list, Map or Set in place: `sort`, `reverse`, `push`, `splice`, `fill`, ... on a list, `set`, `add`, `delete`, `clear` on a Map or Set. The usual case is `return this.items.sort(...)`, which would reorder the model itself. Nothing changes; the error goes to whoever read the computed.
+
+**Fix:** Work on a copy and return it: `this.items.slice().sort(...)`, `[...this.items].reverse()`. `filter()` and `map()` already return new arrays.
+
+```js throws
+const model = Stitch.Observable.create({
+    items: [{ id: 2 }, { id: 1 }],
+    sorted: Stitch.computed(function () { return this.items.sort((a, b) => a.id - b.id); })
+});
+model.sorted;
+```
+Throws: `[Stitch E725]`
 
 ## E8xx: Model helpers, events and the message bus
 
@@ -1212,7 +1246,7 @@ Throws: `[Stitch E802]`
 
 The E99x errors should not occur in normal use; if you see one, it is probably a bug in Stitch or code that uses its internals.
 
-[E901](#e901-onerror-or-onbindreport-without-a-function) · [E902](#e902-second-onerror-or-onbindreport-handler) · [E911](#e911-updates-triggering-each-other-forever) · [E991](#e991-effect-on-a-disposed-reactive-system) · [E992](#e992-scheduler-got-something-that-is-not-an-effect) · [E993](#e993-foreach-binding-missing)
+[E901](#e901-onerror-or-onbindreport-without-a-function) · [E902](#e902-second-onerror-or-onbindreport-handler) · [E911](#e911-updates-triggering-each-other-forever) · [E912](#e912-an-effect-re-running-itself) · [E991](#e991-effect-on-a-disposed-reactive-system) · [E992](#e992-scheduler-got-something-that-is-not-an-effect) · [E993](#e993-foreach-binding-missing)
 
 ### E901: onError() or onBindReport() without a function
 
@@ -1237,6 +1271,21 @@ The E99x errors should not occur in normal use; if you see one, it is probably a
 **Cause:** Effects kept re-running each other for 100 rounds: usually a binding, computed or watch that writes a value it (or something it triggers) reads. Reported to `Stitch.onError`.
 
 **Fix:** Move the write out of the effect, or guard it so the value stops changing.
+
+### E912: An effect re-running itself
+
+**Message:** `Stopped an effect that kept re-running itself: it ran … times inside one change, because it writes a value it reads (for example a $watch callback that writes the watched path). Write only when the value must change (if (value !== wanted)), or move the write to a handler.`
+
+**Cause:** A synchronous effect wrote a value it reads, so it re-ran itself from inside its own run, 100 levels deep: usually a `$watch` callback that writes the watched path every time (`model.$watch('a', v => { model.a = v + 1; })`), or a custom binding's effect that does the same. Stitch stops it before the call stack overflows and reports this error to `Stitch.onError` (uncaught without one); the writes made so far stay.
+
+**Fix:** Write only when the value must change (`if (value !== wanted) model.a = wanted;`), or move the write to a handler.
+
+```js throws
+const model = Stitch.Observable.create({ a: 1 });
+model.$watch('a', function (value) { model.a = value + 1; });
+model.a = 2;
+```
+Throws: `[Stitch E912]`
 
 ### E991: Effect on a disposed reactive system
 

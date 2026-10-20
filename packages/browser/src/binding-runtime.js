@@ -16,13 +16,28 @@ function createBindingRuntime(deps = {}) {
  * an ordinary uncaught error of the event listener.
  */
 function runHandler(element, type, path, run) {
+    const context = { source: "handler", element, binding: `data-${type}="${path}"` };
+    let result;
     try {
-        run();
+        result = run();
     } catch (error) {
         if (!hasErrorHandler()) {
             throw error;
         }
-        reportError(error, { source: "handler", element, binding: `data-${type}="${path}"` });
+        reportError(error, context);
+        return;
+    }
+    // An async handler (or one returning a promise): its rejection goes to Stitch.onError like
+    // a synchronous throw. With no handler installed it is re-thrown, so the browser reports
+    // an ordinary unhandled rejection. Never swallowed.
+    if (result !== null && (typeof result === "object" || typeof result === "function") &&
+        typeof result.then === "function") {
+        Promise.resolve(result).then(undefined, (error) => {
+            if (!hasErrorHandler()) {
+                throw error;
+            }
+            reportError(error, context);
+        });
     }
 }
 
@@ -201,7 +216,7 @@ const BINDING_HANDLERS = {
                 runHandler(element, "click", path, () => {
                     // Looked up again on every click: the model may have replaced the method.
                     const target = paths.resolveHandler(viewModel, ref, where);
-                    target.fn.call(target.owner, target.item, e);
+                    return target.fn.call(target.owner, target.item, e);
                 });
             };
             element.addEventListener("click", clickHandler);
@@ -252,7 +267,7 @@ const BINDING_HANDLERS = {
                         eventName,
                         listener: e => runHandler(element, "event", path, () => {
                             const target = paths.resolveHandler(viewModel, ref, entryWhere);
-                            target.fn.call(target.owner, target.item, e);
+                            return target.fn.call(target.owner, target.item, e);
                         })
                     };
                 });
