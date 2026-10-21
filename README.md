@@ -83,6 +83,11 @@ every project):
 cp -r skills/stitch your-project/.claude/skills/stitch
 ```
 
+How well it works: in a test of 60 fresh agents (Claude Sonnet and Haiku) on five unseen page
+tasks, agents given only the skill built 19 of 20 pages that passed every behavioural test, the
+same as agents given the full documentation (19 of 20), against 3 of 20 with neither. Use it where
+the documentation isn't at hand; it is not measured to do better than the documentation.
+
 ## Examples
 
 Open any `example-*.html` page in a browser (served over HTTP, for example with
