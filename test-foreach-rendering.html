@@ -19,7 +19,8 @@
             'computed-filtered-list',
             'replace-list-with-new-ids',
             'hide-and-show-list',
-            'other-bindings-on-the-list-element'
+            'other-bindings-on-the-list-element',
+            'radio-group-from-a-list-starts-checked'
         ]);
 
         const tick = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -142,6 +143,34 @@
                 await tick();
                 t.equal(ol.style.display, '', 'and follows it');
                 t.deepEqual(Array.from(ol.querySelectorAll('li')).map(li => li.textContent), ['x'], 'the nested list renders its rows');
+            });
+
+            await StitchTest.test('radio-group-from-a-list-starts-checked', async (t) => {
+                // Each radio's value comes from its row through data-attr; data-value must see that value
+                // on the first sync, or the chosen radio starts unchecked (before the fix, value ran before attr).
+                const host = mount(
+                    '<div data-foreach="reports"><label><input type="radio" name="report" data-attr="radioAttrs" ' +
+                    'data-value="$root.report" data-type="int"><span data-text="name"></span></label></div>');
+                const model = Stitch.Observable.create({ report: 2, reports: [] });
+                new Stitch.DataBinder().bind(host, model);
+                model.reports = [
+                    { id: 1, name: 'Report', radioAttrs: { value: '1' } },
+                    { id: 2, name: 'Table', radioAttrs: { value: '2' } }
+                ];
+                await tick();
+                const checked = () => Array.from(host.querySelectorAll('input')).map(input => input.value + ':' + input.checked);
+                t.deepEqual(checked(), ['1:false', '2:true'], 'rows rendered after bind: the model choice is checked');
+                const bound = mount(
+                    '<div data-foreach="reports"><label><input type="radio" name="report2" data-attr="radioAttrs" ' +
+                    'data-value="$root.report" data-type="int"></label></div>');
+                const atBind = Stitch.Observable.create({
+                    report: 1,
+                    reports: [{ id: 1, radioAttrs: { value: '1' } }, { id: 2, radioAttrs: { value: '2' } }]
+                });
+                new Stitch.DataBinder().bind(bound, atBind);
+                t.deepEqual(Array.from(bound.querySelectorAll('input')).map(input => input.checked), [true, false], 'rows present at bind(): the choice is checked');
+                bound.querySelectorAll('input')[1].click();
+                t.equal(atBind.report, 2, 'clicking a radio writes its value as a number');
             });
 
         })();

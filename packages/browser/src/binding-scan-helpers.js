@@ -31,7 +31,8 @@ function bindingSelector(names) {
 /**
  * The bindings on one element, by asking for each registered name (the element's other
  * attributes are not looked at). foreach comes first: on a <select>, the options exist
- * before data-value is applied.
+ * before data-value is applied. attr comes before value: an attribute it sets (a radio's
+ * value, in a row of a list) is in place when data-value first syncs the control.
  * @returns {Array<{type: string, path: string, attributeName: string}>}
  */
 function readElementBindings(element, names) {
@@ -44,6 +45,9 @@ function readElementBindings(element, names) {
             if (name === "foreach") bindings.unshift(binding); else bindings.push(binding);
         }
     }
+    const attrAt = bindings.findIndex(binding => binding.type === "attr");
+    const valueAt = bindings.findIndex(binding => binding.type === "value");
+    if (valueAt !== -1 && attrAt > valueAt) bindings.splice(valueAt, 0, bindings.splice(attrAt, 1)[0]);
     return bindings;
 }
 

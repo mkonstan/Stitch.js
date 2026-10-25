@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.2 (unreleased)
+
+### Fixed
+
+- A radio group built by `data-foreach`, each radio's value set by `data-attr`, now starts with the
+  model's choice checked. Before, the bindings on one element ran `data-value` before `data-attr`,
+  so the first sync compared the model with the browser's default value `"on"` and every radio
+  started unchecked (later changes synced). `attr` now applies before `value` on the same element,
+  as `foreach` already applies first on a `<select>`. Test: `radio-group-from-a-list-starts-checked`.
+
 ## 3.0.1 (2026-10-20)
 
 ### Added
