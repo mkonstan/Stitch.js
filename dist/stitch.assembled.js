@@ -1,4 +1,4 @@
-/*! Stitch.js v3.0.1 | MIT License | https://github.com/mkonstan/Stitch.js */
+/*! Stitch.js v3.0.2 | MIT License | https://github.com/mkonstan/Stitch.js */
 
 /*! STITCH_ASSEMBLY_METADATA {"source":"stitch.entry.js","mode":"reachable","availableModuleCount":26,"moduleCount":26,"modules":["packages/api/index.js","packages/api/src/observable.js","packages/api/src/reactive-factory.js","packages/browser/index.js","packages/browser/src/binding-paths.js","packages/browser/src/binding-runtime.js","packages/browser/src/binding-scan-helpers.js","packages/browser/src/data-binder.js","packages/browser/src/foreach-binding-orchestrator.js","packages/core/index.js","packages/core/src/batch-scheduler.js","packages/core/src/computed-ref.js","packages/core/src/message-bus.js","packages/core/src/reactive-system.js","packages/utils/index.js","packages/utils/src/attr-value-handlers.js","packages/utils/src/error-hook.js","packages/utils/src/foreach-keys.js","packages/utils/src/foreach-row-context.js","packages/utils/src/hook-slot.js","packages/utils/src/reactive-object-helpers.js","packages/utils/src/reactive-stats.js","packages/utils/src/runtime-helpers.js","packages/utils/src/type-converters.js","packages/utils/src/value-binding-helpers.js","packages/utils/src/version.js"],"moduleMap":{"0":"packages/api/index.js","1":"packages/api/src/observable.js","2":"packages/api/src/reactive-factory.js","3":"packages/browser/index.js","4":"packages/browser/src/binding-paths.js","5":"packages/browser/src/binding-runtime.js","6":"packages/browser/src/binding-scan-helpers.js","7":"packages/browser/src/data-binder.js","8":"packages/browser/src/foreach-binding-orchestrator.js","9":"packages/core/index.js","10":"packages/core/src/batch-scheduler.js","11":"packages/core/src/computed-ref.js","12":"packages/core/src/message-bus.js","13":"packages/core/src/reactive-system.js","14":"packages/utils/index.js","15":"packages/utils/src/attr-value-handlers.js","16":"packages/utils/src/error-hook.js","17":"packages/utils/src/foreach-keys.js","18":"packages/utils/src/foreach-row-context.js","19":"packages/utils/src/hook-slot.js","20":"packages/utils/src/reactive-object-helpers.js","21":"packages/utils/src/reactive-stats.js","22":"packages/utils/src/runtime-helpers.js","23":"packages/utils/src/type-converters.js","24":"packages/utils/src/value-binding-helpers.js","25":"packages/utils/src/version.js"}} */
 
@@ -2794,7 +2794,8 @@ function bindingSelector(names) {
 /**
  * The bindings on one element, by asking for each registered name (the element's other
  * attributes are not looked at). foreach comes first: on a <select>, the options exist
- * before data-value is applied.
+ * before data-value is applied. attr comes before value: an attribute it sets (a radio's
+ * value, in a row of a list) is in place when data-value first syncs the control.
  * @returns {Array<{type: string, path: string, attributeName: string}>}
  */
 function readElementBindings(element, names) {
@@ -2807,6 +2808,9 @@ function readElementBindings(element, names) {
             if (name === "foreach") bindings.unshift(binding); else bindings.push(binding);
         }
     }
+    const attrAt = bindings.findIndex(binding => binding.type === "attr");
+    const valueAt = bindings.findIndex(binding => binding.type === "value");
+    if (valueAt !== -1 && attrAt > valueAt) bindings.splice(valueAt, 0, bindings.splice(attrAt, 1)[0]);
     return bindings;
 }
 
@@ -6247,7 +6251,7 @@ module.exports = {
   __stitchModuleFactories[25] = function(module, exports, __stitchRequire){
 "use strict";
 // Stamped by the build from package.json.
-module.exports = { VERSION: "3.0.1" };
+module.exports = { VERSION: "3.0.2" };
 
   };
   var __stitchModuleCache = Object.create(null);
